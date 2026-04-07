@@ -133,8 +133,30 @@ jobs:
       - run: pnpm exec vite build
 
   # ---------- Integration tests (言語非依存: Postman / Newman) ----------
+  # backend/migrations と Postman コレクションが揃っているかを検出する。
+  # 揃っていない間は integration ジョブを自動でスキップし、揃ったら自然に有効化される。
+  integration-detect:
+    name: integration / detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if compgen -G "backend/migrations/*.sql" > /dev/null \
+            && compgen -G "tests/integration/*.postman_collection.json" > /dev/null; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "integration prerequisites not present yet; skipping newman job"
+          fi
+
   integration-test:
     name: integration / newman
+    needs: integration-detect
+    if: needs.integration-detect.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
