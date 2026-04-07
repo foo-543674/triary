@@ -1,15 +1,15 @@
 //! triary-backend library crate.
 //!
-//! バイナリ (`src/main.rs`) はこの crate の薄い entry point であり、
-//! 実際の router 組み立て・サーバ起動・ドメインロジックは全てここに集約する。
-//! これにより `tests/*.rs` の結合テストや将来の別バイナリ (CLI 等) から
-//! 同じ実装を import できる。
+//! The binary (`src/main.rs`) is a thin entry point into this crate; router
+//! assembly, server bootstrap, and all domain logic live here so that
+//! integration tests under `tests/*.rs` and any future binaries (CLI, etc.)
+//! can import the same implementation.
 //!
-//! レイヤー構成:
-//! - [`domain`][]: エンティティ・値オブジェクト・ドメインサービス
-//! - [`application`][]: ユースケース / アプリケーションサービス
-//! - [`infrastructure`][]: DB アクセス・外部サービス実装
-//! - [`interfaces`][]: HTTP ハンドラ・DTO・ルーティング
+//! Layer layout:
+//! - [`domain`][]: entities, value objects, domain services
+//! - [`application`][]: use cases / application services
+//! - [`infrastructure`][]: persistence and external service implementations
+//! - [`interfaces`][]: HTTP handlers, DTOs, and routing
 
 pub mod application;
 pub mod config;
@@ -28,19 +28,21 @@ use tower_http::trace::TraceLayer;
 use crate::config::CorsConfig;
 use crate::interfaces::http::routes;
 
-/// HTTP router を組み立てる。
+/// Builds the HTTP router.
 ///
-/// この関数はテストから呼ばれることを前提にしているため pub 公開し、
-/// `tower::ServiceExt::oneshot` で直接叩けるようにしておく。
+/// Made `pub` so tests can drive it directly via `tower::ServiceExt::oneshot`
+/// without spinning up an actual server.
 ///
-/// CORS は環境変数経由 ([`CorsConfig::from_env`]) で設定する。
-/// 開発・テスト用にはデフォルトで明示的なオリジン無し (= 同一オリジンのみ許可) とし、
-/// 本番では `CORS_ALLOWED_ORIGINS` を必ず設定する運用にする。
+/// CORS is configured from environment variables via [`CorsConfig::from_env`].
+/// Development and tests default to no explicit allowed origin (i.e. only
+/// same-origin requests pass), and production must always set
+/// `CORS_ALLOWED_ORIGINS` explicitly.
 pub fn app() -> Router {
     app_with_cors(CorsConfig::from_env())
 }
 
-/// CORS 設定を明示的に渡す版。テストから設定を上書きするときに使う。
+/// Same as [`app`] but takes an explicit [`CorsConfig`] for tests that need to
+/// override the env-driven default.
 pub fn app_with_cors(cors: CorsConfig) -> Router {
     Router::new()
         .merge(routes::health::router())
@@ -73,7 +75,8 @@ fn build_cors_layer(cors: CorsConfig) -> CorsLayer {
     }
 }
 
-/// サーバを起動する。`main.rs` から呼ばれる唯一の entry point。
+/// Starts the HTTP server. Called from `main.rs` and is the only public
+/// entry point that owns the runtime.
 pub async fn run() -> anyhow::Result<()> {
     init_tracing();
 

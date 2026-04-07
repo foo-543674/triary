@@ -1,12 +1,14 @@
 import { HttpResponse, http } from 'msw';
 
 /**
- * Mock Service Worker のリクエストハンドラ。
+ * Mock Service Worker request handlers.
  *
- * - vitest のコンポーネントテストでは `src/mocks/server.ts` から使う。
- * - Storybook からは `src/mocks/browser.ts` 経由で使う。
- * - 実サーバに投げたいケースでは個別テスト内で `server.use(...)` で上書きする。
+ * - Used by `src/mocks/server.ts` for vitest component tests.
+ * - Used by `src/mocks/browser.ts` for Storybook (and PWA mock mode).
+ * - When a specific test needs to talk to a real backend, override on the fly
+ *   with `server.use(...)` inside that test.
  *
- * 現状は `/health` の正常応答だけを返す最小構成。機能追加のたびに増やしていく。
+ * The current set is intentionally minimal: only `/health` is mocked. Add
+ * more handlers as new features land.
  */
 export const handlers = [http.get('*/health', () => HttpResponse.json({ status: 'ok' }))];

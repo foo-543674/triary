@@ -1,11 +1,11 @@
-# triary 開発タスク集約 Makefile。
-# ローカルインフラ・マイグレーション・ビルド・テスト等の主要操作を
-# コマンド一発で実行できるようにする。
+# NOTE: One-stop Makefile for triary developer tasks.
+#       Wraps the most common operations (local infra, migrations, builds,
+#       tests, ...) behind single commands.
 
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-# .env があれば読み込み（DATABASE_URL 等）
+# NOTE: Load `.env` if present so vars like DATABASE_URL flow into recipes.
 ifneq (,$(wildcard .env))
 include .env
 export
@@ -14,50 +14,50 @@ endif
 COMPOSE := docker compose
 
 .PHONY: help
-help: ## 利用可能なコマンドを一覧表示
+help: ## List available commands
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# ---------- ローカルインフラ ----------
+# ---------- Local infra ----------
 
 .PHONY: infra-up
-infra-up: ## ローカルインフラ(MySQL dev/test)を起動しヘルスチェックが通るまで待つ
+infra-up: ## Start local infra (MySQL dev/test) and wait until healthy
 	@docker network create triary-network 2>/dev/null || true
 	$(COMPOSE) up -d --wait
 
 .PHONY: infra-down
-infra-down: ## ローカルインフラを停止
+infra-down: ## Stop local infra
 	$(COMPOSE) down
 
 .PHONY: infra-reset
-infra-reset: ## ローカルインフラを停止しデータボリュームも削除して再起動
+infra-reset: ## Stop local infra, drop data volumes, and start fresh
 	$(COMPOSE) down -v
 	@docker network create triary-network 2>/dev/null || true
 	$(COMPOSE) up -d --wait
 
 .PHONY: infra-logs
-infra-logs: ## ローカルインフラのログを追尾表示
+infra-logs: ## Tail local infra logs
 	$(COMPOSE) logs -f
 
-# ---------- DB マイグレーション ----------
+# ---------- Database migrations ----------
 
 .PHONY: db-migrate
-db-migrate: ## 開発用 DB にマイグレーションを適用 (backend/migrations/)
+db-migrate: ## Apply migrations to the development DB (backend/migrations/)
 	cd backend && sqlx migrate run
 
 .PHONY: db-migrate-test
-db-migrate-test: ## テスト用 DB にマイグレーションを適用
+db-migrate-test: ## Apply migrations to the test DB
 	cd backend && DATABASE_URL=$(TEST_DATABASE_URL) sqlx migrate run
 
 .PHONY: db-seed
-db-seed: ## 開発用 DB にシードデータを投入
+db-seed: ## Seed the development DB
 	cd backend && bash scripts/seed.sh
 
 .PHONY: db-prepare
-db-prepare: ## sqlx の query! マクロ用オフラインメタデータを再生成 (backend/.sqlx/)
+db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx/)
 	cd backend && cargo sqlx prepare -- --tests
 
 # ---------- Frontend ----------
 
 .PHONY: api-generate
-api-generate: ## OpenAPI スキーマから TypeScript 型を再生成 (frontend/src/api/schema.gen.ts)
+api-generate: ## Regenerate TypeScript types from the OpenAPI schema (frontend/src/api/schema.gen.ts)
 	cd frontend && pnpm run api:generate

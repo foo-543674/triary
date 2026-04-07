@@ -1,10 +1,12 @@
 //! Infrastructure layer.
 //!
-//! 永続化・外部サービス呼び出し・システム時計など、外部世界に触れる実装を置く。
+//! Holds everything that touches the outside world: persistence, external
+//! service calls, system clock, file IO, and so on.
 //!
-//! # 原則
-//! - ここで `sqlx` / HTTP クライアント / ファイル IO などを扱う。
-//! - `domain` で定義されたリポジトリ trait の具象実装を提供する。
-//! - DB スキーマとの変換 (`FromRow` 等) はこのレイヤーに閉じ込める。
-//! - マイグレーションは SQL ベース (`backend/migrations/`)。ORM モデルベースの
-//!   自動生成は使わない (CLAUDE.md 方針)。
+//! # Rules
+//! - This is where `sqlx`, HTTP clients, and similar crates live.
+//! - Provide concrete implementations of the repository traits declared in
+//!   `domain`.
+//! - Keep DB schema mapping (e.g. `FromRow`) confined to this layer.
+//! - Migrations are SQL based (`backend/migrations/`); ORM model-based
+//!   generation is intentionally not used (per CLAUDE.md).

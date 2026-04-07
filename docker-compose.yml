@@ -1,6 +1,7 @@
-# triary のローカル開発用インフラ定義。
-# devcontainer とは疎結合に接続する（triary-network を external で共有）。
-# 必要なときだけ `make infra-up` で起動する。
+# NOTE: Local development infrastructure for triary.
+#       Connected loosely to the devcontainer (we share the
+#       `triary-network` declared as `external: true`).
+#       Bring it up only when you actually need it via `make infra-up`.
 
 services:
   mysql:
@@ -43,7 +44,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_TEST_DATABASE:-triary_test}
       MYSQL_USER: ${MYSQL_USER:-triary}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-triary}
-    # テスト用は毎回クリーンな状態にするため tmpfs でメモリ上に展開
+    # NOTE: Mount /var/lib/mysql on tmpfs so the test DB starts from a clean
+    #       slate on every run.
     tmpfs:
       - /var/lib/mysql
     healthcheck:

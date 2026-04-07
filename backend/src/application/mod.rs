@@ -1,9 +1,12 @@
 //! Application layer.
 //!
-//! ユースケース (アプリケーションサービス) を置く。
+//! Holds use cases (a.k.a. application services).
 //!
-//! # 原則
-//! - `domain` のリポジトリ trait に対して依存し、具象 (infrastructure) に依存しない。
-//! - 1 ユースケース = 1 関数または 1 構造体 + `execute` メソッド、を基本形にする。
-//! - 入力 / 出力は DTO として明示的に定義し、`interfaces` から渡されたものを受ける。
-//! - トランザクション境界はここで定義する。
+//! # Rules
+//! - Depend on repository traits defined in `domain`, never on concrete
+//!   infrastructure types.
+//! - Default shape: one use case = one function or one struct + `execute`
+//!   method.
+//! - Inputs and outputs are explicit DTOs received from the `interfaces`
+//!   layer.
+//! - Transaction boundaries are defined here, not in handlers or repositories.

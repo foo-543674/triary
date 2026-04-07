@@ -1,7 +1,7 @@
-//! HTTP インターフェース。
+//! HTTP interface.
 //!
-//! - [`error`][]: ドメインエラー → HTTP レスポンスへの写像
-//! - [`routes`][]: ルーティング (機能単位でサブモジュールに分割)
+//! - [`error`][]: maps domain errors to HTTP responses
+//! - [`routes`][]: routing, split into per-feature submodules
 
 pub mod error;
 pub mod routes;

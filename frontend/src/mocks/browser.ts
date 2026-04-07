@@ -2,10 +2,10 @@ import { setupWorker } from 'msw/browser';
 import { handlers } from './handlers';
 
 /**
- * ブラウザ環境 (Storybook / PWA のモックモード) 用の MSW Worker。
+ * MSW worker for the browser environment (Storybook, or PWA mock mode).
  *
- * Storybook からは `.storybook/preview.ts` でこの worker を起動する想定。
- * 使う前に `pnpm exec msw init public/ --save` で `public/mockServiceWorker.js` を
- * 生成しておく必要がある (初回のみ)。
+ * `.storybook/preview.ts` is expected to start this worker. Before using it
+ * for the first time, run `pnpm exec msw init public/ --save` to drop
+ * `public/mockServiceWorker.js` into place.
  */
 export const worker = setupWorker(...handlers);

@@ -1,13 +1,14 @@
 //! Domain layer.
 //!
-//! ビジネスルールの中心。エンティティ・値オブジェクト・ドメインサービス・
-//! ドメインイベント・リポジトリ trait を置く。
+//! The heart of the business rules. Holds entities, value objects, domain
+//! services, domain events, and repository traits.
 //!
-//! # 原則
-//! - ここから `axum` / `sqlx` / `tower` などの infrastructure 依存を一切 import しない。
-//! - 純粋な Rust として書き、プロパティベーステストを積極導入する。
-//! - `thiserror` で宣言的なエラー型を定義する。
-//! - ID は `uuid::Uuid` を基本とし、ラッパー型で型安全に扱う。
-//! - 時刻は `chrono::DateTime<chrono::Utc>` を基本とする。
+//! # Rules
+//! - Never import infrastructure crates here (`axum`, `sqlx`, `tower`, ...).
+//! - Keep this layer pure Rust and lean heavily on property-based tests.
+//! - Define error types declaratively with `thiserror`.
+//! - Use `uuid::Uuid` (wrapped in newtypes) as the default identifier so IDs
+//!   stay type safe across the codebase.
+//! - Use `chrono::DateTime<chrono::Utc>` as the default timestamp type.
 //!
-//! サブモジュールは機能単位 (例: `workout`, `exercise`, `user`) で切る。
+//! Submodules are split per feature (e.g. `workout`, `exercise`, `user`).

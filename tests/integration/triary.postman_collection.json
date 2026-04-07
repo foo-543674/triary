@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "triary integration smoke",
-    "description": "バックエンドが最低限起動していることを検証するスモークテスト。",
+    "description": "Smoke tests that verify the backend is at least up and serving requests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

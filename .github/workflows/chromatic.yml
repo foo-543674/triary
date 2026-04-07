@@ -21,11 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Chromatic はベースラインとの差分検出のために full history を必要とする。
+          # NOTE: Chromatic needs the full git history to compute the
+          #       baseline diff against the previous build.
           fetch-depth: 0
 
-      # CHROMATIC_PROJECT_TOKEN が未設定のリポジトリでもワークフロー作成時点で落ちないように、
-      # 事前にトークン有無を検出して以降のステップを skip する。
+      # NOTE: Detect whether the Chromatic project token is set so that
+      #       repositories without it (e.g. brand-new forks) do not fail
+      #       the workflow at creation time. Subsequent steps gate on this.
       - name: detect chromatic token
         id: token
         env:
@@ -60,8 +62,10 @@ jobs:
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: frontend
-          # ビジュアル差分は Chromatic UI 上で人間がレビューして accept/deny する運用にし、
-          # 差分自体で PR ステータスを落とさない。描画エラー・ビルドエラーはこのジョブが失敗する。
+          # NOTE: Visual diffs are reviewed and accepted/denied by humans in
+          #       the Chromatic UI; we do not want them to fail the PR check.
+          #       Render errors and build errors still fail this job.
           exitZeroOnChanges: true
-          # ストーリーファイル・その依存に変更が無い PR では TurboSnap でスナップショットをスキップする。
+          # NOTE: With TurboSnap, PRs that touch neither story files nor
+          #       their dependencies skip snapshotting entirely.
           onlyChanged: true

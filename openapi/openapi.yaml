@@ -3,24 +3,24 @@ info:
   title: triary API
   version: 0.0.0
   description: |
-    triary (筋トレ記録 PWA) のバックエンド API 仕様。
-    スキーマファーストで設計し、本ファイルを一次情報として扱う。
-    実装・型・ドキュメントはここから派生させる。
+    Backend API specification for triary (a workout-logging PWA).
+    Designed schema-first; this file is the source of truth, and the
+    implementation, types, and human-readable docs are derived from it.
 servers:
   - url: http://localhost:8080
-    description: ローカル開発環境
+    description: Local development environment
 tags:
   - name: health
-    description: ヘルスチェック
+    description: Service health checks
 paths:
   /health:
     get:
       tags: [health]
-      summary: ヘルスチェック
+      summary: Service health check
       operationId: getHealth
       responses:
         "200":
-          description: サービスが稼働している
+          description: Service is up and running.
           content:
             application/json:
               schema:

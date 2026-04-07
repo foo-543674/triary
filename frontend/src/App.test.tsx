@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import App from './App';
 
 /**
- * App のスモークテスト。`Router` / `QueryClientProvider` を組み立てた最上位
- * コンポーネントが例外無くマウントできることだけを確認する。
+ * Smoke test for the App shell. Confirms that the top-level component
+ * (which composes `Router` and `QueryClientProvider`) mounts without
+ * throwing.
  *
- * 個別ルートの内容は `routes/*.test.tsx` で検証する方針。
- * (App 全体を render すると将来 `Home` がデータ取得を始めた瞬間に
- * App.test.tsx 側で MSW ハンドラ追加が必要になり、責務が漏れるため)
+ * Per-route assertions live in `routes/*.test.tsx` instead. Rendering the
+ * full App here would force this file to register MSW handlers as soon as
+ * any route starts fetching, which leaks responsibility into the wrong file.
  */
 describe('App', () => {
   it('mounts without throwing', () => {

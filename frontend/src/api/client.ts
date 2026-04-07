@@ -2,10 +2,11 @@ import createClient from 'openapi-fetch';
 import type { paths } from './schema.gen';
 
 /**
- * OpenAPI スキーマ (`openapi/openapi.yaml`) から生成された型を用いた API クライアント。
+ * API client typed against the OpenAPI schema (`openapi/openapi.yaml`).
  *
- * 型定義は `pnpm run api:generate` で `src/api/schema.gen.ts` に生成する。
- * 生成物はコミット対象。手書きで触らないこと。
+ * The type definitions are produced by `pnpm run api:generate` into
+ * `src/api/schema.gen.ts`. The generated file is committed; do not edit it
+ * by hand.
  */
 export const apiClient = createClient<paths>({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080',

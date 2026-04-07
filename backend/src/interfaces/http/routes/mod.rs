@@ -1,5 +1,5 @@
-//! HTTP ルート定義。
+//! HTTP route definitions.
 //!
-//! 機能単位でサブモジュールを切り、`lib::app()` から `merge` する。
+//! Split per feature into submodules and merged from `lib::app()`.
 
 pub mod health;

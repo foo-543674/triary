@@ -13,13 +13,15 @@ updates:
       - "dependencies"
       - "frontend"
     groups:
-      # 開発依存とランタイム依存を分けてレビューしやすくする
+      # NOTE: Split dev and runtime dependencies into separate update PRs so
+      #       reviews stay focused.
       dev-dependencies:
         dependency-type: "development"
       runtime-dependencies:
         dependency-type: "production"
-    # pnpm.overrides で patch している transitive dep の上流が更新されたら
-    # こちらでも気づけるよう、ignore は設定しない方針。
+    # NOTE: Do not configure `ignore` here on purpose. We want to be notified
+    #       whenever an upstream of a transitive dep currently patched via
+    #       `pnpm.overrides` ships a fix.
 
   # ---------- Backend (cargo) ----------
   - package-ecosystem: "cargo"

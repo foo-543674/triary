@@ -1,17 +1,19 @@
-//! `GET /health` ヘルスチェック。
+//! `GET /health` health check endpoint.
 //!
-//! 本体プロセスが生きていることを確認するためのエンドポイント。
-//! 現状は DB 等の下位層に触れない liveness probe として実装している。
-//! 将来的に readiness probe が必要になったら `/ready` を別途追加する方針。
+//! Confirms that the process itself is alive. Currently implemented as a
+//! liveness probe that does not touch downstream layers (DB, etc.). When a
+//! readiness probe is needed, add a separate `/ready` route.
 
 use axum::{Json, Router, routing::get};
 use serde::Serialize;
 
 use crate::interfaces::http::error::AppError;
 
-/// `/health` のステータス値。
-/// 文字列直書きではなく enum で表現することで、`degraded` 等を追加する際に
-/// 全コードベースが型エラーで気づけるようにしておく。
+/// Status value reported by `/health`.
+///
+/// Modelled as an enum (instead of a bare string) so that adding values like
+/// `degraded` later forces every consumer to handle the new variant via the
+/// type system.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum HealthStatus {

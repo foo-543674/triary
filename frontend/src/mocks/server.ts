@@ -2,9 +2,9 @@ import { setupServer } from 'msw/node';
 import { handlers } from './handlers';
 
 /**
- * Node 環境 (vitest) 用の MSW サーバ。
+ * MSW server for the Node-side test environment (vitest).
  *
- * `src/test/setup.ts` から start / reset / close をフックしており、
- * 各テストは MSW が有効な状態で実行される。
+ * `src/test/setup.ts` wires up start / reset / close lifecycle hooks so that
+ * every test runs with MSW enabled by default.
  */
 export const server = setupServer(...handlers);

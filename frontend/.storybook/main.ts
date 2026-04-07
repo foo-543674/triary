@@ -7,24 +7,28 @@ const config: StorybookConfig = {
   },
   stories: ['../src/**/*.stories.@(ts|tsx|mdx)'],
   addons: [],
-  // vite.config.ts を共有しているが、Storybook の build には PWA プラグインは不要。
-  // むしろ VitePWA が Storybook の rollup 設定に `manualChunks` を流し込み、
-  // 「Unknown input options: manualChunks」エラーで build が落ちる。
-  // Storybook 向けには PWA プラグインを除去した config に差し替える。
+  // HACK: We share `vite.config.ts` with the app, but Storybook builds do
+  //       not need (and actively break with) the PWA plugin: VitePWA injects
+  //       a `manualChunks` option into Storybook's rollup pipeline, causing
+  //       the build to fail with "Unknown input options: manualChunks". As
+  //       a workaround we strip the PWA plugin out of the config that
+  //       Storybook sees.
   viteFinal: async (config) => {
-    // vite の plugins はネスト配列を許すので再帰的に flatten してから filter する。
+    // NOTE: Vite allows nested plugin arrays, so flatten recursively before
+    //       filtering.
     const flatten = (input: unknown[]): unknown[] =>
       input.flatMap((p) => (Array.isArray(p) ? flatten(p) : [p]));
 
     const plugins = flatten(config.plugins ?? []).filter((plugin) => {
       if (!plugin || typeof plugin !== 'object') return true;
       const name = (plugin as { name?: string }).name ?? '';
-      // vite-plugin-pwa は `vite-plugin-pwa` の他に `vite-plugin-pwa:build`
-      // `vite-plugin-pwa:dev-sw` 等複数の Plugin を束ねて返す。全て除外する。
+      // NOTE: vite-plugin-pwa exposes several Plugin objects (the main
+      //       `vite-plugin-pwa` one plus `vite-plugin-pwa:build`,
+      //       `vite-plugin-pwa:dev-sw`, ...). Drop them all.
       return !name.startsWith('vite-plugin-pwa');
     });
 
-    // biome-ignore lint/suspicious/noExplicitAny: vite の plugin 配列型に戻す
+    // biome-ignore lint/suspicious/noExplicitAny: cast back to vite's plugin array type
     return { ...config, plugins: plugins as any };
   },
 };

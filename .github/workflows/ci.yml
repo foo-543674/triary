@@ -13,8 +13,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
-  # sqlx の query! マクロは .sqlx/ に事前生成されたメタデータを使って
-  # live DB 無しでコンパイルできるようにする (ローカルでは `cargo sqlx prepare` を実行)。
+  # NOTE: sqlx `query!` macros use the metadata pre-generated under `.sqlx/`
+  #       so they can compile without a live database. Run
+  #       `cargo sqlx prepare` locally whenever queries change.
   SQLX_OFFLINE: "true"
 
 jobs:
@@ -120,9 +121,10 @@ jobs:
       - name: vitest run
         run: pnpm exec vitest run
       - name: build storybook
-        # 実ストーリーの描画は vitest の stories.smoke テストで担保する。
-        # ここではバンドラ・プリセット・設定ファイル側の破綻を検知する目的で
-        # Storybook の本番ビルドを走らせる。
+        # NOTE: Real story rendering is covered by the vitest stories smoke
+        #       test. This step exists to catch breakage in the bundler /
+        #       preset / config layer by running the production storybook
+        #       build.
         run: pnpm run build-storybook
 
   frontend-build:
@@ -146,9 +148,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vite build
 
-  # ---------- Integration tests (言語非依存: Postman / Newman) ----------
-  # backend/migrations と Postman コレクションが揃っているかを検出する。
-  # 揃っていない間は integration ジョブを自動でスキップし、揃ったら自然に有効化される。
+  # ---------- Integration tests (language agnostic via Postman / Newman) ----------
+  # NOTE: Detect whether `backend/migrations/` and the Postman collection are
+  #       in place. While they are missing the integration job is skipped
+  #       automatically; once both land, it activates on its own.
   integration-detect:
     name: integration / detect
     runs-on: ubuntu-latest
@@ -221,7 +224,7 @@ jobs:
       - name: newman run
         run: newman run tests/integration/triary.postman_collection.json
 
-  # ---------- OpenAPI スキーマのバリデーション ----------
+  # ---------- OpenAPI schema validation ----------
   openapi-validate:
     name: openapi / spectral lint
     runs-on: ubuntu-latest
@@ -234,7 +237,7 @@ jobs:
       - name: spectral lint
         run: npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
 
-  # ---------- 依存脆弱性スキャン ----------
+  # ---------- Dependency vulnerability scans ----------
   security-scan-backend:
     name: security / cargo audit
     runs-on: ubuntu-latest

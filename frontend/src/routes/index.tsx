@@ -1,8 +1,10 @@
 import type { Component } from 'solid-js';
 
 /**
- * `/` ルートに対応するトップ画面の placeholder。
- * 実際のダッシュボード (直近のトレーニング・次回の予定など) に差し替えていく。
+ * Placeholder for the top page mounted at `/`.
+ *
+ * To be replaced with the real dashboard (recent workouts, next planned
+ * session, etc.) as those features land.
  */
 const Home: Component = () => {
   return (

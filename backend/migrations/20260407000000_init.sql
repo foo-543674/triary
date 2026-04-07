@@ -1,10 +1,10 @@
 -- Initial placeholder migration.
 --
--- このファイルはマイグレーションパイプラインと sqlx-cli の動作確認のために
--- 置いているだけで、ドメインモデルとは無関係。本格的なスキーマがドメイン
--- 確定後に追加されたら、この placeholder テーブルは続くマイグレーションで
--- DROP されるべきもの (テーブル名にアンダースコア prefix を付けて
--- "ユーザ向けではない / 過渡的" であることを名前で示している)。
+-- NOTE: This file exists only to exercise the migration pipeline and the
+--       sqlx-cli wiring; it has nothing to do with the real domain. Once the
+--       first real schema lands, the placeholder table below should be
+--       dropped in a follow-up migration. The leading underscore in the table
+--       name is meant to signal "not user facing / transient".
 
 CREATE TABLE IF NOT EXISTS _migration_placeholder (
     id          INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

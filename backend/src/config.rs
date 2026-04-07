@@ -1,27 +1,28 @@
-//! 環境変数から取得するアプリ設定。
+//! Application configuration loaded from environment variables.
 //!
-//! 設定は副作用 (env 読み取り) を伴うため、構築は `from_env` 等の明示的な
-//! コンストラクタに集約し、ドメイン層・アプリケーション層からは値型として
-//! 受け取る。これによりテストでは `CorsConfig::AllowedOrigins(...)` を直接
-//! 渡せて env を汚さずに済む。
+//! Reading env vars is a side effect, so we centralise it in explicit
+//! constructors like `from_env`. Domain and application layers receive plain
+//! value types instead, which keeps tests free of env-var poking
+//! (e.g. `CorsConfig::AllowedOrigins(...)` can be passed in directly).
 
-/// CORS 許可オリジンの設定。
+/// CORS allow-list configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CorsConfig {
-    /// 明示的な許可オリジン無し (同一オリジンからのみアクセス可)。
+    /// No explicit allowed origins; only same-origin requests are accepted.
     Disabled,
-    /// 許可するオリジンのリスト。
+    /// Explicit list of allowed origins.
     AllowedOrigins(Vec<String>),
 }
 
 impl CorsConfig {
-    /// 環境変数 `CORS_ALLOWED_ORIGINS` (カンマ区切り) から設定を読む。
+    /// Reads `CORS_ALLOWED_ORIGINS` (comma separated) from the environment.
     ///
-    /// - 未設定または空文字列のみ: [`CorsConfig::Disabled`]。
-    /// - 1 つ以上の値: [`CorsConfig::AllowedOrigins`]。
+    /// - Unset or empty string: [`CorsConfig::Disabled`].
+    /// - One or more values: [`CorsConfig::AllowedOrigins`].
     ///
-    /// 本番環境ではフロントエンドの URL を明示的に指定する想定。
-    /// dev では `http://localhost:3000` を入れるとフロントから直接呼べる。
+    /// Production should always specify the frontend URL explicitly.
+    /// In dev, set this to e.g. `http://localhost:3000` so the SPA can call
+    /// the API directly.
     pub fn from_env() -> Self {
         match std::env::var("CORS_ALLOWED_ORIGINS") {
             Ok(raw) => Self::parse(&raw),

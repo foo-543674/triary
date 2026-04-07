@@ -1,15 +1,16 @@
-//! HTTP レイヤーのアプリケーションエラー型。
+//! Application error type for the HTTP layer.
 //!
-//! ドメイン層 / アプリケーション層は自身のエラー型を `thiserror` で定義する。
-//! ここではそれらをまとめて HTTP レスポンスに写像するための [`AppError`] を提供する。
-//! 新しいエラー variant を追加するときは以下を必ずペアで行うこと:
+//! Domain and application layers define their own error types using
+//! `thiserror`. This module provides [`AppError`], which collects them and
+//! maps them to HTTP responses. When adding a new variant, always update both
+//! of the following at the same time:
 //!
-//! 1. `AppError` に variant を追加する。
-//! 2. [`AppError::status_code`] で対応する HTTP ステータスを返す。
-//! 3. [`AppError::error_code`] でクライアントに返すコードを決める。
+//! 1. Add the variant to `AppError`.
+//! 2. Map the variant in [`AppError::status_code`] to its HTTP status.
+//! 3. Map the variant in [`AppError::error_code`] to the public error code.
 //!
-//! これによりハンドラは `-> Result<Json<T>, AppError>` を返すだけで、
-//! 統一フォーマットのエラーレスポンスになる。
+//! With this in place, handlers only need to return `Result<Json<T>, AppError>`
+//! to get a uniform error response shape.
 
 use axum::{
     Json,
@@ -19,27 +20,29 @@ use axum::{
 use serde::Serialize;
 use thiserror::Error;
 
-/// 全ハンドラ共通のエラー型。
+/// Common error type returned from every HTTP handler.
 ///
-/// 現時点で `Forbidden` 等の認可関連 variant を返す経路が無いため、
-/// それらの variant は意図的に定義していない (YAGNI)。
-/// 認可ロジックを実装するコミットで、対応する variant も同時に追加すること。
-/// (triary の認証方式自体が未決定であり、`concept.md` 参照)
+/// Authorisation-related variants (e.g. `Forbidden`) are intentionally absent
+/// because there is currently no code path that produces them (YAGNI). When
+/// authorisation logic is introduced, add the matching variant in the same
+/// commit. (triary's authentication strategy itself is undecided; see
+/// `concept.md`.)
 #[derive(Debug, Error)]
 pub enum AppError {
-    /// リクエストの形式 / バリデーションエラー。
+    /// Malformed request or validation failure.
     #[error("bad request: {0}")]
     BadRequest(String),
 
-    /// リソースが見つからない。
+    /// Resource not found.
     #[error("not found: {0}")]
     NotFound(String),
 
-    /// リソース競合 (楽観ロック失敗など)。
+    /// Resource conflict (e.g. optimistic locking failure).
     #[error("conflict: {0}")]
     Conflict(String),
 
-    /// 内部サーバエラー (予期せぬ失敗・下位層の未分類エラーを包む)。
+    /// Internal server error. Wraps any unclassified failure from lower
+    /// layers.
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -72,8 +75,9 @@ struct ErrorBody {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // Internal エラーは中身の message を外部に出さない方針。
-        // (実装詳細や機密情報の漏洩を避けるため。詳細は tracing でサーバ側ログに残す。)
+        // NOTE: Internal errors must not leak their inner message to clients,
+        //       since it can carry implementation details or secrets. The full
+        //       error stays in the tracing log on the server side instead.
         let (code, message) = match &self {
             Self::Internal(err) => {
                 tracing::error!(error = ?err, "internal server error");

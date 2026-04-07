@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# devcontainer の postCreateCommand で実行される初期セットアップスクリプト。
-# Rust / Frontend の開発ツールチェーンを devcontainer 内にインストールする。
+# NOTE: Initial setup script invoked by the devcontainer postCreateCommand.
+#       Installs the Rust and frontend toolchains inside the devcontainer.
 
 set -euo pipefail
 

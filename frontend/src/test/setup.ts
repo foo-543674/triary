@@ -3,7 +3,8 @@ import { cleanup } from '@solidjs/testing-library';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { server } from '../mocks/server';
 
-// MSW: テスト間でハンドラのリークを避けるため、通常の lifecycle hook を全部仕込む。
+// NOTE: Wire up the standard MSW lifecycle hooks so handlers cannot leak
+//       between tests.
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
 });

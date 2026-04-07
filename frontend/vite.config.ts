@@ -10,8 +10,9 @@ export default defineConfig({
     solidPlugin(),
     tailwindcss(),
     VitePWA({
-      // Service Worker は自動で生成・注入する。
-      // 開発中に実際に PWA 挙動を確認したいケースに備えて `devOptions.enabled` も有効化。
+      // NOTE: Auto-generate and auto-inject the service worker. We also
+      //       enable `devOptions` so that PWA behaviour can be exercised
+      //       during local dev.
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       devOptions: { enabled: true, type: 'module' },

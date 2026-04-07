@@ -1,14 +1,16 @@
 //! Interfaces layer.
 //!
-//! 外部との接点 (HTTP API / CLI 等) を置く。現状は HTTP のみ。
+//! Adapters that face the outside world (HTTP API, CLI, etc.). Currently
+//! HTTP only.
 //!
-//! # 原則
-//! - HTTP DTO は `interfaces::http` に閉じ込め、domain/application の型を
-//!   生のままレスポンスに出さない。
-//! - エラーは [`http::error::AppError`] に写像し、`IntoResponse` 経由で
-//!   HTTP ステータスに変換する。
-//! - OpenAPI 定義 (`openapi/openapi.yaml`) が一次情報。ここの handler / DTO は
-//!   その契約を満たすように書く。Postman コレクション (`tests/integration/`) で
-//!   言語非依存に契約を検証する。
+//! # Rules
+//! - HTTP DTOs live in `interfaces::http` and never expose raw domain or
+//!   application types in responses.
+//! - Errors are mapped to [`http::error::AppError`], which becomes an HTTP
+//!   status code via `IntoResponse`.
+//! - The OpenAPI spec at `openapi/openapi.yaml` is the source of truth.
+//!   Handlers and DTOs here must satisfy that contract; the language-agnostic
+//!   Postman collection under `tests/integration/` enforces the contract from
+//!   the outside.
 
 pub mod http;

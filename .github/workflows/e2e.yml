@@ -1,7 +1,7 @@
 name: E2E
 
-# 実行時間の長い E2E は PR では回さず、main へのマージ後にのみ実行する。
-# CD 導入時に前段として再調整する。
+# NOTE: E2E runs are slow, so we keep them off PRs and only fire after a
+#       merge to main. Re-tune this trigger when CD is wired up.
 on:
   push:
     branches: [main]
@@ -11,8 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Playwright の設定ファイルが入るまで e2e ジョブを自動 skip する。
-  # `frontend/playwright.config.{ts,js}` がコミットされたら自然に有効化される。
+  # NOTE: Auto-skip the e2e job until a Playwright config exists.
+  #       The job activates on its own once
+  #       `frontend/playwright.config.{ts,js}` is committed.
   e2e-detect:
     name: e2e / detect
     runs-on: ubuntu-latest
@@ -27,7 +28,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::frontend/playwright.config.* が無いため e2e ジョブをスキップします"
+            echo "::warning::frontend/playwright.config.* is missing; skipping the e2e job"
           fi
 
   e2e:
