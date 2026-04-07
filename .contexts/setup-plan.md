@@ -35,7 +35,8 @@
   - Backend: Rust + Axum + MySQL
   - Frontend: TypeScript + SolidJS + Tailwind CSS + CSS Modules
   - 配信形態: PWA
-- 認証: ユーザー ID は任意文字列（個人情報収集なし）
+- ユーザーデータの方針: 個人情報は収集しない
+- 認証方式: 未決定（実装着手時に選定）
 - データ管理: リモート（サーバー側）
 
 ## 方針サマリ

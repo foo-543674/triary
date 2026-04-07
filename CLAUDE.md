@@ -8,7 +8,8 @@
 - **Frontend**: TypeScript + SolidJS + Tailwind CSS + CSS Modules、PWA 配信（`frontend/`）
 - **DB**: MySQL 8.0。マイグレーションは **SQL ベース**（`sqlx-cli`）。ORM モデルベース生成は使わない
 - **API**: スキーマファースト。`openapi/` 配下に OpenAPI 定義を置き、そこからドキュメント・型を派生させる
-- **認証**: ユーザー ID は任意文字列（個人情報収集なし）
+- **ユーザーデータの方針**: 個人情報は収集しない
+- **認証方式**: 未決定（実装着手時に選定）
 
 ## 開発フロー
 
