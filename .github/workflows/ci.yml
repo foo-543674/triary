@@ -114,8 +114,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: vitest run
         run: pnpm exec vitest run
-      - name: storybook smoke test
-        run: pnpm run storybook:smoke-test
+      - name: build storybook
+        # 実ストーリーの描画は vitest の stories.smoke テストで担保する。
+        # ここではバンドラ・プリセット・設定ファイル側の破綻を検知する目的で
+        # Storybook の本番ビルドを走らせる。
+        run: pnpm run build-storybook
 
   frontend-build:
     name: frontend / build (vite)

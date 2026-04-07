@@ -15,8 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "storybook:smoke-test": "storybook build --quiet"
+    "build-storybook": "storybook build"
   },
   "license": "MIT",
   "devDependencies": {
