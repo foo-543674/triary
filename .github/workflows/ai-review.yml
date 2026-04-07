@@ -168,7 +168,7 @@ jobs:
 
       - name: post review as sticky PR comment
         if: always() && hashFiles('ai-review-report.md') != ''
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: ai-review-foo-skills
           number: ${{ env.PR_NUMBER }}
