@@ -83,6 +83,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -102,6 +104,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -124,6 +128,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -246,6 +252,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
