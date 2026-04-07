@@ -20,6 +20,10 @@ use serde::Serialize;
 use thiserror::Error;
 
 /// 全ハンドラ共通のエラー型。
+///
+/// triary は認証を持たないため `Forbidden` 等の認可関連 variant は意図的に
+/// 持たない。将来 認可機構を導入する場合は、その実装と同じコミットで variant を
+/// 追加すること (使われない variant を先回りして残さない方針)。
 #[derive(Debug, Error)]
 pub enum AppError {
     /// リクエストの形式 / バリデーションエラー。
@@ -29,11 +33,6 @@ pub enum AppError {
     /// リソースが見つからない。
     #[error("not found: {0}")]
     NotFound(String),
-
-    /// 認可失敗。triary は認証を持たない方針だが、
-    /// リソース ID の所有チェック等で使う余地を残しておく。
-    #[error("forbidden: {0}")]
-    Forbidden(String),
 
     /// リソース競合 (楽観ロック失敗など)。
     #[error("conflict: {0}")]
@@ -49,7 +48,6 @@ impl AppError {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::NotFound(_) => StatusCode::NOT_FOUND,
-            Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -59,7 +57,6 @@ impl AppError {
         match self {
             Self::BadRequest(_) => "bad_request",
             Self::NotFound(_) => "not_found",
-            Self::Forbidden(_) => "forbidden",
             Self::Conflict(_) => "conflict",
             Self::Internal(_) => "internal_error",
         }
