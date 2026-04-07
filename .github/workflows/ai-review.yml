@@ -1,0 +1,142 @@
+name: AI Review
+
+# foo-543674/foo-skills の code-reviewer エージェントで PR をレビューする。
+# - PR 作成・更新時に自動実行
+# - workflow_dispatch で任意の PR を指定して手動実行も可能
+# - foo-skills は実行時に main から clone するので常に最新
+#
+# ============================================================
+# 認証: Claude Max プランの OAuth トークンを使用（従量課金回避）
+# ============================================================
+# GitHub Secrets: CLAUDE_CODE_OAUTH_TOKEN
+#
+# トークンが切れた / 認証エラーが出たときの更新手順:
+#   1. ローカルの Claude Code CLI で `claude setup-token` を実行
+#      （Max プランでログイン済みのアカウントで実行すること）
+#   2. ブラウザで OAuth フローを完了し、表示された長期トークンをコピー
+#   3. GitHub repo の Settings → Secrets and variables → Actions
+#      → `CLAUDE_CODE_OAUTH_TOKEN` を Update で貼り替え
+#   4. 失敗していた PR で workflow_dispatch から再実行、または空コミットで再トリガ
+#
+# 注意:
+# - このトークンは Max プランの定額枠・レート制限を消費する。
+#   CI が連続実行されるとローカルの Claude Code 作業と 5 時間ウィンドウを
+#   取り合うので、詰まったら [skip ai-review] でスキップすること。
+# - 従量課金 (API キー) に切り戻すときは `claude_code_oauth_token` を
+#   `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` に差し替える。
+# ============================================================
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "レビュー対象の PR 番号"
+        required: true
+        type: number
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  ai-review:
+    name: ai / code review (foo-skills)
+    # draft PR とタイトルに [skip ai-review] を含む PR はスキップ。
+    # workflow_dispatch は常に実行する。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false &&
+       !contains(github.event.pull_request.title, '[skip ai-review]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+    steps:
+      # workflow_dispatch からも動かせるよう、PR 情報をまとめて解決する
+      - name: resolve PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            data=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+            echo "head_sha=$(echo "$data" | jq -r .head.sha)" >> "$GITHUB_OUTPUT"
+            echo "base_ref=$(echo "$data" | jq -r .base.ref)" >> "$GITHUB_OUTPUT"
+          else
+            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "base_ref=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr.outputs.head_sha }}
+
+      - name: fetch base branch
+        run: |
+          git fetch origin \
+            "${{ steps.pr.outputs.base_ref }}:refs/remotes/origin/${{ steps.pr.outputs.base_ref }}"
+
+      # foo-skills プラグインを実行時に最新の main から取得する。
+      # タグ固定ではなく常に最新を使う方針（ユーザー意向）。
+      # `.claude-plugin/plugin.json` を持つ正式なプラグイン構造なので、
+      # Claude Code の `--plugin-dir` フラグでそのままロードできる。
+      # これにより ${CLAUDE_PLUGIN_ROOT} も正しく設定される。
+      - name: checkout foo-skills (latest main)
+        uses: actions/checkout@v4
+        with:
+          repository: foo-543674/foo-skills
+          path: .foo-skills
+          ref: main
+
+      - name: run claude code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # --plugin-dir で foo-skills をローカルプラグインとしてロードする。
+          # これによりエージェントは `foo-skills:code-reviewer` として呼び出せる。
+          claude_args: "--plugin-dir ./.foo-skills"
+          prompt: |
+            この PR に対してコードレビューを実行し、結果を `ai-review-report.md` に書き出してください。
+
+            ## レビュー対象
+            - ベースブランチ: `origin/${{ steps.pr.outputs.base_ref }}`
+            - 差分取得コマンド例:
+              - `git diff --name-only origin/${{ steps.pr.outputs.base_ref }}...HEAD`
+              - `git diff origin/${{ steps.pr.outputs.base_ref }}...HEAD`
+
+            ## 実行方法
+            Task tool で `foo-skills:code-reviewer` サブエージェントを起動してください。
+            foo-skills プラグインは `--plugin-dir` でロード済みなので、
+            `${CLAUDE_PLUGIN_ROOT}` を含む内部パス参照はそのまま解決されます。
+
+            ## プロジェクト固有の前提
+            - Backend: Rust + Axum + MySQL (`backend/`)
+            - Frontend: TypeScript + SolidJS + Tailwind + CSS Modules (`frontend/`)
+            - マイグレーションは SQL ベース (`backend/migrations/`)
+            - API はスキーマファースト (`openapi/`)
+            - Frontend の lint/format は Biome 一本化（ESLint/Prettier は使わない）
+            - 統合テストは言語非依存（Postman/Newman）
+            - 詳細は `CLAUDE.md` を参照
+
+            ## 出力要件
+            - 最終成果物は `ai-review-report.md` ただ 1 ファイル
+            - 内容はレビューレポートの markdown 本文のみ（前置き・後書き・進捗メモ禁止）
+            - 指摘がない場合も Summary を含むレポートを生成する
+            - コードへの修正・コミット・PR コメント投稿は一切行わない
+
+      # claude-code-action の結果にかかわらず、レポートが生成されていれば投稿する
+      - name: post review as sticky PR comment
+        if: always() && hashFiles('ai-review-report.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: ai-review-foo-skills
+          number: ${{ env.PR_NUMBER }}
+          path: ai-review-report.md
