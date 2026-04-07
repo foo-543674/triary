@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: triary API
+  version: 0.0.0
+  description: |
+    triary (筋トレ記録 PWA) のバックエンド API 仕様。
+    スキーマファーストで設計し、本ファイルを一次情報として扱う。
+    実装・型・ドキュメントはここから派生させる。
+servers:
+  - url: http://localhost:8080
+    description: ローカル開発環境
+tags:
+  - name: health
+    description: ヘルスチェック
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: ヘルスチェック
+      operationId: getHealth
+      responses:
+        "200":
+          description: サービスが稼働している
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
