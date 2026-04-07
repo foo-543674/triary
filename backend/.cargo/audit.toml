@@ -1,0 +1,18 @@
+# cargo-audit configuration.
+#
+# NOTE: Each advisory listed below is intentionally ignored, typically because
+#       no patched version exists upstream. Always include the reason inline,
+#       and revisit periodically.
+
+[advisories]
+ignore = [
+  # NOTE: RUSTSEC-2023-0071 - Marvin Attack (timing side channel in `rsa` <=0.9.x)
+  #       - Path: sqlx-mysql depends on `rsa` for the MySQL native password
+  #         authentication plugin.
+  #       - Status (2026-04-07): no patched release of the `rsa` crate is
+  #         available, and sqlx cannot route around it yet.
+  #       - Mitigation: prefer `caching_sha2_password` on the MySQL server side
+  #         and keep MySQL access on a private network behind TLS.
+  #       - Re-evaluate when `rsa` >= 0.10 ships and sqlx-mysql adopts it.
+  "RUSTSEC-2023-0071",
+]

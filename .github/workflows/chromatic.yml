@@ -1,0 +1,71 @@
+name: Chromatic
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: chromatic / publish storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # NOTE: Chromatic needs the full git history to compute the
+          #       baseline diff against the previous build.
+          fetch-depth: 0
+
+      # NOTE: Detect whether the Chromatic project token is set so that
+      #       repositories without it (e.g. brand-new forks) do not fail
+      #       the workflow at creation time. Subsequent steps gate on this.
+      - name: detect chromatic token
+        id: token
+        env:
+          TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CHROMATIC_PROJECT_TOKEN secret is not set; skipping chromatic run"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.has_token == 'true'
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.has_token == 'true'
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: install dependencies
+        if: steps.token.outputs.has_token == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: publish to chromatic
+        if: steps.token.outputs.has_token == 'true'
+        uses: chromaui/action@v16
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: frontend
+          # NOTE: Visual diffs are reviewed and accepted/denied by humans in
+          #       the Chromatic UI; we do not want them to fail the PR check.
+          #       Render errors and build errors still fail this job.
+          exitZeroOnChanges: true
+          # NOTE: With TurboSnap, PRs that touch neither story files nor
+          #       their dependencies skip snapshotting entirely.
+          onlyChanged: true

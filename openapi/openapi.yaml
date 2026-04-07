@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: triary API
+  version: 0.0.0
+  description: |
+    Backend API specification for triary (a workout-logging PWA).
+    Designed schema-first; this file is the source of truth, and the
+    implementation, types, and human-readable docs are derived from it.
+servers:
+  - url: http://localhost:8080
+    description: Local development environment
+tags:
+  - name: health
+    description: Service health checks
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Service health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is up and running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]

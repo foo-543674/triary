@@ -1,0 +1,271 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  # NOTE: sqlx `query!` macros use the metadata pre-generated under `.sqlx/`
+  #       so they can compile without a live database. Run
+  #       `cargo sqlx prepare` locally whenever queries change.
+  SQLX_OFFLINE: "true"
+
+jobs:
+  # ---------- Backend ----------
+  backend-lint:
+    name: backend / lint (fmt + clippy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features
+
+  backend-test:
+    name: backend / test (nextest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: cargo nextest run
+        run: cargo nextest run --all-features --no-tests=pass
+
+  backend-build:
+    name: backend / build (release)
+    runs-on: ubuntu-latest
+    needs: backend-lint
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: cargo build --release
+        run: cargo build --release
+
+  # ---------- Frontend ----------
+  frontend-lint:
+    name: frontend / lint (biome ci)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: biome ci
+        run: pnpm exec biome ci .
+      - name: typecheck (tsc --noEmit)
+        run: pnpm exec tsc --noEmit
+
+  frontend-test:
+    name: frontend / test (vitest + storybook smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: vitest run
+        run: pnpm exec vitest run
+      - name: build storybook
+        # NOTE: Real story rendering is covered by the vitest stories smoke
+        #       test. This step exists to catch breakage in the bundler /
+        #       preset / config layer by running the production storybook
+        #       build.
+        run: pnpm run build-storybook
+
+  frontend-build:
+    name: frontend / build (vite)
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vite build
+
+  # ---------- Integration tests (language agnostic via Postman / Newman) ----------
+  # NOTE: Detect whether `backend/migrations/` and the Postman collection are
+  #       in place. While they are missing the integration job is skipped
+  #       automatically; once both land, it activates on its own.
+  integration-detect:
+    name: integration / detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if compgen -G "backend/migrations/*.sql" > /dev/null \
+            && compgen -G "tests/integration/*.postman_collection.json" > /dev/null; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "integration prerequisites not present yet; skipping newman job"
+          fi
+
+  integration-test:
+    name: integration / newman
+    needs: integration-detect
+    if: needs.integration-detect.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: triary_test
+          MYSQL_USER: triary
+          MYSQL_PASSWORD: triary
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -prootpassword"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+          --tmpfs /var/lib/mysql
+    env:
+      DATABASE_URL: mysql://triary:triary@127.0.0.1:3306/triary_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: install newman
+        run: npm install -g newman
+      - name: run migrations
+        working-directory: backend
+        run: sqlx migrate run
+      - name: start backend
+        working-directory: backend
+        run: |
+          cargo build --release
+          nohup ./target/release/triary-backend > backend.log 2>&1 &
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:8080/health; then exit 0; fi
+            sleep 1
+          done
+          echo "backend failed to start"; cat backend.log; exit 1
+      - name: newman run
+        run: newman run tests/integration/triary.postman_collection.json
+
+  # ---------- OpenAPI schema validation ----------
+  openapi-validate:
+    name: openapi / spectral lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: spectral lint
+        run: npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
+
+  # ---------- Dependency vulnerability scans ----------
+  security-scan-backend:
+    name: security / cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
+
+  security-scan-frontend:
+    name: security / pnpm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pnpm audit --audit-level high

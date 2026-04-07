@@ -1,29 +1,37 @@
 name: AI Review
 
-# foo-543674/foo-skills の code-reviewer エージェントで PR をレビューする。
-# - PR 作成・更新時に自動実行
-# - workflow_dispatch で任意の PR を指定して手動実行も可能
-# - foo-skills は実行時に main から clone するので常に最新
+# NOTE: Run code review on PRs via the foo-543674/foo-skills code-reviewer
+#       agent.
+#       - Auto-runs on PR open / update.
+#       - Can also be triggered manually for an arbitrary PR via
+#         workflow_dispatch.
+#       - foo-skills is cloned from main at run time, so we always pick up the
+#         latest revision.
 #
 # ============================================================
-# 認証: Claude Max プランの OAuth トークンを使用（従量課金回避）
+# NOTE: Authentication uses the Claude Max plan OAuth token (avoids per-call
+#       billing).
 # ============================================================
 # GitHub Secrets: CLAUDE_CODE_OAUTH_TOKEN
 #
-# トークンが切れた / 認証エラーが出たときの更新手順:
-#   1. ローカルの Claude Code CLI で `claude setup-token` を実行
-#      （Max プランでログイン済みのアカウントで実行すること）
-#   2. ブラウザで OAuth フローを完了し、表示された長期トークンをコピー
-#   3. GitHub repo の Settings → Secrets and variables → Actions
-#      → `CLAUDE_CODE_OAUTH_TOKEN` を Update で貼り替え
-#   4. 失敗していた PR で workflow_dispatch から再実行、または空コミットで再トリガ
+# NOTE: Token rotation procedure (when the existing token expires or auth
+#       starts failing):
+#   1. Run `claude setup-token` from a local Claude Code CLI logged in with
+#      the Max-plan account.
+#   2. Complete the OAuth flow in the browser and copy the long-lived token.
+#   3. Update `CLAUDE_CODE_OAUTH_TOKEN` under the repo's
+#      Settings -> Secrets and variables -> Actions.
+#   4. Re-trigger the failing PR via workflow_dispatch or by pushing an empty
+#      commit.
 #
-# 注意:
-# - このトークンは Max プランの定額枠・レート制限を消費する。
-#   CI が連続実行されるとローカルの Claude Code 作業と 5 時間ウィンドウを
-#   取り合うので、詰まったら [skip ai-review] でスキップすること。
-# - 従量課金 (API キー) に切り戻すときは `claude_code_oauth_token` を
-#   `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` に差し替える。
+# NOTE: Operational caveats:
+#       - This token consumes the Max plan flat-rate quota and rate limits.
+#         Concurrent CI runs compete with local Claude Code work over the
+#         same five-hour window, so use `[skip ai-review]` in the PR title
+#         to skip this job when needed.
+#       - To fall back to per-call billing (API key), replace
+#         `claude_code_oauth_token` with
+#         `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}`.
 # ============================================================
 
 on:
@@ -32,7 +40,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "レビュー対象の PR 番号"
+        description: "PR number to review"
         required: true
         type: number
 
@@ -43,8 +51,8 @@ concurrency:
 jobs:
   ai-review:
     name: ai / code review (foo-skills)
-    # draft PR とタイトルに [skip ai-review] を含む PR はスキップ。
-    # workflow_dispatch は常に実行する。
+    # NOTE: Skip draft PRs and PRs whose title contains `[skip ai-review]`.
+    #       workflow_dispatch always runs.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
@@ -55,12 +63,14 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-      # anthropics/claude-code-action@v1 は OIDC トークンで認証するため必須
+      # NOTE: anthropics/claude-code-action@v1 authenticates via the OIDC
+      #       token, so id-token: write is required.
       id-token: write
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
     steps:
-      # workflow_dispatch からも動かせるよう、PR 情報をまとめて解決する
+      # NOTE: Resolve PR metadata uniformly so the workflow_dispatch path
+      #       works the same as the auto trigger.
       - name: resolve PR metadata
         id: pr
         env:
@@ -86,11 +96,12 @@ jobs:
           git fetch origin \
             "${{ steps.pr.outputs.base_ref }}:refs/remotes/origin/${{ steps.pr.outputs.base_ref }}"
 
-      # foo-skills プラグインを実行時に最新の main から取得する。
-      # タグ固定ではなく常に最新を使う方針（ユーザー意向）。
-      # `.claude-plugin/plugin.json` を持つ正式なプラグイン構造なので、
-      # Claude Code の `--plugin-dir` フラグでそのままロードできる。
-      # これにより ${CLAUDE_PLUGIN_ROOT} も正しく設定される。
+      # NOTE: Pull foo-skills from main at run time. We intentionally do not
+      #       pin a tag (per repo owner preference) and rely on the latest
+      #       revision instead. The repository ships a proper plugin layout
+      #       (`.claude-plugin/plugin.json`), so Claude Code can load it as a
+      #       local plugin via `--plugin-dir`, which also wires
+      #       `${CLAUDE_PLUGIN_ROOT}` correctly.
       - name: checkout foo-skills (latest main)
         uses: actions/checkout@v4
         with:
@@ -102,39 +113,59 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # --plugin-dir で foo-skills をローカルプラグインとしてロードする。
-          # これによりエージェントは `foo-skills:code-reviewer` として呼び出せる。
+          # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
+          #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
           prompt: |
-            この PR に対してコードレビューを実行し、結果を `ai-review-report.md` に書き出してください。
+            Run a code review against this PR and write the result to
+            `ai-review-report.md`. Always produce the file even when there
+            are zero findings. The review report format itself is defined
+            by the agent; do not override it here.
 
-            ## レビュー対象
-            - ベースブランチ: `origin/${{ steps.pr.outputs.base_ref }}`
-            - 差分取得コマンド例:
+            Write the review report body in Japanese. (The repository
+            owner reads reviews in Japanese, even though the codebase and
+            this prompt are in English.)
+
+            ## Review target
+            - Base branch: `origin/${{ steps.pr.outputs.base_ref }}`
+            - Helpful diff commands:
               - `git diff --name-only origin/${{ steps.pr.outputs.base_ref }}...HEAD`
               - `git diff origin/${{ steps.pr.outputs.base_ref }}...HEAD`
 
-            ## 実行方法
-            Task tool で `foo-skills:code-reviewer` サブエージェントを起動してください。
-            foo-skills プラグインは `--plugin-dir` でロード済みなので、
-            `${CLAUDE_PLUGIN_ROOT}` を含む内部パス参照はそのまま解決されます。
+            ## How to run
+            Spawn the `foo-skills:code-reviewer` subagent via the Task tool.
+            The foo-skills plugin is already loaded via `--plugin-dir`, so
+            internal references that use `${CLAUDE_PLUGIN_ROOT}` resolve as
+            expected.
 
-            ## プロジェクト固有の前提
+            ## Project-specific context
             - Backend: Rust + Axum + MySQL (`backend/`)
             - Frontend: TypeScript + SolidJS + Tailwind + CSS Modules (`frontend/`)
-            - マイグレーションは SQL ベース (`backend/migrations/`)
-            - API はスキーマファースト (`openapi/`)
-            - Frontend の lint/format は Biome 一本化（ESLint/Prettier は使わない）
-            - 統合テストは言語非依存（Postman/Newman）
-            - 詳細は `CLAUDE.md` を参照
+            - Migrations are plain SQL files under `backend/migrations/`
+            - The API is schema-first (`openapi/`)
+            - Frontend lint/format is Biome only (no ESLint, no Prettier)
+            - Integration tests are language-agnostic (Postman / Newman)
+            - See `CLAUDE.md` for the full project guide
 
-            ## 出力要件
-            - 最終成果物は `ai-review-report.md` ただ 1 ファイル
-            - 内容はレビューレポートの markdown 本文のみ（前置き・後書き・進捗メモ禁止）
-            - 指摘がない場合も Summary を含むレポートを生成する
-            - コードへの修正・コミット・PR コメント投稿は一切行わない
+            ## Constraints
+            - Do not modify code, create commits, or post PR comments under
+              any circumstances.
 
-      # claude-code-action の結果にかかわらず、レポートが生成されていれば投稿する
+      # NOTE: When `ai-review-report.md` is missing we cannot tell whether
+      #       the run was clean (no findings) or whether the workflow itself
+      #       broke. Verify the file exists explicitly and fail the job
+      #       loudly when it does not, regardless of the agent's exit status.
+      - name: ensure review report exists
+        if: always()
+        run: |
+          if [ ! -f ai-review-report.md ]; then
+            echo "::error::ai-review-report.md was not generated."
+            echo "::error::The agent is required to write a report even with zero findings, so this means the workflow itself is broken."
+            echo "::error::Inspect the 'run claude code review' step logs above."
+            exit 1
+          fi
+          echo "ai-review-report.md is present ($(wc -c < ai-review-report.md) bytes)"
+
       - name: post review as sticky PR comment
         if: always() && hashFiles('ai-review-report.md') != ''
         uses: marocchino/sticky-pull-request-comment@v2
