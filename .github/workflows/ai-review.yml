@@ -122,6 +122,10 @@ jobs:
             are zero findings. The review report format itself is defined
             by the agent; do not override it here.
 
+            Write the review report body in Japanese. (The repository
+            owner reads reviews in Japanese, even though the codebase and
+            this prompt are in English.)
+
             ## Review target
             - Base branch: `origin/${{ steps.pr.outputs.base_ref }}`
             - Helpful diff commands:
