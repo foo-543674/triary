@@ -21,9 +21,10 @@ use thiserror::Error;
 
 /// 全ハンドラ共通のエラー型。
 ///
-/// triary は認証を持たないため `Forbidden` 等の認可関連 variant は意図的に
-/// 持たない。将来 認可機構を導入する場合は、その実装と同じコミットで variant を
-/// 追加すること (使われない variant を先回りして残さない方針)。
+/// 現時点で `Forbidden` 等の認可関連 variant を返す経路が無いため、
+/// それらの variant は意図的に定義していない (YAGNI)。
+/// 認可ロジックを実装するコミットで、対応する variant も同時に追加すること。
+/// (triary の認証方式自体が未決定であり、`concept.md` 参照)
 #[derive(Debug, Error)]
 pub enum AppError {
     /// リクエストの形式 / バリデーションエラー。
