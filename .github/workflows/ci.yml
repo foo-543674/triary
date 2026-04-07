@@ -1,0 +1,232 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ---------- Backend ----------
+  backend-lint:
+    name: backend / lint (fmt + clippy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features
+
+  backend-test:
+    name: backend / test (nextest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: cargo nextest run
+        run: cargo nextest run --all-features
+
+  backend-build:
+    name: backend / build (release)
+    runs-on: ubuntu-latest
+    needs: backend-lint
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: cargo build --release
+        run: cargo build --release
+
+  # ---------- Frontend ----------
+  frontend-lint:
+    name: frontend / lint (biome ci)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: biome ci
+        run: pnpm exec biome ci .
+
+  frontend-test:
+    name: frontend / test (vitest + storybook smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: vitest run
+        run: pnpm exec vitest run
+      - name: storybook smoke test
+        run: pnpm run storybook:smoke-test --if-present
+
+  frontend-build:
+    name: frontend / build (vite)
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vite build
+
+  # ---------- Integration tests (言語非依存: Postman / Newman) ----------
+  integration-test:
+    name: integration / newman
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: triary_test
+          MYSQL_USER: triary
+          MYSQL_PASSWORD: triary
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -prootpassword"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+          --tmpfs /var/lib/mysql
+    env:
+      DATABASE_URL: mysql://triary:triary@127.0.0.1:3306/triary_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: install newman
+        run: npm install -g newman
+      - name: run migrations
+        working-directory: backend
+        run: sqlx migrate run
+      - name: start backend
+        working-directory: backend
+        run: |
+          cargo build --release
+          nohup ./target/release/triary-backend > backend.log 2>&1 &
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:8080/health; then exit 0; fi
+            sleep 1
+          done
+          echo "backend failed to start"; cat backend.log; exit 1
+      - name: newman run
+        run: newman run tests/integration/triary.postman_collection.json
+
+  # ---------- OpenAPI スキーマのバリデーション ----------
+  openapi-validate:
+    name: openapi / spectral lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: spectral lint
+        run: npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
+
+  # ---------- 依存脆弱性スキャン ----------
+  security-scan-backend:
+    name: security / cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
+
+  security-scan-frontend:
+    name: security / pnpm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm audit --audit-level high
