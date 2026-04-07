@@ -115,7 +115,7 @@ jobs:
       - name: vitest run
         run: pnpm exec vitest run
       - name: storybook smoke test
-        run: pnpm run storybook:smoke-test --if-present
+        run: pnpm run storybook:smoke-test
 
   frontend-build:
     name: frontend / build (vite)
