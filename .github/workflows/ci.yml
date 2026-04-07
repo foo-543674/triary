@@ -96,6 +96,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: biome ci
         run: pnpm exec biome ci .
+      - name: typecheck (tsc --noEmit)
+        run: pnpm exec tsc --noEmit
 
   frontend-test:
     name: frontend / test (vitest + storybook smoke)

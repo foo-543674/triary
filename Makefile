@@ -55,3 +55,9 @@ db-seed: ## 開発用 DB にシードデータを投入
 .PHONY: db-prepare
 db-prepare: ## sqlx の query! マクロ用オフラインメタデータを再生成 (backend/.sqlx/)
 	cd backend && cargo sqlx prepare -- --tests
+
+# ---------- Frontend ----------
+
+.PHONY: api-generate
+api-generate: ## OpenAPI スキーマから TypeScript 型を再生成 (frontend/src/api/schema.gen.ts)
+	cd frontend && pnpm run api:generate
