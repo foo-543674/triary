@@ -9,9 +9,18 @@ use serde::Serialize;
 
 use crate::interfaces::http::error::AppError;
 
+/// `/health` のステータス値。
+/// 文字列直書きではなく enum で表現することで、`degraded` 等を追加する際に
+/// 全コードベースが型エラーで気づけるようにしておく。
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthStatus {
+    Ok,
+}
+
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
-    pub status: &'static str,
+    pub status: HealthStatus,
 }
 
 pub fn router() -> Router {
@@ -19,7 +28,9 @@ pub fn router() -> Router {
 }
 
 async fn health() -> Result<Json<HealthResponse>, AppError> {
-    Ok(Json(HealthResponse { status: "ok" }))
+    Ok(Json(HealthResponse {
+        status: HealthStatus::Ok,
+    }))
 }
 
 #[cfg(test)]
