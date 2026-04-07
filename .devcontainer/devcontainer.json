@@ -7,32 +7,58 @@
       "profile": "default"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "25"
+      "version": "22"
     },
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "mounts": [
-    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.claude.json,target=/home/vscode/.claude.json,type=bind,consistency=cached"
-  ],
+  "runArgs": ["--network=triary-network"],
+  "initializeCommand": "docker network create triary-network 2>/dev/null || true",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [3000, 8080, 3306, 6006],
+  "portsAttributes": {
+    "3000": { "label": "Frontend (Vite)" },
+    "8080": { "label": "Backend (Axum)" },
+    "3306": { "label": "MySQL" },
+    "6006": { "label": "Storybook" }
+  },
   "customizations": {
     "vscode": {
       "extensions": [
         "rust-lang.rust-analyzer",
         "tamasfe.even-better-toml",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
+        "biomejs.biome",
         "bradlc.vscode-tailwindcss"
       ],
       "settings": {
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "quickfix.biome": "explicit",
+          "source.organizeImports.biome": "explicit"
+        },
         "[rust]": {
           "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[javascript]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[css]": {
+          "editor.defaultFormatter": "biomejs.biome"
         },
         "rust-analyzer.check.command": "clippy"
       }
     }
-  },
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code"
+  }
 }
