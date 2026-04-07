@@ -212,7 +212,7 @@
 ### 人間用
 
 - `README.md`: プロジェクト概要、セットアップ手順、開発フロー、主要コマンド
-- `docs/api.md`: API 仕様（OpenAPI から自動生成）
+- `openapi/openapi.yaml`: API 仕様（一次情報。プレビュー手順は `README.md` の "API spec" 節）
 
 ### AI 用
 
@@ -256,7 +256,7 @@
 2. [x] ローカルインフラの構築 → `setup-local-infra` スキル
 3. [x] CI パイプラインの構築 → `setup-ci` スキル
 4. [x] Claude 設定の構築（`.claude/settings.json`, `CLAUDE.md`）
-5. [x] ドキュメントの初期構成（`README.md`, `openapi/`, `docs/`）
+5. [x] ドキュメントの初期構成（`README.md`, `openapi/`）
 6. [~] 動作確認（devcontainer 起動 → インフラ起動 → マイグレーション → テスト実行 → CI 実行）
    - 構文検証は完了（devcontainer.json / settings.json / YAML / Makefile / bash）
    - フル起動検証は devcontainer 再起動後に実施

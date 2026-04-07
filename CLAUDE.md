@@ -59,8 +59,7 @@ database, you do not have to run `make infra-up`.
 - `.contexts/setup-plan.md`: environment build plan (rationale for the
   setup decisions)
 - `.contexts/security-overrides.md`: ledger for the pnpm.overrides patches
-- `docs/api.md`: API documentation (derived from OpenAPI)
-- `openapi/`: OpenAPI schema (the source of truth for the API)
+- `openapi/openapi.yaml`: OpenAPI schema (the source of truth for the API)
 
 ## Design principles
 

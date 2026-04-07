@@ -70,6 +70,22 @@ make db-seed         # Seed the development DB
 For backend / frontend specific commands, see the "Common commands" section
 in `CLAUDE.md`.
 
+## API spec
+
+The API is schema-first. The source of truth lives at
+[`openapi/openapi.yaml`](./openapi/openapi.yaml). To preview it locally:
+
+```sh
+# Redocly
+npx @redocly/cli preview-docs openapi/openapi.yaml
+
+# Swagger UI (via docker)
+docker run --rm -p 8081:8080 \
+  -e SWAGGER_JSON=/openapi/openapi.yaml \
+  -v $(pwd)/openapi:/openapi \
+  swaggerapi/swagger-ui
+```
+
 ## Repository layout
 
 ```
@@ -81,7 +97,6 @@ in `CLAUDE.md`.
 │   └── migrations/     # sqlx SQL migrations
 ├── frontend/           # SolidJS + Tailwind frontend
 ├── openapi/            # OpenAPI schema (source of truth for the API)
-├── docs/               # Human-facing documentation
 ├── tests/integration/  # Postman collection (language-agnostic integration tests)
 ├── docker-compose.yml  # Local infra (MySQL dev/test)
 ├── Makefile            # Developer task hub

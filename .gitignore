@@ -37,7 +37,6 @@ docker-compose.override.yml
 # ---------------- OpenAPI / generated artifacts ----------------
 # NOTE: Files generated from the OpenAPI schema (types, SDK, HTML docs, ...).
 openapi/generated/
-docs/api/generated/
 
 # ---------------- IDE / editor ----------------
 .vscode/
