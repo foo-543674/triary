@@ -1,0 +1,72 @@
+# triary のローカル開発用インフラ定義。
+# devcontainer とは疎結合に接続する（triary-network を external で共有）。
+# 必要なときだけ `make infra-up` で起動する。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: triary-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-triary_development}
+      MYSQL_USER: ${MYSQL_USER:-triary}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-triary}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-rootpassword}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - triary-network
+
+  mysql-test:
+    image: mysql:8.0
+    container_name: triary-mysql-test
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_TEST_DATABASE:-triary_test}
+      MYSQL_USER: ${MYSQL_USER:-triary}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-triary}
+    # テスト用は毎回クリーンな状態にするため tmpfs でメモリ上に展開
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-rootpassword}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - triary-network
+
+volumes:
+  mysql-data:
+
+networks:
+  triary-network:
+    external: true
