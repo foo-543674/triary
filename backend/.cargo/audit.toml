@@ -1,0 +1,18 @@
+# cargo-audit の設定。
+#
+# ここに列挙した RustSec 勧告は、
+# 現時点で上流に修正版が存在しない等の理由により、意図的に無視する。
+# 無視する場合は必ず理由を併記し、定期的に再評価する。
+
+[advisories]
+ignore = [
+  # RUSTSEC-2023-0071: Marvin Attack (rsa <=0.9.x のタイミングサイドチャネル)
+  # - 経路: sqlx-mysql が MySQL の native password 認証プラグインのために
+  #   rsa クレートに依存している。
+  # - 状況 (2026-04-07 時点): 上流の `rsa` クレートにパッチ版が未リリース。
+  #   sqlx 側でも現状回避不可。
+  # - 緩和策: MySQL サーバー側で caching_sha2_password を使い、
+  #   MySQL ユーザーの接続経路を TLS + プライベートネットワーク内に限定する。
+  # - 再評価: rsa >= 0.10 がリリースされ sqlx-mysql が追随したら解除する。
+  "RUSTSEC-2023-0071",
+]
