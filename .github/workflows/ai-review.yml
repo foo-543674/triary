@@ -131,10 +131,29 @@ jobs:
             ## 出力要件
             - 最終成果物は `ai-review-report.md` ただ 1 ファイル
             - 内容はレビューレポートの markdown 本文のみ（前置き・後書き・進捗メモ禁止）
-            - 指摘がない場合も Summary を含むレポートを生成する
+            - **指摘がゼロでも必ず `ai-review-report.md` を生成すること**。
+              指摘ゼロの場合は以下の構成で出力する:
+                - 1 行目: `# Code Review Report`
+                - `## Summary` 節に **`LGTM` の文字列を必ず含める**
+                  (例: `- 結論: **LGTM** （Critical 0 / Warning 0 / Nit 0）`)
+                - 必要に応じて `## Good Points` 節のみ追加してよい
+                - `## Critical` / `## Warning` / `## Nit` 節は出さない
             - コードへの修正・コミット・PR コメント投稿は一切行わない
 
-      # claude-code-action の結果にかかわらず、レポートが生成されていれば投稿する
+      # ai-review-report.md が無ければ「指摘ゼロ」なのか「ワークフロー壊れ」なのか
+      # 区別できない。エージェントの実行結果に関わらず、ファイルの存在を明示的に
+      # 検証して、無い場合はジョブを失敗させる。
+      - name: ensure review report exists
+        if: always()
+        run: |
+          if [ ! -f ai-review-report.md ]; then
+            echo "::error::ai-review-report.md が生成されませんでした。"
+            echo "::error::エージェントが指摘ゼロでもレポートを書く想定なので、これはワークフロー異常です。"
+            echo "::error::上記 'run claude code review' ステップのログを確認してください。"
+            exit 1
+          fi
+          echo "ai-review-report.md を確認しました ($(wc -c < ai-review-report.md) bytes)"
+
       - name: post review as sticky PR comment
         if: always() && hashFiles('ai-review-report.md') != ''
         uses: marocchino/sticky-pull-request-comment@v2
