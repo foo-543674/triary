@@ -118,8 +118,9 @@ jobs:
           claude_args: "--plugin-dir ./.foo-skills"
           prompt: |
             Run a code review against this PR and write the result to
-            `ai-review-report.md`. The review report format is defined by
-            the agent itself; do not override it here.
+            `ai-review-report.md`. Always produce the file even when there
+            are zero findings. The review report format itself is defined
+            by the agent; do not override it here.
 
             ## Review target
             - Base branch: `origin/${{ steps.pr.outputs.base_ref }}`
