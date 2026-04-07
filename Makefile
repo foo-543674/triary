@@ -51,3 +51,7 @@ db-migrate-test: ## テスト用 DB にマイグレーションを適用
 .PHONY: db-seed
 db-seed: ## 開発用 DB にシードデータを投入
 	cd backend && bash scripts/seed.sh
+
+.PHONY: db-prepare
+db-prepare: ## sqlx の query! マクロ用オフラインメタデータを再生成 (backend/.sqlx/)
+	cd backend && cargo sqlx prepare -- --tests

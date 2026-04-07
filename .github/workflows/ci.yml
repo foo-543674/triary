@@ -13,6 +13,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  # sqlx の query! マクロは .sqlx/ に事前生成されたメタデータを使って
+  # live DB 無しでコンパイルできるようにする (ローカルでは `cargo sqlx prepare` を実行)。
+  SQLX_OFFLINE: "true"
 
 jobs:
   # ---------- Backend ----------
