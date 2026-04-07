@@ -118,7 +118,8 @@ jobs:
           claude_args: "--plugin-dir ./.foo-skills"
           prompt: |
             Run a code review against this PR and write the result to
-            `ai-review-report.md`.
+            `ai-review-report.md`. The review report format is defined by
+            the agent itself; do not override it here.
 
             ## Review target
             - Base branch: `origin/${{ steps.pr.outputs.base_ref }}`
@@ -141,19 +142,7 @@ jobs:
             - Integration tests are language-agnostic (Postman / Newman)
             - See `CLAUDE.md` for the full project guide
 
-            ## Output requirements
-            - The single deliverable is `ai-review-report.md`.
-            - The body must be the markdown review report only (no preamble,
-              no trailing commentary, no progress notes).
-            - **Always create `ai-review-report.md` even when there are zero
-              findings.** In the zero-finding case, use this layout:
-                - Line 1: `# Code Review Report`
-                - A `## Summary` section that **must contain the literal
-                  string `LGTM`**
-                  (e.g. `- Verdict: **LGTM** (Critical 0 / Warning 0 / Nit 0)`)
-                - Optionally a `## Good Points` section
-                - Do not emit `## Critical` / `## Warning` / `## Nit`
-                  sections
+            ## Constraints
             - Do not modify code, create commits, or post PR comments under
               any circumstances.
 
