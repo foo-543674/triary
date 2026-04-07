@@ -1,0 +1,67 @@
+name: Chromatic
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: chromatic / publish storybook
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Chromatic はベースラインとの差分検出のために full history を必要とする。
+          fetch-depth: 0
+
+      # CHROMATIC_PROJECT_TOKEN が未設定のリポジトリでもワークフロー作成時点で落ちないように、
+      # 事前にトークン有無を検出して以降のステップを skip する。
+      - name: detect chromatic token
+        id: token
+        env:
+          TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CHROMATIC_PROJECT_TOKEN secret is not set; skipping chromatic run"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.token.outputs.has_token == 'true'
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.has_token == 'true'
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: install dependencies
+        if: steps.token.outputs.has_token == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: publish to chromatic
+        if: steps.token.outputs.has_token == 'true'
+        uses: chromaui/action@v16
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: frontend
+          # ビジュアル差分は Chromatic UI 上で人間がレビューして accept/deny する運用にし、
+          # 差分自体で PR ステータスを落とさない。描画エラー・ビルドエラーはこのジョブが失敗する。
+          exitZeroOnChanges: true
+          # ストーリーファイル・その依存に変更が無い PR では TurboSnap でスナップショットをスキップする。
+          onlyChanged: true
