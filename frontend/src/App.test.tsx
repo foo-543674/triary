@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import App from './App';
 
 describe('App', () => {
-  it('renders the greeting copy', () => {
+  it('renders the header with the app name', () => {
     render(() => <App />);
-    expect(screen.getByText(/hello tailwind/i)).toBeInTheDocument();
+    // Layout は router の解決前に描画されるので、ヘッダは同期的に assert できる。
+    expect(screen.getByRole('link', { name: /triary/i })).toBeInTheDocument();
   });
 });

@@ -15,7 +15,8 @@
 
     // Type Checking & Safety
     "strict": true,
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
+    "skipLibCheck": true,
+    "types": ["node", "vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", ".storybook"]
+  "include": ["src", ".storybook", "vite.config.ts"]
 }

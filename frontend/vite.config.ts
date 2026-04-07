@@ -1,11 +1,53 @@
-/// <reference types="vitest" />
 import tailwindcss from '@tailwindcss/vite';
 import devtools from 'solid-devtools/vite';
-import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 import solidPlugin from 'vite-plugin-solid';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  plugins: [devtools(), solidPlugin(), tailwindcss()],
+  plugins: [
+    devtools(),
+    solidPlugin(),
+    tailwindcss(),
+    VitePWA({
+      // Service Worker は自動で生成・注入する。
+      // 開発中に実際に PWA 挙動を確認したいケースに備えて `devOptions.enabled` も有効化。
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      devOptions: { enabled: true, type: 'module' },
+      includeAssets: ['apple-touch-icon.png'],
+      manifest: {
+        name: 'triary',
+        short_name: 'triary',
+        description: 'Log your workouts and track progressive overload.',
+        theme_color: '#15803d',
+        background_color: '#ffffff',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+      },
+    }),
+  ],
   server: {
     port: 3000,
   },
@@ -16,13 +58,5 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    // vite-plugin-solid が提供する JSX 変換を vitest でも通すために必要。
-    // @solidjs/testing-library の README に従った設定。
-    transformMode: { web: [/\.[jt]sx?$/] },
-    server: {
-      deps: {
-        inline: [/solid-js/, /@solidjs\/router/],
-      },
-    },
   },
 });
