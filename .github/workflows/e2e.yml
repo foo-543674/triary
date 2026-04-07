@@ -11,8 +11,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Playwright の設定ファイルが入るまで e2e ジョブを自動 skip する。
+  # `frontend/playwright.config.{ts,js}` がコミットされたら自然に有効化される。
+  e2e-detect:
+    name: e2e / detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if compgen -G "frontend/playwright.config.*" > /dev/null; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::frontend/playwright.config.* が無いため e2e ジョブをスキップします"
+          fi
+
   e2e:
     name: e2e / playwright
+    needs: e2e-detect
+    if: needs.e2e-detect.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
