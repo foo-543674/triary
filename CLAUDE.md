@@ -1,57 +1,71 @@
-# triary プロジェクト固有ガイド
+# triary project guide
 
-筋トレ記録・スコアリングを行う PWA。個人プロジェクト兼プログラミング学習。
+A workout-logging and scoring PWA. Personal project, doubles as a programming
+learning playground.
 
-## アーキテクチャ概要
+## Architecture overview
 
-- **Backend**: Rust + Axum + MySQL（`backend/`）
-- **Frontend**: TypeScript + SolidJS + Tailwind CSS + CSS Modules、PWA 配信（`frontend/`）
-- **DB**: MySQL 8.0。マイグレーションは **SQL ベース**（`sqlx-cli`）。ORM モデルベース生成は使わない
-- **API**: スキーマファースト。`openapi/` 配下に OpenAPI 定義を置き、そこからドキュメント・型を派生させる
-- **ユーザーデータの方針**: 個人情報は収集しない
-- **認証方式**: 未決定（実装着手時に選定）
+- **Backend**: Rust + Axum + MySQL (`backend/`)
+- **Frontend**: TypeScript + SolidJS + Tailwind CSS + CSS Modules, served as a
+  PWA (`frontend/`)
+- **DB**: MySQL 8.0. Migrations are **plain SQL** (managed via `sqlx-cli`); we
+  do not use ORM model-based generation.
+- **API**: Schema first. The OpenAPI definition lives under `openapi/`, and
+  documentation and types are derived from it.
+- **User data policy**: We do not collect personal information.
+- **Authentication strategy**: Undecided. Will be chosen when implementation
+  starts.
 
-## 開発フロー
+## Development workflow
 
-- **TDD で進める**。ただし Rust の型システムで保証できる部分のテストは省略する。プロパティベーステストを積極導入
-- **API はスキーマファースト**（OpenAPI 定義先行）
-- **統合テストは言語非依存**（Postman / Newman）で書く。バックエンド言語移行時にもテスト資産を維持できるようにするため
-- **Frontend の lint / format は Biome に一本化**。ESLint / Prettier は使わない
-- **マイグレーションは SQL ベース**。稼働中サービスでモデルと DB スキーマが密結合するのを避ける
+- **TDD**: drive development from tests. Skip tests for things the Rust type
+  system already guarantees, and lean on property-based tests.
+- **API is schema first**: write the OpenAPI definition before the
+  implementation.
+- **Integration tests are language agnostic** (Postman / Newman) so the test
+  assets survive a future backend rewrite in another language.
+- **Frontend lint / format is Biome only**. ESLint and Prettier are not used.
+- **Migrations are SQL based** to avoid tightly coupling models with the DB
+  schema in a running service.
 
-## 主要コマンド
+## Common commands
 
-| コマンド | 用途 |
+| Command | Purpose |
 |---|---|
-| `make help` | 利用可能なコマンド一覧 |
-| `make infra-up` | ローカルインフラ（MySQL dev/test）を起動 |
-| `make infra-down` | ローカルインフラを停止 |
-| `make infra-reset` | データボリュームごとリセットして再起動 |
-| `make db-migrate` | 開発 DB にマイグレーション適用 |
-| `make db-migrate-test` | テスト DB にマイグレーション適用 |
-| `make db-seed` | 開発 DB にシード投入 |
-| `cd backend && cargo nextest run` | Rust の単体テスト |
-| `cd backend && cargo clippy --all-targets` | Rust の lint |
-| `cd backend && cargo fmt --all` | Rust の format |
-| `cd frontend && npx biome ci .` | Frontend の lint + format チェック |
-| `cd frontend && npx vitest run` | Frontend の単体テスト |
-| `cd frontend && npx vite dev` | Frontend 開発サーバー起動 |
+| `make help` | List available make targets |
+| `make infra-up` | Start local infra (MySQL dev/test) |
+| `make infra-down` | Stop local infra |
+| `make infra-reset` | Reset data volumes and restart |
+| `make db-migrate` | Apply migrations to the development DB |
+| `make db-migrate-test` | Apply migrations to the test DB |
+| `make db-seed` | Seed the development DB |
+| `cd backend && cargo nextest run` | Rust unit tests |
+| `cd backend && cargo clippy --all-targets` | Rust lint |
+| `cd backend && cargo fmt --all` | Rust format |
+| `cd frontend && npx biome ci .` | Frontend lint + format check |
+| `cd frontend && npx vitest run` | Frontend unit tests |
+| `cd frontend && npx vite dev` | Frontend dev server |
 
-## devcontainer とローカルインフラの関係
+## devcontainer and local infra
 
-devcontainer とローカルインフラは **疎結合**。devcontainer は単独で起動し、
-`triary-network`（`external: true`）経由で MySQL に接続する。DB が不要な作業では
-`make infra-up` を実行しなくてよい。
+The devcontainer and local infrastructure are **loosely coupled**. The
+devcontainer starts on its own and reaches MySQL through `triary-network`
+(declared `external: true`). When the work in front of you does not need a
+database, you do not have to run `make infra-up`.
 
-## 参照すべきドキュメント
+## Reference documents
 
-- `.contexts/concept.md`: プロジェクトコンセプト・プロダクトの背景
-- `.contexts/setup-plan.md`: 環境構築計画書（方針の根拠）
-- `docs/api.md`: API 仕様（OpenAPI から生成）
-- `openapi/`: OpenAPI スキーマ（API の一次情報）
+- `.contexts/concept.md`: project concept and product background
+- `.contexts/setup-plan.md`: environment build plan (rationale for the
+  setup decisions)
+- `.contexts/security-overrides.md`: ledger for the pnpm.overrides patches
+- `docs/api.md`: API documentation (derived from OpenAPI)
+- `openapi/`: OpenAPI schema (the source of truth for the API)
 
-## 設計判断の原則
+## Design principles
 
-- 迷ったら `.contexts/setup-plan.md` の「方針サマリ」に戻る
-- 技術選定の変更を検討する場合は、`.contexts/` に判断の背景を追記する
-- コミット前に `cargo fmt` / `cargo clippy` / `biome ci` が通ることを確認する
+- When in doubt, go back to the policy summary in `.contexts/setup-plan.md`.
+- When considering a change to the tech stack, append the rationale to a doc
+  under `.contexts/`.
+- Make sure `cargo fmt` / `cargo clippy` / `biome ci` all pass before
+  committing.

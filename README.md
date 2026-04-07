@@ -1,98 +1,106 @@
 # triary
 
-筋トレの記録・スコアリングを行う Web アプリケーション（PWA）。漸進性過負荷の原則に沿って、
-回数・重量・セット数からワークアウトをスコアリングし、トレーニングの進捗を可視化する。
+A workout-logging and scoring web application (PWA). Workouts are scored
+from reps, weight, and set count following the principle of progressive
+overload, so training progress is easy to see at a glance.
 
-個人プロジェクト兼プログラミング学習用リポジトリ。
+This is a personal project that doubles as a programming learning
+repository.
 
-## 技術スタック
+## Tech stack
 
-| レイヤー | 技術 |
+| Layer | Technology |
 |---|---|
 | Backend | Rust + Axum |
-| DB | MySQL 8.0（マイグレーションは SQL ベースの `sqlx-cli`） |
+| DB | MySQL 8.0 (SQL-based migrations via `sqlx-cli`) |
 | Frontend | TypeScript + SolidJS + Tailwind CSS + CSS Modules |
-| 配信形態 | PWA |
-| Lint / Format (Rust) | `rustfmt` + `clippy` |
-| Lint / Format (Frontend) | Biome |
-| テスト (Backend) | `cargo nextest` + プロパティベーステスト |
-| テスト (Frontend) | Vitest + Storybook |
-| 統合テスト | Postman / Newman（言語非依存） |
+| Delivery | PWA |
+| Lint / format (Rust) | `rustfmt` + `clippy` |
+| Lint / format (Frontend) | Biome |
+| Tests (Backend) | `cargo nextest` + property-based tests |
+| Tests (Frontend) | Vitest + Storybook |
+| Integration tests | Postman / Newman (language agnostic) |
 | E2E | Playwright |
 | CI | GitHub Actions |
 
-詳しい方針の根拠は `.contexts/setup-plan.md` を参照。
+See `.contexts/setup-plan.md` for the rationale behind these choices.
 
-## セットアップ
+## Setup
 
-### 前提
+### Prerequisites
 
-- Docker（Docker Desktop / Rancher Desktop 等）
-- VS Code + Dev Containers 拡張
+- Docker (Docker Desktop / Rancher Desktop / etc.)
+- VS Code with the Dev Containers extension
 
-### 手順
+### Steps
 
 ```sh
-# 1. clone
+# 1. Clone
 git clone <this-repo>
 cd triary
 
-# 2. 環境変数を用意
+# 2. Prepare environment variables
 cp .env.example .env
 
-# 3. VS Code で開き、"Reopen in Container" を選ぶ
-#    devcontainer が Rust / Node / 各種ツールをセットアップする
+# 3. Open in VS Code and choose "Reopen in Container".
+#    The devcontainer sets up Rust, Node, and the rest of the toolchain.
 
-# 4. ローカルインフラ（MySQL dev + test）を起動
+# 4. Start the local infra (MySQL dev + test)
 make infra-up
 
-# 5. マイグレーション
+# 5. Apply migrations
 make db-migrate
 
-# 6. 以降はそれぞれ開発サーバー起動
+# 6. Then start the dev servers individually
 cd backend  && cargo run
 cd frontend && npx vite dev
 ```
 
-## 主要コマンド
+## Common commands
 
 ```sh
-make help            # 利用可能なコマンド一覧
-make infra-up        # ローカルインフラ起動
-make infra-down      # 停止
-make infra-reset     # データごとリセット
-make db-migrate      # DB マイグレーション
-make db-seed         # シード投入
+make help            # List available commands
+make infra-up        # Start local infra
+make infra-down      # Stop local infra
+make infra-reset     # Reset data and restart
+make db-migrate      # Apply DB migrations
+make db-seed         # Seed the development DB
 ```
 
-backend / frontend の個別コマンドは `CLAUDE.md` の「主要コマンド」を参照。
+For backend / frontend specific commands, see the "Common commands" section
+in `CLAUDE.md`.
 
-## ディレクトリ構成
+## Repository layout
 
 ```
 .
-├── .contexts/          # プロジェクトの背景・設計判断・構築計画
-├── .devcontainer/      # devcontainer 設定（Rust + Node + Biome + DooD）
-├── .github/workflows/  # CI / E2E パイプライン
-├── backend/            # Rust + Axum のバックエンド
-│   └── migrations/     # sqlx の SQL マイグレーション
-├── frontend/           # SolidJS + Tailwind のフロントエンド
-├── openapi/            # OpenAPI スキーマ（API の一次情報）
-├── docs/               # 人間向けドキュメント
-├── tests/integration/  # Postman コレクション（言語非依存の統合テスト）
-├── docker-compose.yml  # ローカルインフラ（MySQL dev/test）
-├── Makefile            # 開発タスク集約
-└── CLAUDE.md           # Claude Code / AI 向けのプロジェクトガイド
+├── .contexts/          # Project background, design decisions, build plan
+├── .devcontainer/      # devcontainer config (Rust + Node + Biome + DooD)
+├── .github/workflows/  # CI / E2E pipelines
+├── backend/            # Rust + Axum backend
+│   └── migrations/     # sqlx SQL migrations
+├── frontend/           # SolidJS + Tailwind frontend
+├── openapi/            # OpenAPI schema (source of truth for the API)
+├── docs/               # Human-facing documentation
+├── tests/integration/  # Postman collection (language-agnostic integration tests)
+├── docker-compose.yml  # Local infra (MySQL dev/test)
+├── Makefile            # Developer task hub
+└── CLAUDE.md           # Project guide for Claude Code / AI assistants
 ```
 
-## 開発方針
+## Development principles
 
-- **TDD**: Red → Green → Refactor。Rust の型で保証できる部分はテストを省略し、プロパティベーステストを積極活用
-- **スキーマファースト**: API は OpenAPI 定義を先に書き、そこから実装・ドキュメント・型を派生させる
-- **SQL マイグレーション**: ORM モデル生成は使わない。稼働中サービスでモデルと DB スキーマが密結合するのを避けるため
-- **言語非依存の統合テスト**: バックエンドを将来的に別言語へ移植しても、テスト資産が維持されるよう Newman で書く
-- **devcontainer とインフラの疎結合**: devcontainer は単独で起動し、`triary-network` 経由で必要なときだけインフラに接続する
+- **TDD**: Red -> Green -> Refactor. Skip tests for things the Rust type
+  system already guarantees, and lean on property-based tests.
+- **Schema first**: write the OpenAPI definition first, then derive
+  implementation, documentation, and types from it.
+- **SQL migrations**: avoid ORM model generation so the live service does
+  not couple models tightly to the DB schema.
+- **Language-agnostic integration tests**: write them in Newman so the test
+  assets survive a possible future backend rewrite in another language.
+- **Loose coupling between devcontainer and infra**: the devcontainer runs
+  standalone and only joins the infra over `triary-network` when needed.
 
-## ライセンス
+## License
 
-個人プロジェクトのため未定。
+Undecided (personal project).

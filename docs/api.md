@@ -1,17 +1,18 @@
-# API ドキュメント
+# API documentation
 
-API の一次情報は [`openapi/openapi.yaml`](../openapi/openapi.yaml) にあります。
-このファイルはそれを補足する人間向けの説明を置く場所です。
+The source of truth for the API is
+[`openapi/openapi.yaml`](../openapi/openapi.yaml).
+This file holds the human-readable notes that complement that schema.
 
-## 閲覧方法
+## How to view the docs
 
-### Redocly でローカルプレビュー
+### Local preview with Redocly
 
 ```sh
 npx @redocly/cli preview-docs openapi/openapi.yaml
 ```
 
-### Swagger UI でローカル確認
+### Local check with Swagger UI
 
 ```sh
 docker run -p 8081:8080 \
@@ -20,9 +21,9 @@ docker run -p 8081:8080 \
   swaggerapi/swagger-ui
 ```
 
-## 生成物
+## Generated artifacts
 
-CI では以下が生成される（構築予定）:
+CI is planned to produce the following:
 
-- Swagger UI / Redoc を GitHub Pages にデプロイ（PR ごと）
-- `spectral` によるスキーマ linting
+- A Swagger UI / Redoc deploy to GitHub Pages, refreshed on every PR.
+- Schema linting via `spectral`.
