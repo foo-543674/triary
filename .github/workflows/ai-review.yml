@@ -55,6 +55,8 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      # anthropics/claude-code-action@v1 は OIDC トークンで認証するため必須
+      id-token: write
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
     steps:
