@@ -53,7 +53,7 @@ jobs:
         with:
           tool: cargo-nextest
       - name: cargo nextest run
-        run: cargo nextest run --all-features
+        run: cargo nextest run --all-features --no-tests=pass
 
   backend-build:
     name: backend / build (release)
