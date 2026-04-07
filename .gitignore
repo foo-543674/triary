@@ -1,21 +1,80 @@
-# Rust
+# ---------------- Rust / Backend ----------------
 backend/target/
+**/*.rs.bk
+*.pdb
+# sqlx のオフラインクエリキャッシュは基本コミットするので除外しない
+# (コミットしたくない場合のみ下記を有効化)
+# backend/.sqlx/
 
-# Node / Frontend
+# ---------------- Node / Frontend ----------------
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/storybook-static/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
 
-# IDE
+# ---------------- テスト / カバレッジ ----------------
+backend/coverage/
+backend/tarpaulin-report.html
+lcov.info
+*.profraw
+
+# ---------------- ローカルインフラ / Docker ----------------
+# docker compose が生成する一時ファイル
+docker-compose.override.yml
+# MySQL がホスト側に書き出すダンプ等
+*.sql.gz
+*.dump
+
+# ---------------- OpenAPI / 生成物 ----------------
+# OpenAPI からの生成物 (型・SDK・HTML ドキュメント等)
+openapi/generated/
+docs/api/generated/
+
+# ---------------- IDE / エディタ ----------------
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.shared.json
 .idea/
 *.swp
 *.swo
+*.swn
+*~
 
-# OS
+# ---------------- OS ----------------
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Environment
+# ---------------- 環境変数 / シークレット ----------------
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+!**/test/**/*.pem
+!**/test/**/*.key
+
+# ---------------- Claude Code (個人設定のみ除外) ----------------
+.claude/settings.local.json
+.claude/.credentials.json
+
+# ---------------- ログ / 一時ファイル ----------------
+*.log
+logs/
+tmp/
+.tmp/
+.cache/
