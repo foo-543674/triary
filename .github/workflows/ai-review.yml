@@ -90,7 +90,7 @@ jobs:
           fi
 
       - name: checkout PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.pr.outputs.head_sha }}
@@ -107,7 +107,7 @@ jobs:
       #       local plugin via `--plugin-dir`, which also wires
       #       `${CLAUDE_PLUGIN_ROOT}` correctly.
       - name: checkout foo-skills (latest main)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: foo-543674/foo-skills
           path: .foo-skills
