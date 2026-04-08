@@ -51,11 +51,15 @@ concurrency:
 jobs:
   ai-review:
     name: ai / code review (foo-skills)
-    # NOTE: Skip draft PRs and PRs whose title contains `[skip ai-review]`.
-    #       workflow_dispatch always runs.
+    # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`, and
+    #       PRs opened by dependabot (dependabot only edits dependency
+    #       manifests / lockfiles / workflow `uses:` lines, which the human
+    #       reviewer handles together with the `pnpm.overrides` ledger in
+    #       `.contexts/security-overrides.md`). workflow_dispatch always runs.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
+       github.event.pull_request.user.login != 'dependabot[bot]' &&
        !contains(github.event.pull_request.title, '[skip ai-review]'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
