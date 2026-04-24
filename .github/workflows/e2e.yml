@@ -54,7 +54,7 @@ jobs:
         with:
           tool: sqlx-cli
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
