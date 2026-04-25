@@ -117,6 +117,18 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # NOTE: Pass GITHUB_TOKEN explicitly so the action skips the
+          #       Anthropic-side App-token exchange. That exchange checks
+          #       the OIDC `actor` (= commit author) for repo write access,
+          #       which fails with `App token exchange failed: 401
+          #       Unauthorized - User does not have write access on this
+          #       repository` whenever a bot account such as Copilot
+          #       (`copilot-swe-agent[bot]`) authored the head commit, even
+          #       though `triggering_actor` is the repo owner. Using the
+          #       workflow-scoped GITHUB_TOKEN sidesteps that check and
+          #       relies on the `permissions:` block declared above for
+          #       repo access.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
