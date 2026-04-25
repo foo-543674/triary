@@ -129,6 +129,18 @@ jobs:
           #       relies on the `permissions:` block declared above for
           #       repo access.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # NOTE: Allow the Copilot Coding Agent as a "non-write user".
+          #       The agent appears as `actor: Copilot` (no `[bot]`
+          #       suffix), so the action's automatic bot detection
+          #       misses it, then `octokit.repos.getCollaboratorPermission
+          #       Level({ username: "Copilot" })` returns "Copilot is not
+          #       a user" and the run fails with `Failed to check
+          #       permissions for Copilot`. Whitelisting the actor here
+          #       skips the permission lookup. Safe in this workflow
+          #       because the permissions block only grants
+          #       pull-requests / issues write (no contents:write) and
+          #       the Copilot agent is always invoked by the repo owner.
+          allowed_non_write_users: "Copilot"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
