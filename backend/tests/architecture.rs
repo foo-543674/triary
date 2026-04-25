@@ -28,6 +28,7 @@ const FORBIDDEN_INFRA_CRATES: &[&str] = &[
     "sqlx",
     "tower",
     "tower_http",
+    "tracing",
     "tracing_subscriber",
     "hyper",
 ];
@@ -110,7 +111,8 @@ struct Violation {
 }
 
 fn forbidden_import_violations(path: &Path) -> Vec<Violation> {
-    let source = fs::read_to_string(path).unwrap_or_default();
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
     source
         .lines()
         .enumerate()
@@ -142,7 +144,8 @@ fn imports_crate(use_path: &str, crate_name: &str) -> bool {
 }
 
 fn forbidden_type_decl_violations(path: &Path) -> Vec<Violation> {
-    let source = fs::read_to_string(path).unwrap_or_default();
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
     source
         .lines()
         .enumerate()
@@ -163,7 +166,8 @@ fn forbidden_type_decl_violations(path: &Path) -> Vec<Violation> {
 }
 
 fn handler_type_decl_violations(path: &Path) -> Vec<Violation> {
-    let source = fs::read_to_string(path).unwrap_or_default();
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
     source
         .lines()
         .enumerate()

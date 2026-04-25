@@ -28,13 +28,26 @@
       "Bash(chmod:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
-      "Bash(find:*)",
+      "Bash(find /workspaces/triary:*)",
+      "Bash(find .:*)",
+      "Bash(find backend:*)",
+      "Bash(find frontend:*)",
+      "Bash(find openapi:*)",
+      "Bash(find tests:*)",
       "Bash(grep:*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
       "Bash(git push --force*)",
-      "Bash(git reset --hard*)"
+      "Bash(git reset --hard*)",
+      "Bash(find /:*)",
+      "Bash(find /etc:*)",
+      "Bash(find /home:*)",
+      "Bash(find /root:*)",
+      "Bash(grep -r * /)",
+      "Bash(grep -r * /etc*)",
+      "Bash(grep -r * /home*)",
+      "Bash(grep -r * /root*)"
     ]
   }
 }

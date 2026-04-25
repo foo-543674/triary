@@ -64,10 +64,9 @@ These rules are checked by `cargo nextest run -p triary-backend` (the
 
 ## Quality lenses applied
 
-The full lens set lives under
-`/home/foo-543674/.claude/plugins/cache/foo-skills/foo-skills/2.1.0/perspectives/`
-and is mirrored as a checklist in `.contexts/bootstrap-decisions.md`. The
-ones most often consulted on this project:
+The full lens set comes from the `foo-skills` plugin (see
+`.contexts/bootstrap-decisions.md` for which `perspectives/` were selected
+and why). The ones most often consulted on this project:
 
 - **architecture**: layer origins, port placement, error boundaries
 - **api-design**: HTTP status reserved for protocol concerns; errors as
