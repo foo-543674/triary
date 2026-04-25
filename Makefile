@@ -61,3 +61,10 @@ db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx
 .PHONY: api-generate
 api-generate: ## Regenerate TypeScript types from the OpenAPI schema (frontend/src/api/schema.gen.ts)
 	cd frontend && pnpm run api:generate
+
+# ---------- Architecture tests ----------
+
+.PHONY: arch-test
+arch-test: ## Run architecture tests for both backend and frontend
+	cd backend && cargo nextest run --test architecture --no-tests=pass
+	cd frontend && pnpm run arch:test

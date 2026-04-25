@@ -16,15 +16,20 @@
       "Bash(npm:*)",
       "Bash(npx:*)",
       "Bash(node:*)",
+      "Bash(pnpm:*)",
       "Bash(biome:*)",
       "Bash(vite:*)",
       "Bash(vitest:*)",
+      "Bash(tsc:*)",
+      "Bash(depcruise:*)",
       "Bash(newman:*)",
       "Bash(gh:*)",
       "Bash(git:*)",
       "Bash(chmod:*)",
       "Bash(ls:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",

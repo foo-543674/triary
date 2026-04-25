@@ -1,0 +1,126 @@
+// Architecture rules for the frontend.
+//
+// Run via `pnpm run arch:test`. The rules mirror what is documented in
+// `CLAUDE.md` and `.contexts/bootstrap-decisions.md`. Tighten them when a
+// new violation pattern is observed; loosen them only with a note in
+// `bootstrap-decisions.md`.
+
+/** @type {import('dependency-cruiser').IConfiguration} */
+module.exports = {
+  forbidden: [
+    {
+      name: "no-circular",
+      severity: "error",
+      comment:
+        "Circular dependencies are a structural smell. Extract the shared piece into a third module instead of letting two modules depend on each other.",
+      from: {},
+      to: { circular: true },
+    },
+    {
+      name: "no-orphans",
+      severity: "warn",
+      comment:
+        "Orphan modules are usually dead code. Either wire them up or delete them.",
+      from: {
+        orphan: true,
+        pathNot: [
+          "(^|/)\\.[^/]+\\.(js|cjs|mjs|ts|cts|mts)$", // dotfiles such as .biome.cjs
+          "\\.d\\.ts$",
+          "(^|/)tsconfig\\.json$",
+          "(^|/)biome\\.json$",
+          "(^|/)package\\.json$",
+          "src/index\\.tsx$",
+          "src/test/setup\\.ts$",
+          "src/mocks/(server|browser|handlers)\\.ts$",
+          "src/api/schema\\.gen\\.ts$",
+          "vite\\.config\\.ts$",
+          "\\.stories\\.(ts|tsx)$",
+          "\\.test\\.(ts|tsx)$",
+        ],
+      },
+      to: {},
+    },
+    {
+      name: "components-must-not-depend-on-features",
+      severity: "error",
+      comment:
+        "`components/` is generic / domain-presentational UI. It must not reach back into `features/`. If you need feature data inside a presentational component, lift it to props.",
+      from: { path: "^src/components/" },
+      to: { path: "^src/features/" },
+    },
+    {
+      name: "components-must-not-depend-on-routes",
+      severity: "error",
+      comment:
+        "Routes are URL-bound entry points; presentational components must not import them.",
+      from: { path: "^src/components/" },
+      to: { path: "^src/routes/" },
+    },
+    {
+      name: "no-feature-cross-imports",
+      severity: "error",
+      comment:
+        "Each feature owns its own state and UI. Cross-feature imports create implicit coupling. Extract shared pieces into `lib/` or `components/`.",
+      from: { path: "^src/features/([^/]+)/" },
+      to: {
+        path: "^src/features/([^/]+)/",
+        pathNot: "^src/features/$1/",
+      },
+    },
+    {
+      name: "openapi-fetch-only-from-api",
+      severity: "error",
+      comment:
+        "`openapi-fetch` is the HTTP transport. It is allowed inside `src/api/` only. Everything else must go through the typed client exported from `src/api/client`.",
+      from: {
+        path: "^src/",
+        pathNot: "^src/api/",
+      },
+      to: { path: "^node_modules/openapi-fetch/" },
+    },
+    {
+      name: "schema-gen-only-from-api",
+      severity: "error",
+      comment:
+        "`api/schema.gen.ts` is the generated OpenAPI types. Import them through `src/api/` so we can swap the transport in one place.",
+      from: {
+        path: "^src/",
+        pathNot: "^src/api/",
+      },
+      to: { path: "^src/api/schema\\.gen\\.ts$" },
+    },
+    {
+      name: "no-deprecated-core",
+      severity: "warn",
+      comment:
+        "Some core modules of Node have been deprecated. Find an alternative.",
+      from: {},
+      to: { dependencyTypes: ["core"], path: "^(punycode|domain|constants|sys|_linklist|_stream_wrap)$" },
+    },
+    {
+      name: "not-to-dev-dep",
+      severity: "error",
+      comment:
+        "Production code must not depend on devDependencies. Move the import to a test/story file or promote the package to `dependencies`.",
+      from: {
+        path: "^src/",
+        pathNot:
+          "\\.(test|spec|stories)\\.(js|jsx|ts|tsx)$|^src/test/|^src/mocks/",
+      },
+      to: { dependencyTypes: ["npm-dev"] },
+    },
+  ],
+  options: {
+    doNotFollow: { path: "node_modules" },
+    exclude: { path: "^(dist|storybook-static|node_modules|coverage)/" },
+    tsConfig: { fileName: "tsconfig.json" },
+    enhancedResolveOptions: {
+      exportsFields: ["exports"],
+      conditionNames: ["import", "require", "node", "default", "browser"],
+      mainFields: ["module", "main", "types", "typings"],
+    },
+    reporterOptions: {
+      text: { highlightFocused: true },
+    },
+  },
+};

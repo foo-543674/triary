@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "arch:test": "depcruise --config .dependency-cruiser.cjs src",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "api:generate": "openapi-typescript ../openapi/openapi.yaml -o ./src/api/schema.gen.ts"
@@ -28,6 +29,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@types/node": "^25.6.0",
     "chromatic": "^16",
+    "dependency-cruiser": "^16",
     "fast-check": "^4.7.0",
     "jsdom": "^29.0.2",
     "msw": "^2.13.5",
