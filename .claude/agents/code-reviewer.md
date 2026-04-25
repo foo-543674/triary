@@ -25,8 +25,10 @@ model: sonnet
 
 ### 1. アーキテクチャ境界（最優先）
 
-- `backend/src/domain/` 配下に `axum` / `sqlx` / `tower*` / `tracing` の
-  import がないか
+- `backend/src/domain/` 配下に `axum` / `axum_extra` / `sqlx` / `tower` /
+  `tower_http` / `tracing` / `tracing_subscriber` / `hyper` の import が
+  ないか（`backend/tests/architecture.rs` の `FORBIDDEN_INFRA_CRATES`
+  と同期）
 - `backend/src/application/` 配下に上記インフラクレートの import がな
   いか
 - `domain` / `application` の関数・メソッドシグネチャに `sqlx::FromRow`

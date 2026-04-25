@@ -45,8 +45,9 @@ full rationale):
 | `interfaces` | external protocol boundary | HTTP / CLI adapters, DTO conversion, auth middleware |
 
 Hard rules:
-- `domain` must not import `axum`, `sqlx`, `tower`, `tower_http`, `tracing`,
-  or any other infrastructure crate.
+- `domain` must not import `axum`, `axum_extra`, `sqlx`, `tower`,
+  `tower_http`, `tracing`, `tracing_subscriber`, `hyper`, or any other
+  infrastructure crate.
 - `application` must not import infrastructure crates either; it depends on
   ports defined in `domain` / `application`.
 - Repository traits live in `application/ports/`; concrete implementations
@@ -59,8 +60,8 @@ Hard rules:
   `Manager`, `Helper`, `Util`, `Utils`, `Processor`, `Worker`, `Engine`.
   `Handler` is allowed only inside `interfaces::http`.
 
-These rules are checked by `cargo nextest run -p triary-backend` (the
-`tests/architecture/` test suite) and `pnpm run arch:test` for the frontend.
+These rules are checked by `cargo nextest run` against
+`backend/tests/architecture.rs` and `pnpm run arch:test` for the frontend.
 
 ## Quality lenses applied
 

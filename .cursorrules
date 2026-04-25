@@ -15,8 +15,8 @@ guide. This file is the always-on context Cursor should respect.
 
 ## Backend layer rules (hard constraints)
 
-- `backend/src/domain/` MUST NOT import `axum`, `sqlx`, `tower*`,
-  `tower_http`, or `tracing`.
+- `backend/src/domain/` MUST NOT import `axum`, `axum_extra`, `sqlx`,
+  `tower`, `tower_http`, `tracing`, `tracing_subscriber`, or `hyper`.
 - `backend/src/application/` MUST NOT import infrastructure crates.
 - Repository traits live in `application/ports/`; implementations in
   `infrastructure/repositories/`.

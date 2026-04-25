@@ -78,8 +78,10 @@
 ### テスト化したルール
 
 - **Rust 依存方向**: `domain` / `application` 配下に
-  `axum` / `sqlx` / `tower_http` / `tracing_subscriber` の use 文がな
-  いことをスキャン
+  `axum` / `axum_extra` / `sqlx` / `tower` / `tower_http` / `tracing` /
+  `tracing_subscriber` / `hyper` の use 文がないことをスキャン
+  （実装側 `backend/tests/architecture.rs` の `FORBIDDEN_INFRA_CRATES`
+  と同期）
 - **Rust 禁止語**: ソース全体で `Service` / `Manager` / `Helper` /
   `Util(s)` / `Processor` / `Worker` / `Engine` を含む型名（`pub
   struct` / `pub enum` / `pub trait` 宣言）がないことをスキャン。
@@ -88,8 +90,9 @@
   `frontend/src/features/` への import 禁止、`frontend/src/features/<x>/`
   から `frontend/src/features/<y>/` への横断 import 禁止、
   `frontend/src/api/` 以外から `openapi-fetch` の直接 import 禁止
-- **TS 禁止語**: `dependency-cruiser` の `forbidden` ルールでは難しい
-  ため、`pnpm run arch:test` の中で簡易 `grep` チェックを併用
+- **TS 禁止語**: `dependency-cruiser` は依存関係を見るツールで型名・クラ
+  ス名のスキャンには向かないため、TS 側の禁止語チェックは `arch:test`
+  には組み込まず、`code-reviewer` エージェント（Layer 3）に委ねる
 
 ### CI 組み込み
 
@@ -104,6 +107,27 @@
   code-reviewer が指摘）
 - `errors[]` 配列形式のエラーレスポンス（OpenAPI 側のスキーマ検証で別
   途カバー）
+
+## `.claude/settings.json` 許可コマンドの方針
+
+bootstrap で許可コマンド (`permissions.allow` / `permissions.deny`) を以下
+の方針で更新した。後から AI が判断に迷ったときの参照点として残す。
+
+- **`find` と `grep` は project path に限定して allow する**: ベストプラ
+  クティスは「allow 側を積極的に限定する」方針。`Bash(find:*)` のように
+  全許可するとシステムパス探索を deny だけで止める形になり、deny の漏れ
+  が即セキュリティ事故になる。例えば `Bash(grep * .)` `Bash(grep * ./*)`
+  `Bash(grep * /workspaces/triary*)` 等で **プロジェクト内とカレント基
+  準の grep のみを allow** している
+- **意図的な副作用**: パス指定なしの相対 grep（例: `grep "x" file.rs`）
+  は permission prompt を出す。これは仕様であり、設定の不備ではない。
+  pwd を絶対パスで指定するか `./file.rs` の形にすれば allow される
+- **`deny` はコロン構文のみ**: `Bash(find /etc:*)` のような prefix-match
+  を使い、wildcard `Bash(find /etc*)` のグロブは allow パターンを巻き込
+  むので使わない
+- **ルートパス deny は載せない**: `Bash(find /:*)` は `find /workspaces/
+  triary` まで巻き込むので置かない。代わりに `find /` 単独実行は allow
+  に無く、permission prompt 経由で都度確認するに留める
 
 ## Phase 5: 技術インフラの状態
 

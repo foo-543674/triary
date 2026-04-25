@@ -17,8 +17,8 @@ this file is the short version Copilot needs in every prompt.
 ## Layer rules (do not break)
 
 Backend:
-- `domain` must not import infrastructure crates (`axum`, `sqlx`, `tower*`,
-  `tracing`).
+- `domain` must not import infrastructure crates (`axum`, `axum_extra`,
+  `sqlx`, `tower`, `tower_http`, `tracing`, `tracing_subscriber`, `hyper`).
 - `application` must not import infrastructure crates either.
 - Repository traits live in `application/ports/`; implementations in
   `infrastructure/repositories/`.

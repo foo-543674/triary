@@ -7,8 +7,8 @@
 //!
 //! Rules enforced here:
 //! 1. `domain` and `application` must not import infrastructure crates
-//!    (`axum`, `sqlx`, `tower`, `tower_http`, `tracing_subscriber`,
-//!    `axum_*`).
+//!    (`axum`, `axum_extra`, `sqlx`, `tower`, `tower_http`, `tracing`,
+//!    `tracing_subscriber`, `hyper`).
 //! 2. Forbidden structural vocabulary in declared type names
 //!    (`Service`, `Manager`, `Helper`, `Util`, `Utils`, `Processor`,
 //!    `Worker`, `Engine`). `Handler` is allowed only inside
@@ -251,10 +251,8 @@ fn collect_files(root: &Path) -> Vec<PathBuf> {
 }
 
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-    let entries = match fs::read_dir(dir) {
-        Ok(it) => it,
-        Err(_) => return,
-    };
+    let entries =
+        fs::read_dir(dir).unwrap_or_else(|e| panic!("failed to read_dir {}: {e}", dir.display()));
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -283,7 +281,7 @@ fn format_violations(violations: &[Violation]) -> String {
 
 #[cfg(test)]
 mod helpers_self_test {
-    use super::{contains_token, declared_type_name, imports_crate};
+    use super::{contains_token, declared_type_name, imports_crate, strip_comment};
 
     #[test]
     fn contains_token_matches_pascal_case_boundaries() {
@@ -309,6 +307,21 @@ mod helpers_self_test {
         assert_eq!(declared_type_name("pub type Alias = u32;"), Some("Alias"));
         assert_eq!(declared_type_name("fn foo() {}"), None);
         assert_eq!(declared_type_name("// pub struct Foo;"), None);
+    }
+
+    #[test]
+    fn strip_comment_removes_line_comment_tail() {
+        assert_eq!(
+            strip_comment("use axum::Router; // re-export"),
+            "use axum::Router; "
+        );
+        assert_eq!(strip_comment("// pub struct Foo"), "");
+        assert_eq!(strip_comment("pub struct Foo;"), "pub struct Foo;");
+        // Known limitation: a `//` inside a string literal would also be
+        // stripped, but `use` lines and type declarations don't carry
+        // string literals in practice. Block comments (`/* ... */`) are
+        // also out of scope; document any new false positive here.
+        assert_eq!(strip_comment("let s = \"a // b\";"), "let s = \"a ");
     }
 
     #[test]
