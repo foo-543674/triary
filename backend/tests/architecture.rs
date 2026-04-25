@@ -197,9 +197,13 @@ fn declared_type_name(line: &str) -> Option<&str> {
         .or_else(|| line.strip_prefix("pub(super) "))
         .unwrap_or(line)
         .trim_start();
+    let after_unsafe = after_visibility
+        .strip_prefix("unsafe ")
+        .unwrap_or(after_visibility)
+        .trim_start();
     let after_keyword = KEYWORDS
         .iter()
-        .find_map(|kw| after_visibility.strip_prefix(kw))?
+        .find_map(|kw| after_unsafe.strip_prefix(kw))?
         .trim_start();
     let name_end = after_keyword
         .find(|c: char| !c.is_alphanumeric() && c != '_')
@@ -297,6 +301,24 @@ mod helpers_self_test {
         assert!(!contains_token("Engineer", "Engine"));
         assert!(!contains_token("Servicing", "Service"));
         assert!(!contains_token("Helpline", "Help"));
+        // Boundary spec: only the character AFTER the token is checked, not
+        // the one before. So PascalCase composition matches even when the
+        // preceding char is lowercase, but a fully lowercase word does not
+        // match an uppercase token.
+        assert!(contains_token("XService", "Service"));
+        assert!(!contains_token("service", "Service"));
+    }
+
+    #[test]
+    fn declared_type_name_extracts_unsafe_trait() {
+        assert_eq!(
+            declared_type_name("pub unsafe trait FooService {}"),
+            Some("FooService")
+        );
+        assert_eq!(
+            declared_type_name("unsafe trait BarManager {}"),
+            Some("BarManager")
+        );
     }
 
     #[test]
