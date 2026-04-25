@@ -60,7 +60,10 @@ module.exports = {
       name: "no-feature-cross-imports",
       severity: "error",
       comment:
-        "Each feature owns its own state and UI. Cross-feature imports create implicit coupling. Extract shared pieces into `lib/` or `components/`.",
+        "Each feature owns its own state and UI. Cross-feature imports create implicit coupling. Extract shared pieces into `lib/` or `components/`." +
+        " NOTE: `$1` in `to.pathNot` is a group-match backreference to the first capture group in `from.path` (the feature name)." +
+        " This is explicitly supported by dependency-cruiser v16 in both `path` and `pathNot` fields of `to`." +
+        " Verify with a real cross-feature import once features directories exist.",
       from: { path: "^src/features/([^/]+)/" },
       to: {
         path: "^src/features/([^/]+)/",

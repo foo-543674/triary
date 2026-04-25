@@ -215,7 +215,9 @@ fn declared_type_name(line: &str) -> Option<&str> {
 /// Checks whether `name` contains `token` at a PascalCase word boundary.
 ///
 /// Treats `token` as matched when the next character is end-of-string or
-/// the start of a new word (uppercase, digit-after-letter, or non-ident).
+/// the start of a new word (uppercase letter or non-ident character).
+/// Digits and underscores are treated as continuation characters (not word
+/// boundaries), so `"Engine2"` does NOT match `"Engine"`.
 /// `prev` is intentionally ignored: `UserService` should match `Service`
 /// even though `r` is lowercase.
 ///
@@ -223,6 +225,7 @@ fn declared_type_name(line: &str) -> Option<&str> {
 /// - `"UserService"` matches `"Service"` (next = end-of-string)
 /// - `"ServiceImpl"` matches `"Service"` (next = `'I'` uppercase)
 /// - `"Engineer"` does NOT match `"Engine"` (next = `'e'` lowercase)
+/// - `"Engine2"` does NOT match `"Engine"` (next = `'2'` digit, continuation)
 fn contains_token(name: &str, token: &str) -> bool {
     let mut start = 0;
     while let Some(pos) = name[start..].find(token) {
@@ -307,6 +310,16 @@ mod helpers_self_test {
         // match an uppercase token.
         assert!(contains_token("XService", "Service"));
         assert!(!contains_token("service", "Service"));
+    }
+
+    #[test]
+    fn contains_token_treats_digits_as_continuation() {
+        // Digits are continuation characters, not word boundaries.
+        // "Engine2" does NOT match "Engine" because '2' continues the token.
+        assert!(!contains_token("Engine2", "Engine"));
+        assert!(!contains_token("Service2", "Service"));
+        // Underscores are also continuation characters.
+        assert!(!contains_token("Engine_v2", "Engine"));
     }
 
     #[test]
