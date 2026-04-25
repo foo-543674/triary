@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "arch:test": "depcruise --config .dependency-cruiser.cjs src",
+    "arch:test": "depcruise --config .dependency-cruiser.cjs \"src/**/*.{ts,tsx}\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "api:generate": "openapi-typescript ../openapi/openapi.yaml -o ./src/api/schema.gen.ts"

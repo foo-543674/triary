@@ -115,6 +115,7 @@ module.exports = {
     exclude: { path: "^(dist|storybook-static|node_modules|coverage)/" },
     tsConfig: { fileName: "tsconfig.json" },
     enhancedResolveOptions: {
+      extensions: [".ts", ".tsx", ".d.ts", ".js", ".jsx", ".json"],
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "browser"],
       mainFields: ["module", "main", "types", "typings"],

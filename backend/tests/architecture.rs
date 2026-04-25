@@ -148,9 +148,7 @@ fn forbidden_type_decl_violations(path: &Path) -> Vec<Violation> {
         .enumerate()
         .filter_map(|(idx, raw_line)| {
             let line = strip_comment(raw_line);
-            let Some(name) = declared_type_name(line) else {
-                return None;
-            };
+            let name = declared_type_name(line)?;
             FORBIDDEN_TYPE_TOKENS
                 .iter()
                 .find(|token| contains_token(name, token))
@@ -266,7 +264,15 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
 fn format_violations(violations: &[Violation]) -> String {
     violations
         .iter()
-        .map(|v| format!("  {}:{} — {}\n    {}", v.file.display(), v.line, v.reason, v.text))
+        .map(|v| {
+            format!(
+                "  {}:{} — {}\n    {}",
+                v.file.display(),
+                v.line,
+                v.reason,
+                v.text
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -305,7 +311,10 @@ mod helpers_self_test {
     fn imports_crate_recognises_use_paths() {
         assert!(imports_crate("axum::Router;", "axum"));
         assert!(imports_crate("sqlx::{MySql, Pool};", "sqlx"));
-        assert!(imports_crate("tower_http::trace::TraceLayer;", "tower_http"));
+        assert!(imports_crate(
+            "tower_http::trace::TraceLayer;",
+            "tower_http"
+        ));
         assert!(!imports_crate("crate::domain::User;", "axum"));
         assert!(!imports_crate("self::sub::Foo;", "axum"));
     }
