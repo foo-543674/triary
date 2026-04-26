@@ -51,14 +51,30 @@ concurrency:
 jobs:
   ai-review:
     name: ai / code review (foo-skills)
-    # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`, and
+    # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`,
     #       PRs opened by dependabot (dependabot only edits dependency
     #       manifests / lockfiles / workflow `uses:` lines, which the human
     #       reviewer handles together with the `pnpm.overrides` ledger in
-    #       `.contexts/security-overrides.md`). workflow_dispatch always runs.
+    #       `.contexts/security-overrides.md`), and events where
+    #       `github.actor` is `Copilot`.
+    #       The `Copilot` actor is used by the GitHub Copilot Coding Agent
+    #       when it pushes commits. It is not a real GitHub user account,
+    #       so `anthropics/claude-code-action@v1`'s `checkHumanActor`
+    #       fails with `GET /users/Copilot - 404` before it can even reach
+    #       the `allowed_bots` check. A job-level `GITHUB_ACTOR` env
+    #       override to the repo owner does not help: the composite
+    #       action's inner step has its own `env:` block which shadows the
+    #       job-level env, causing the runner to restore the real
+    #       `GITHUB_ACTOR` value (upstream issue
+    #       anthropics/claude-code-action#900, unfixed as of v1).
+    #       Skipping Copilot-triggered push events is the reliable
+    #       workaround. Human pushes to the same branch still trigger the
+    #       job normally, and `workflow_dispatch` always runs for on-demand
+    #       review.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
+       github.actor != 'Copilot' &&
        github.event.pull_request.user.login != 'dependabot[bot]' &&
        !contains(github.event.pull_request.title, '[skip ai-review]'))
     runs-on: ubuntu-latest
@@ -72,33 +88,6 @@ jobs:
       id-token: write
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-      # NOTE: Override GITHUB_ACTOR at the JOB level (not per-step) so
-      #       composite child steps inside `anthropics/claude-code-action@v1`
-      #       inherit it. Step-level env on a composite `uses:` line does
-      #       NOT propagate to the composite's inner steps (the action
-      #       itself documents this at action.yml:331). When the head
-      #       commit was authored by the Copilot Coding Agent,
-      #       `github.actor` is the literal `Copilot` (not a real GitHub
-      #       user account), so the action's `checkHumanActor`
-      #       (`src/github/validation/actor.ts:12-19`) calls
-      #       `octokit.users.getByUsername({ username: "Copilot" })`
-      #       *before* consulting `allowed_bots` and dies with
-      #       `GET /users/Copilot - 404`. Upstream issue
-      #       anthropics/claude-code-action#900 is open / unfixed at
-      #       v1.0.107. `@actions/github`'s Context reads
-      #       `process.env.GITHUB_ACTOR`, so swapping it for the repo
-      #       owner here makes the lookup hit a real `User` and
-      #       `checkHumanActor` short-circuits as human. Only override
-      #       when the original actor is Copilot, so human runs still
-      #       report the real actor.
-      #       ASSUMPTION: this is a personal repository whose owner is
-      #       type `User`. If the repo is ever transferred to an
-      #       organization, `github.repository_owner` will resolve to an
-      #       Organization account instead of a User, and
-      #       `checkHumanActor` would 404 on it the same way it does on
-      #       Copilot. In that case either drop this override or hard-code
-      #       the owner's user login.
-      GITHUB_ACTOR: ${{ github.actor == 'Copilot' && github.repository_owner || github.actor }}
     steps:
       # NOTE: Resolve PR metadata uniformly so the workflow_dispatch path
       #       works the same as the auto trigger.
@@ -147,27 +136,13 @@ jobs:
           # NOTE: Pass GITHUB_TOKEN explicitly so the action skips the
           #       Anthropic-side App-token exchange. That exchange checks
           #       the OIDC `actor` (= commit author) for repo write access,
-          #       which fails with `App token exchange failed: 401
+          #       which can fail with `App token exchange failed: 401
           #       Unauthorized - User does not have write access on this
-          #       repository` whenever a bot account such as Copilot
-          #       (`copilot-swe-agent[bot]`) authored the head commit, even
-          #       though `triggering_actor` is the repo owner. Using the
-          #       workflow-scoped GITHUB_TOKEN sidesteps that check and
-          #       relies on the `permissions:` block declared above for
-          #       repo access. The OIDC token is unaffected by the
-          #       GITHUB_ACTOR env override above (OIDC is signed by the
-          #       runner before the step runs), so this bypass is still
-          #       required even with the actor override in place.
+          #       repository` when a bot account authored the head commit.
+          #       Using the workflow-scoped GITHUB_TOKEN sidesteps that
+          #       check and relies on the `permissions:` block declared
+          #       above for repo access.
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # NOTE: Belt-and-suspenders for the permission check
-          #       (`octokit.repos.getCollaboratorPermissionLevel`).
-          #       The GITHUB_ACTOR override above already redirects this
-          #       lookup to the repo owner (who has write access), so this
-          #       input is likely redundant — but kept because we cannot
-          #       confirm from the v1 source that the permission step
-          #       reads `context.actor` rather than another identity.
-          #       Drop this once a real Copilot run proves it unnecessary.
-          allowed_non_write_users: "Copilot"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
