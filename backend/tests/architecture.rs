@@ -374,6 +374,23 @@ mod helpers_self_test {
     }
 
     #[test]
+    fn contains_token_handles_util_singular() {
+        // `Util` (singular) and `Utils` (plural) are both in
+        // FORBIDDEN_TYPE_TOKENS. The boundary spec says only the character
+        // AFTER the token is checked, and only digits / underscores count as
+        // continuation. Lowercase letters break the token, so `Utils` does
+        // NOT match the token `Util` (the trailing `s` is lowercase but is
+        // a normal letter, not a digit / underscore -> word boundary -> the
+        // `Util` arm is intentionally not matched, and `Utils` has its own
+        // arm). Pin this with explicit assertions so a future tweak to the
+        // boundary rule cannot silently regress only the `Util` singular
+        // arm.
+        assert!(contains_token("FormUtil", "Util"));
+        assert!(contains_token("Util", "Util"));
+        assert!(!contains_token("UserUtils", "Util"));
+    }
+
+    #[test]
     fn contains_token_treats_digits_as_continuation() {
         // Digits are continuation characters, not word boundaries.
         // "Engine2" does NOT match "Engine" because '2' continues the token.
