@@ -592,6 +592,13 @@ exercises.parent_exercise_id → exercises.exercise_id  [SET NULL on delete]
   名前衝突チェックは `SELECT ... FOR UPDATE` でロックを取るか、UNIQUE
   制約違反を掴んで domain エラーに変換する (後者のほうがロック範囲が
   小さい)
+- **空集合のギャップロック注意**: `MAX(block_order) FOR UPDATE` 等を子テーブルに
+  対して撃ったとき、対象集合が空 (= 初回 INSERT 直前) の場合、`REPEATABLE
+  READ` のギャップロックが期待通り効かないケースがある。集約ルートを先行
+  ロック (例: `SELECT id FROM sessions WHERE id = ? FOR UPDATE`) してから
+  子テーブルの `MAX` を取ることで race を直列化する。`exercise_blocks` /
+  `workout_sets` への並行 INSERT は、それぞれ親 (`sessions` / `exercise_blocks`)
+  の集約ルート行を先にロックしてから採番を確定する
 - **再採番の実装**: 実装フェーズで検討。スキーマ設計の問題ではない
 
 ## 10. マイグレーション計画
