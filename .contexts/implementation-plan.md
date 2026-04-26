@@ -808,7 +808,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **API 変更**:
 
-- 200: `{nodes: Exercise[], children: {[parent_id]: [child_id, ...]}}` (`api-design.md` §exercises tree)。
+- 200: `{root_id: IdString, nodes: (Exercise & {children_order: IdString[]})[]}` (`api-design.md` §2.2 GET .../tree)。各ノードに自身の子を `children_order` 配列で持たせて兄弟順序を表現する (順序情報は children ネストではなく正規化)。
 
 **backend**:
 
