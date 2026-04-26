@@ -754,7 +754,10 @@
 **backend**:
 
 - `application/usecases/clone_preset_exercise.rs`。
-- 名前 suffix は Repository が衝突をチェックしながら決める。SELECT → INSERT の race で `already_taken` が出た場合は最大 5 回までリトライする (各回で suffix 番号を 1 つ進める)。それでも失敗したら 500 `internal_error` を返す (MVP のスケールでは事実上ヒットしない想定)。
+- 名前 suffix の決定とリトライポリシーは usecase が持つ (Repository は永続化能力のみを表現する純粋なポートにする、`architecture.md` §application)。
+  - usecase 内で `ExerciseRepository::name_taken(&self, name: &ExerciseName, owner: &UserId) -> Result<bool, _>` を呼び、衝突していなければ `insert` する。
+  - DB の UNIQUE 制約違反 (race) が出た場合は usecase 内で suffix 番号を `+1` して最大 5 回までリトライ。
+  - 5 回超えても insert に成功しない場合は `UseCaseError::Internal` を返す (MVP のスケールでは事実上ヒットしない想定)。
 
 **frontend**:
 
