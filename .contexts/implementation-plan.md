@@ -1027,27 +1027,29 @@ session_id DESC` 順のカーソルページングが動く。
 
 **API 変更**:
 
-- `GET /api/v1/history/sessions?cursor=<base64url>&limit=<1..100>`。
+- `GET /api/v1/history/sessions?from=<YYYY-MM-DD>&to=<YYYY-MM-DD>&cursor=<base64url>&limit=<1..100>` (`api-design.md` §2.6)。
+- `from` / `to` はいずれも任意。両方未指定なら全期間、`from` のみなら以降、`to` のみなら以前。
 - 200: `{items: Session[], page_info: PageInfo}`。
-- 400: `invalid_format` (cursor デコード失敗)。
+- 400: `invalid_format` (cursor / from / to デコード失敗)。
 
 **backend**:
 
 - カーソル: base64url(JSON `{"w": "2026-04-08", "s": "01HZ..."}`)。
 - インデックス `sessions(user_id, workout_date DESC, session_id DESC)` を使う SQL。
+- `from` / `to` は WHERE 句に追加 (`workout_date >= ? AND workout_date <= ?`)。
 - ページサイズ既定 30、最大 100。
 
 **frontend**:
 
-- `features/history/queries/sessions.ts` (`useInfiniteQuery`)。
+- `features/history/queries/sessions.ts` (`useInfiniteQuery`、`from` / `to` をクエリキーに含める)。
 - `routes/history/index.tsx` で日付降順リスト、無限スクロール or 「もっと見る」ボタン。
-- 日付選択 (date picker) で `workout_date` フィルタは MVP 範囲外 (US-9 受け入れ基準は「降順リスト + 日付選択 = その日のセッション一覧」だが、フィルタは S20 後に検討、本計画 §11 に留保)。
-  - **暫定**: フィルタ無し降順スクロールで US-9 の「全体ペース俯瞰」を満たす。日付 → 該当日セッション一覧は `routes/history/[date].tsx` を S19 内で同時に作る。
+- 日付選択 (date picker) で `from` / `to` を指定して特定日 / 特定期間に絞り込む。日付 1 日選択 = `from` と `to` を同じ値に設定。
 
 **テスト**:
 
 - 100 件 fixture を作って 30 / 30 / 30 / 10 でカーソルが正しく動くこと。
-- limit=0 / limit=101 / cursor が壊れている → 400。
+- `from` / `to` で期間絞り込み (片側指定 / 両側指定 / 同日指定)。
+- limit=0 / limit=101 / cursor が壊れている / `from` の format が不正 → 400。
 
 ---
 
@@ -1262,7 +1264,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 | `note` の最大長 | S12 着手時 | 2000 文字 (TEXT) |
 | `block_order` 再採番の SQL | S16 / S17 着手時 | 「全行 UPDATE」を採用、トランザクション内 |
 | ~~ブロック上限超過の error code~~ | 確定済み (`api-design.md` §1.6 / §2.3) | `exceeds_max_blocks` on `blocks` を採用 |
-| 履歴の日付フィルタ仕様 | S19 着手時 | フィルタ無しを既定。日付指定は `routes/history/[date].tsx` 別画面で対応 |
+| ~~履歴の日付フィルタ仕様~~ | 確定済み (`api-design.md` §2.6) | `from` / `to` クエリパラメータで実装する (S19) |
 | ドラッグ並び替えの依存追加 | S16 / S17 着手時 | 既定は不採用 (上下ボタン) |
 | PWA プラグイン (`vite-plugin-pwa`) | S21 着手時 | 採用提案。ユーザー確認必須 |
 | Postman 結合テストの fixture 投入方法 | S24 着手時 | Newman pre-request スクリプトで signup 経由 |
