@@ -115,6 +115,23 @@ jobs:
 
       - name: run claude code review
         uses: anthropics/claude-code-action@v1
+        # NOTE: When the head commit was authored by the Copilot Coding
+        #       Agent, `github.actor` is the literal string `Copilot`
+        #       (no `[bot]` suffix, not a real GitHub user). The action's
+        #       `checkHumanActor` (src/github/validation/actor.ts) calls
+        #       `octokit.users.getByUsername({ username: actor })`
+        #       *before* consulting `allowed_bots`, so the run dies with
+        #       `GET /users/Copilot - 404` / `Action failed with error:
+        #       Not Found`. Upstream issue #900 is open / unfixed at
+        #       v1.0.107. `@actions/github`'s Context reads
+        #       `process.env.GITHUB_ACTOR`, so overriding it here makes
+        #       the lookup target the repo owner instead, which exists
+        #       and resolves as type "User" — `checkHumanActor` then
+        #       short-circuits as a human and never touches the bot
+        #       branch. We only override when the original actor is
+        #       Copilot so human runs still report the real actor.
+        env:
+          GITHUB_ACTOR: ${{ github.actor == 'Copilot' && github.repository_owner || github.actor }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # NOTE: Pass GITHUB_TOKEN explicitly so the action skips the
@@ -127,19 +144,19 @@ jobs:
           #       though `triggering_actor` is the repo owner. Using the
           #       workflow-scoped GITHUB_TOKEN sidesteps that check and
           #       relies on the `permissions:` block declared above for
-          #       repo access.
+          #       repo access. The OIDC token is unaffected by the
+          #       GITHUB_ACTOR env override above (OIDC is signed by the
+          #       runner before the step runs), so this bypass is still
+          #       required even with the actor override in place.
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # NOTE: Allow the Copilot Coding Agent as a "non-write user".
-          #       The agent appears as `actor: Copilot` (no `[bot]`
-          #       suffix), so the action's automatic bot detection
-          #       misses it, then `octokit.repos.getCollaboratorPermission
-          #       Level({ username: "Copilot" })` returns "Copilot is not
-          #       a user" and the run fails with `Failed to check
-          #       permissions for Copilot`. Whitelisting the actor here
-          #       skips the permission lookup. Safe in this workflow
-          #       because the permissions block only grants
-          #       pull-requests / issues write (no contents:write) and
-          #       the Copilot agent is always invoked by the repo owner.
+          # NOTE: Belt-and-suspenders for the permission check
+          #       (`octokit.repos.getCollaboratorPermissionLevel`).
+          #       The GITHUB_ACTOR override above already redirects this
+          #       lookup to the repo owner (who has write access), so this
+          #       input is likely redundant — but kept because we cannot
+          #       confirm from the v1 source that the permission step
+          #       reads `context.actor` rather than another identity.
+          #       Drop this once a real Copilot run proves it unnecessary.
           allowed_non_write_users: "Copilot"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
