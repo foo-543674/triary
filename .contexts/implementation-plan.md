@@ -616,7 +616,7 @@
 
 - `GET /api/v1/exercises`: 200 `{items: Exercise[]}` (preset + 自分の種目混在、ページング無し)。
 - `GET /api/v1/exercises/{exercise_id}`: 200 `Exercise`。404 `not_found` (パスの ID 不存在 or 他人のユーザー種目)。
-- `Exercise` schema (`api-design.md` §exercises 参照): `{id: IdString, owner: 'preset'|'user', name, measurement_kinds: [{kind: 'reps'|'weight'|'time', is_required: bool}], parent_id: IdString?}`。
+- `Exercise` schema (`api-design.md` §2.2 参照): `{id: IdString, owner: 'preset'|'user', name, measurement_kinds: [{kind: 'reps'|'weight'|'time', required: bool}], parent_id: IdString?}`。
 
 **backend**:
 
