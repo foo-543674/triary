@@ -746,9 +746,10 @@
 
 **API 変更**:
 
-- `POST /api/v1/exercises/{exercise_id}/clones`: request 任意 (空でよい)、201 `Exercise` (新規ユーザー種目) (`api-design.md` §2.2)。
+- `POST /api/v1/exercises/{exercise_id}/clones`: request `{name?: string}` (省略時は自動命名)、201 `Exercise` (新規ユーザー種目) (`api-design.md` §2.2)。
 - 403 if path id is not preset (この API は preset 専用)。
-- 名前は `{元の名前} (コピー)` から始まり、衝突する場合は `(コピー 2)`、`(コピー 3)`... と suffix を増やす。
+- 自動命名: `{元の名前} (コピー)` から始まり、衝突する場合は `(コピー 2)`、`(コピー 3)`... と suffix を増やす。
+- 改名指定: `name` を渡したときはその値で作成し、既存と衝突したら 400 `already_taken` on `name`。
 - measurement_kinds は preset と同じ。parent は preset 自身。
 
 **backend**:
