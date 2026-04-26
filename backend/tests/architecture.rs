@@ -265,7 +265,8 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     let entries =
         fs::read_dir(dir).unwrap_or_else(|e| panic!("failed to read_dir {}: {e}", dir.display()));
     for entry in entries {
-        let entry = entry.unwrap_or_else(|e| panic!("failed to read entry in {}: {e}", dir.display()));
+        let entry =
+            entry.unwrap_or_else(|e| panic!("failed to read entry in {}: {e}", dir.display()));
         let path = entry.path();
         if path.is_dir() {
             walk(&path, out);
