@@ -542,7 +542,7 @@ HTTP 404 ではなく **400 `not_found` on `parent_id`**（入力値の検証エ
 - 認証: 必要
 - リクエスト: 空ボディ（または `{"name": "..."}` で改名指定可）
 - レスポンス 201: 新しく作られた自分の種目（GET と同形）
-- エラー: 404 `not_found`（クローン元が存在しない）、400 `already_taken` on `name`（改名指定が既存と衝突）
+- エラー: 404 `not_found`（クローン元が存在しない、または path の種目が preset ではないユーザー種目だった場合 — このエンドポイントは preset 専用で、preset / user の区別を path セマンティクスに露呈させないため 404 に寄せる）、400 `already_taken` on `name`（改名指定が既存と衝突）
 
 URL について: REST のリソース指向に寄せるなら `/exercise-copies` のような
 トップレベル POST も検討したが、`{exercise_id}` を URL から特定できる方が
