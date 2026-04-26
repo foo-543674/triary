@@ -907,8 +907,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **テスト**:
 
-- 50 個目までは OK、51 個目で 400 (`exceeds_max_blocks`、と新規 code を `architecture.md` §エラー境界 に追加する場合は本計画 §11 の留保事項に注記)。
-  - **判断保留**: 仕様書では「1 セッション最大 50 種目ブロック」が境界条件として明示。コードを追加するか、`out_of_range` で代用するか。本計画では新コード `exceeds_max_blocks` を追加する方針 (一貫性のため)。
+- 50 個目までは OK、51 個目で 400 `exceeds_max_blocks` on `blocks` (`api-design.md` §1.6 / §2.3)。
 
 ---
 
@@ -1262,7 +1261,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 | Argon2id パラメータ | S01 着手時 | m=19456, t=2, p=1 (`OWASP-2024` 準拠) |
 | `note` の最大長 | S12 着手時 | 2000 文字 (TEXT) |
 | `block_order` 再採番の SQL | S16 / S17 着手時 | 「全行 UPDATE」を採用、トランザクション内 |
-| ブロック上限超過の error code | S14 着手時 | `exceeds_max_blocks` を新設 |
+| ~~ブロック上限超過の error code~~ | 確定済み (`api-design.md` §1.6 / §2.3) | `exceeds_max_blocks` on `blocks` を採用 |
 | 履歴の日付フィルタ仕様 | S19 着手時 | フィルタ無しを既定。日付指定は `routes/history/[date].tsx` 別画面で対応 |
 | ドラッグ並び替えの依存追加 | S16 / S17 着手時 | 既定は不採用 (上下ボタン) |
 | PWA プラグイン (`vite-plugin-pwa`) | S21 着手時 | 採用提案。ユーザー確認必須 |
