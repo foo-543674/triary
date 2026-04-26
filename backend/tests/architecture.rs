@@ -110,6 +110,16 @@ struct Violation {
     reason: String,
 }
 
+/// Scans `path` for `use` declarations that pull in any infrastructure
+/// crate listed in `FORBIDDEN_INFRA_CRATES`.
+///
+/// Known limitation: only `use` form is scanned. Rust 2018+ `extern
+/// crate` declarations (`extern crate axum;`) are not detected. This is
+/// acceptable in practice because (1) the project is on edition 2024 and
+/// does not need `extern crate`, and (2) Cargo dependencies live in the
+/// crate-level `Cargo.toml`, so `extern crate` would be redundant here.
+/// If a future change starts using `extern crate` for any reason, add a
+/// parallel scan in this function.
 fn forbidden_import_violations(path: &Path) -> Vec<Violation> {
     let source = fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
@@ -344,6 +354,13 @@ mod helpers_self_test {
         assert!(contains_token("UserServiceImpl", "Service"));
         assert!(contains_token("Engine", "Engine"));
         assert!(contains_token("Manager", "Manager"));
+        // `Utils` is in FORBIDDEN_TYPE_TOKENS alongside `Util`. Keep an
+        // independent boundary case so that a future tweak to
+        // `contains_token` cannot silently regress only the `Utils`
+        // arm (e.g. by tightening "next char must be uppercase" in a
+        // way that excludes the trailing `s`).
+        assert!(contains_token("UserUtils", "Utils"));
+        assert!(contains_token("UtilsImpl", "Utils"));
     }
 
     #[test]
