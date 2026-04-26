@@ -113,13 +113,12 @@ struct Violation {
 /// Scans `path` for `use` declarations that pull in any infrastructure
 /// crate listed in `FORBIDDEN_INFRA_CRATES`.
 ///
-/// Known limitation: only `use` form is scanned. Rust 2018+ `extern
-/// crate` declarations (`extern crate axum;`) are not detected. This is
-/// acceptable in practice because (1) the project is on edition 2024 and
-/// does not need `extern crate`, and (2) Cargo dependencies live in the
-/// crate-level `Cargo.toml`, so `extern crate` would be redundant here.
-/// If a future change starts using `extern crate` for any reason, add a
-/// parallel scan in this function.
+/// Known limitation: only the `use` form is scanned. The legacy
+/// `extern crate axum;` form is NOT detected. This project is on Rust
+/// edition 2024, where `extern crate` is unnecessary, and Cargo
+/// dependencies are declared in `Cargo.toml`, so the form is not used
+/// here in practice. If a future change starts using `extern crate`
+/// for any reason, add a parallel scan in this function.
 fn forbidden_import_violations(path: &Path) -> Vec<Violation> {
     let source = fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
