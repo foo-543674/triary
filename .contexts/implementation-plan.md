@@ -348,7 +348,7 @@
 **API クライアント整備**:
 
 - `frontend/src/api/client.ts` の `apiClient` に `credentials: 'include'` を渡す (Cookie 必須)。
-- `frontend/src/api/errors.ts` を追加 — `ErrorEnvelope` を `Result<T, ApiError>` に変換するユーティリティ。
+- `frontend/src/lib/api-error.ts` を追加 — `ErrorEnvelope` を `Result<T, ApiError>` に変換するユーティリティ。`api/` は architecture.md §ディレクトリ構造で「OpenAPI 生成型 + 薄い fetch クライアント」のみと定められているため、変換ロジックは `lib/` に置く。
 
 **ルーティング**:
 
