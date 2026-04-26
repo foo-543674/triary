@@ -905,7 +905,11 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **backend**:
 
 - `application/usecases/add_block.rs`。所有権チェック (session.user_id == viewer)。
-- `block_order` の採番は 1 トランザクション内で `SELECT MAX(block_order) FROM exercise_blocks WHERE session_id = ? FOR UPDATE` で行い、`+1` した値で INSERT。`sessions` 行ロックでは並行 INSERT を防げないため、`exercise_blocks` の集約レンジロックが必要 (`data-model.md` §再採番戦略)。
+- `block_order` の採番は 1 トランザクション内で次の手順:
+  1. `SELECT id FROM sessions WHERE id = ? FOR UPDATE` で **session 行を先行ロック** (集約ルートロック)。`exercise_blocks` が空のとき MySQL 8.0 REPEATABLE READ ではギャップロックが期待通り効かないケースがあるため、session 行ロックで「同じセッションへの並行ブロック追加」を直列化する。
+  2. `SELECT MAX(block_order) FROM exercise_blocks WHERE session_id = ?` で末尾を取得 (この時点で session 行ロックにより並行 INSERT は阻止されている)。
+  3. `+1` した値で INSERT。
+  - 詳細は `data-model.md` §再採番戦略 を参照。
 
 **frontend**:
 
