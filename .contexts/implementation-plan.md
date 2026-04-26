@@ -1000,8 +1000,11 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **API 変更**:
 
-- `PATCH /api/v1/blocks/{block_id}`: `{exercise_id?, order?}`。種目差し替え時、新種目の measurement_kinds が既存 sets の値と非互換ならば 400 `incompatible_with_existing_sets`。
-- `DELETE /api/v1/blocks/{block_id}`: 204 (sets はカスケード)。
+- `PATCH /api/v1/blocks/{block_id}`: `{exercise_id?, order?}`。200 で更新後の `Block` を返す (`api-design.md` §2.4)。
+- エラー (`api-design.md` §2.4):
+  - 404 `not_found` (パス上の block 不存在 / 他ユーザー)
+  - 400 on `exercise_id`: `not_found` (ボディ参照種目が不存在 / 他ユーザー) / `incompatible_with_existing_sets` (新種目の measurement_kinds が既存 sets と非互換)
+- `DELETE /api/v1/blocks/{block_id}`: 204 (sets はカスケード)。404 `not_found`。
 
 **backend**:
 
