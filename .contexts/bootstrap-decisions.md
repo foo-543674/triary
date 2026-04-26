@@ -119,6 +119,42 @@
   録するに留める。features ディレクトリ追加時にクロスインポートのテスト
   ケースを追加して検証すること。
 
+### 意図的な例外（dependency-cruiser）
+
+- **`not-to-dev-dep` の `src/index.tsx` 除外**:
+  `frontend/src/index.tsx` に `import 'solid-devtools';` の側作用インポー
+  トがある。`solid-devtools` は本番ビルド向けに noop エントリ
+  （`./dist/index_noop.js`）を `exports.import.default` で提供しており、
+  実行時コストは 0 であるため `devDependencies` に置いたまま運用する。
+  そこで `not-to-dev-dep` ルールの `from.pathNot` に
+  `^src/index\.tsx$` を追加し、当該エントリポイントだけを明示除外する
+  （`solid-devtools/vite` プラグインとペアで成立する側作用インポートで
+  あって、本物の本番依存を見逃す穴ではない）。
+  この例外を取り下げるべきタイミング: `solid-devtools` を削除したとき、
+  または `solid-devtools` 側が本番でも有効な API を主動線として提供する
+  ようになったとき（その場合は `dependencies` へ昇格させて除外不要）。
+
+### upstream 依存の workaround とその撤去条件
+
+- **`.github/workflows/ai-review.yml` の `github.actor != 'Copilot'` 条件
+  と `trigger-copilot-review` ジョブ**:
+  `anthropics/claude-code-action@v1` の `checkHumanActor` が
+  `Copilot` actor 名（GitHub Copilot Coding Agent が push する際の actor）
+  を解決できず `GET /users/Copilot - 404` で失敗する
+  （upstream issue: anthropics/claude-code-action#900）。これを回避する
+  ため、`pull_request` トリガーの `ai-review` ジョブは `actor == 'Copilot'`
+  時にスキップし、別ジョブ `trigger-copilot-review` から
+  `workflow_dispatch` 経由で再起動している。
+  この workaround の撤去条件:
+  1. `anthropics/claude-code-action` の v1 系で issue #900 が解決され、
+     `Copilot` actor を `allowed_bots` 経由で許可できるようになる
+     （= `checkHumanActor` が 404 を返さないようになる）。
+  2. もしくは GitHub 側で Copilot Coding Agent の actor 表現が
+     `copilot[bot]` 等の解決可能なボット ID へ正規化される。
+  上記いずれかが成立したら、`if:` 条件から `github.actor != 'Copilot'` を
+  外し、`trigger-copilot-review` ジョブと `allowed_bots: "github-actions"`
+  を撤去する。
+
 ## `.claude/settings.json` 許可コマンドの方針
 
 bootstrap で許可コマンド (`permissions.allow` / `permissions.deny`) を以下

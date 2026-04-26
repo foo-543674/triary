@@ -104,11 +104,12 @@ module.exports = {
       name: "not-to-dev-dep",
       severity: "error",
       comment:
-        "Production code must not depend on devDependencies. Move the import to a test/story file or promote the package to `dependencies`.",
+        "Production code must not depend on devDependencies. Move the import to a test/story file or promote the package to `dependencies`." +
+        " Exception: `src/index.tsx` carries the `import 'solid-devtools'` side-effect import that pairs with the `solid-devtools/vite` plugin. The package ships a noop entry for production builds, so the runtime cost is zero and it stays in `devDependencies` by design (see `.contexts/bootstrap-decisions.md`).",
       from: {
         path: "^src/",
         pathNot:
-          "\\.(test|spec|stories)\\.(js|jsx|ts|tsx)$|^src/test/|^src/mocks/",
+          "\\.(test|spec|stories)\\.(js|jsx|ts|tsx)$|^src/test/|^src/mocks/|^src/index\\.tsx$",
       },
       to: { dependencyTypes: ["npm-dev"] },
     },

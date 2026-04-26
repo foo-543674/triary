@@ -66,5 +66,5 @@ api-generate: ## Regenerate TypeScript types from the OpenAPI schema (frontend/s
 
 .PHONY: arch-test
 arch-test: ## Run architecture tests for both backend and frontend
-	cd backend && cargo nextest run --test architecture --no-tests=pass
+	cd backend && cargo nextest run --test architecture --all-features --no-tests=pass
 	cd frontend && pnpm run arch:test

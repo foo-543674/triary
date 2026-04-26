@@ -117,7 +117,8 @@ fn forbidden_import_violations(path: &Path) -> Vec<Violation> {
         .lines()
         .enumerate()
         .filter_map(|(idx, raw_line)| {
-            let line = strip_comment(raw_line).trim();
+            let stripped = strip_comment(raw_line);
+            let line = stripped.trim();
             if !line.starts_with("use ") {
                 return None;
             }
@@ -151,7 +152,7 @@ fn forbidden_type_decl_violations(path: &Path) -> Vec<Violation> {
         .enumerate()
         .filter_map(|(idx, raw_line)| {
             let line = strip_comment(raw_line);
-            let name = declared_type_name(line)?;
+            let name = declared_type_name(&line)?;
             FORBIDDEN_TYPE_TOKENS
                 .iter()
                 .find(|token| contains_token(name, token))
@@ -173,7 +174,7 @@ fn handler_type_decl_violations(path: &Path) -> Vec<Violation> {
         .enumerate()
         .filter_map(|(idx, raw_line)| {
             let line = strip_comment(raw_line);
-            let name = declared_type_name(line)?;
+            let name = declared_type_name(&line)?;
             if contains_token(name, "Handler") {
                 Some(Violation {
                     file: path.to_path_buf(),
@@ -244,8 +245,48 @@ fn contains_token(name: &str, token: &str) -> bool {
     false
 }
 
-fn strip_comment(line: &str) -> &str {
-    line.split_once("//").map(|(code, _)| code).unwrap_or(line)
+/// Strips trailing line comments (`// ...`) and any single-line block
+/// comments (`/* ... */`) from a source line.
+///
+/// Block-comment handling is intentionally minimal: it only collapses
+/// `/* ... */` segments that open and close on the same line, which is
+/// the form that can mask `use` declarations or type definitions in
+/// realistic code (`use axum::Router; /* re-export */`,
+/// `/* legacy */ pub struct FooService;`). Multi-line block comments are
+/// not tracked across lines; if we ever start writing declarations
+/// inside multi-line `/* */` blocks, that case must be re-evaluated and
+/// a stateful tokenizer added.
+///
+/// Known limitation: a `//` or `/*` inside a string literal will also be
+/// treated as a comment delimiter. `use` lines and type declarations do
+/// not carry string literals in practice, so the false positive is
+/// accepted for now and documented by the helpers self-test.
+fn strip_comment(line: &str) -> String {
+    // Replace each single-line `/* ... */` with a single space so that
+    // tokens on either side stay separated (`a/*x*/b` -> `a b`).
+    let mut buf = String::with_capacity(line.len());
+    let mut rest = line;
+    loop {
+        match (rest.find("/*"), rest.find("*/")) {
+            (Some(open), Some(close_after_open))
+                if close_after_open > open
+                    && rest[open..].find("*/").map(|c| open + c) == Some(close_after_open) =>
+            {
+                buf.push_str(&rest[..open]);
+                buf.push(' ');
+                rest = &rest[close_after_open + "*/".len()..];
+            }
+            _ => {
+                buf.push_str(rest);
+                break;
+            }
+        }
+    }
+    // Then strip a trailing line comment.
+    match buf.split_once("//") {
+        Some((code, _)) => code.to_string(),
+        None => buf,
+    }
 }
 
 fn collect_files(root: &Path) -> Vec<PathBuf> {
@@ -365,9 +406,65 @@ mod helpers_self_test {
         assert_eq!(strip_comment("pub struct Foo;"), "pub struct Foo;");
         // Known limitation: a `//` inside a string literal would also be
         // stripped, but `use` lines and type declarations don't carry
-        // string literals in practice. Block comments (`/* ... */`) are
-        // also out of scope; document any new false positive here.
+        // string literals in practice.
         assert_eq!(strip_comment("let s = \"a // b\";"), "let s = \"a ");
+    }
+
+    #[test]
+    fn strip_comment_removes_single_line_block_comments() {
+        // Trailing block comment after a `use` declaration.
+        assert_eq!(
+            strip_comment("use axum::Router; /* forbidden */"),
+            "use axum::Router;  "
+        );
+        // Leading block comment before a type declaration. The block
+        // comment is replaced with a single space so the keyword
+        // (`pub`) remains parseable by `declared_type_name`.
+        assert_eq!(
+            strip_comment("/* legacy */ pub struct FooService;"),
+            "  pub struct FooService;"
+        );
+        // Multiple block comments on one line.
+        assert_eq!(
+            strip_comment("/*a*/ pub /*b*/ struct Foo;"),
+            "  pub   struct Foo;"
+        );
+        // Multi-line block comments are intentionally NOT tracked across
+        // line boundaries: an unterminated `/*` on a single line is left
+        // as-is so the analyzer still has something to inspect.
+        assert_eq!(
+            strip_comment("pub struct Foo; /* unterminated"),
+            "pub struct Foo; /* unterminated"
+        );
+    }
+
+    #[test]
+    fn strip_comment_keeps_block_comment_safe_for_type_decl() {
+        // The whole point of block-comment stripping: a banned token
+        // hidden inside a block comment must NOT be reported as a type
+        // declaration, but a real declaration that follows the block
+        // comment must still be detected.
+        let cleaned = strip_comment("/* Service */ pub struct Foo;");
+        assert_eq!(declared_type_name(&cleaned), Some("Foo"));
+        let masked = strip_comment("pub struct Foo; /* Service */");
+        assert_eq!(declared_type_name(&masked), Some("Foo"));
+    }
+
+    #[test]
+    fn declared_type_name_does_not_handle_pub_in_path() {
+        // `pub(in crate::path)` uses space-separated tokens inside the
+        // visibility specifier, which the current prefix-stripping
+        // approach cannot parse. We have no use case for it in this
+        // repo (and architecture tests do not need to police it), so
+        // this is documented as a known limitation: declarations using
+        // `pub(in ...)` will return `None` and be silently skipped by
+        // the forbidden-vocabulary check. If we ever start using
+        // `pub(in ...)` for real, this test will fail and force a
+        // proper visibility parser.
+        assert_eq!(
+            declared_type_name("pub(in crate::infra) struct FooService;"),
+            None
+        );
     }
 
     #[test]
