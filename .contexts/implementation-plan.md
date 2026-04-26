@@ -438,8 +438,9 @@
 
 **backend 触点**:
 
-- `domain/user/`:
-  - `user_id.rs`: `UserHandle` (newtype、`try_new(&str) -> Result<Self, DomainError>`、長さ 3-32、charset `^[a-z0-9_-]+$`、小文字正規化)。値オブジェクトは単一エラーを返す (`architecture.md` §ドメインロジックの置き場所)。複数フィールドのエラー集約は `CreateUserValidator` 等のバリデータ層で `Vec<DomainError>` に束ねる。
+- `domain/user/` (`data-model.md` §4.1 の `users` テーブルが内部 PK の `user_id` (BINARY(16) ULID) と公開ログイン識別子の `user_handle` (VARCHAR(32)) を分けているのと対応してファイルも分ける):
+  - `user_id.rs`: `UserId` newtype (ULID ラッパ、内部 PK)。`UserId::parse(raw) -> Result<Self, DomainError>`。
+  - `user_handle.rs`: `UserHandle` newtype (ログイン識別子、長さ 3-32、charset `^[a-z0-9_-]+$`、小文字正規化、予約語拒否)。`UserHandle::try_new(&str) -> Result<Self, DomainError>`。値オブジェクトは単一エラーを返す (`architecture.md` §ドメインロジックの置き場所)。複数フィールドのエラー集約は `CreateUserValidator` 等のバリデータ層で `Vec<DomainError>` に束ねる。
   - `password.rs`: `RawPassword` (12-128 文字、検証成功時は `Validated<RawPassword>` を返す型付きパイプライン §architecture ADR #8 に従う)。
   - `password_hash.rs`: `PasswordHash` newtype (PHC 文字列のラッパ)。
   - `user.rs`: `User` 集約 (`UserId`, `UserHandle`, `PasswordHash`, `created_at`, `updated_at`)。
