@@ -754,7 +754,7 @@
 **backend**:
 
 - `application/usecases/clone_preset_exercise.rs`。
-- 名前 suffix は Repository が衝突をチェックしながら決める (race を避けるため、`already_taken` で 1 回まではリトライする実装が許容される)。
+- 名前 suffix は Repository が衝突をチェックしながら決める。SELECT → INSERT の race で `already_taken` が出た場合は最大 5 回までリトライする (各回で suffix 番号を 1 つ進める)。それでも失敗したら 500 `internal_error` を返す (MVP のスケールでは事実上ヒットしない想定)。
 
 **frontend**:
 
