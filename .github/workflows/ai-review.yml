@@ -72,6 +72,33 @@ jobs:
       id-token: write
     env:
       PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+      # NOTE: Override GITHUB_ACTOR at the JOB level (not per-step) so
+      #       composite child steps inside `anthropics/claude-code-action@v1`
+      #       inherit it. Step-level env on a composite `uses:` line does
+      #       NOT propagate to the composite's inner steps (the action
+      #       itself documents this at action.yml:331). When the head
+      #       commit was authored by the Copilot Coding Agent,
+      #       `github.actor` is the literal `Copilot` (not a real GitHub
+      #       user account), so the action's `checkHumanActor`
+      #       (`src/github/validation/actor.ts:12-19`) calls
+      #       `octokit.users.getByUsername({ username: "Copilot" })`
+      #       *before* consulting `allowed_bots` and dies with
+      #       `GET /users/Copilot - 404`. Upstream issue
+      #       anthropics/claude-code-action#900 is open / unfixed at
+      #       v1.0.107. `@actions/github`'s Context reads
+      #       `process.env.GITHUB_ACTOR`, so swapping it for the repo
+      #       owner here makes the lookup hit a real `User` and
+      #       `checkHumanActor` short-circuits as human. Only override
+      #       when the original actor is Copilot, so human runs still
+      #       report the real actor.
+      #       ASSUMPTION: this is a personal repository whose owner is
+      #       type `User`. If the repo is ever transferred to an
+      #       organization, `github.repository_owner` will resolve to an
+      #       Organization account instead of a User, and
+      #       `checkHumanActor` would 404 on it the same way it does on
+      #       Copilot. In that case either drop this override or hard-code
+      #       the owner's user login.
+      GITHUB_ACTOR: ${{ github.actor == 'Copilot' && github.repository_owner || github.actor }}
     steps:
       # NOTE: Resolve PR metadata uniformly so the workflow_dispatch path
       #       works the same as the auto trigger.
@@ -115,29 +142,6 @@ jobs:
 
       - name: run claude code review
         uses: anthropics/claude-code-action@v1
-        # NOTE: When the head commit was authored by the Copilot Coding
-        #       Agent, `github.actor` is the literal string `Copilot`
-        #       (no `[bot]` suffix, not a real GitHub user). The action's
-        #       `checkHumanActor` (src/github/validation/actor.ts) calls
-        #       `octokit.users.getByUsername({ username: actor })`
-        #       *before* consulting `allowed_bots`, so the run dies with
-        #       `GET /users/Copilot - 404` / `Action failed with error:
-        #       Not Found`. Upstream issue #900 is open / unfixed at
-        #       v1.0.107. `@actions/github`'s Context reads
-        #       `process.env.GITHUB_ACTOR`, so overriding it here makes
-        #       the lookup target the repo owner instead, which exists
-        #       and resolves as type "User" — `checkHumanActor` then
-        #       short-circuits as a human and never touches the bot
-        #       branch. We only override when the original actor is
-        #       Copilot so human runs still report the real actor.
-        #       ASSUMPTION: personal repository (owner is type "User").
-        #       If this repo is ever transferred to an organization, the
-        #       `github.repository_owner` fallback may resolve to an
-        #       Organization account instead of a User, breaking the same
-        #       `checkHumanActor` lookup it is meant to bypass. In that case
-        #       remove this override or hard-code the owner's user login.
-        env:
-          GITHUB_ACTOR: ${{ github.actor == 'Copilot' && github.repository_owner || github.actor }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # NOTE: Pass GITHUB_TOKEN explicitly so the action skips the
