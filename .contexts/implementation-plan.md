@@ -444,9 +444,9 @@
   - `password.rs`: `RawPassword` (12-128 文字、検証成功時は `Validated<RawPassword>` を返す型付きパイプライン §architecture ADR #8 に従う)。
   - `password_hash.rs`: `PasswordHash` newtype (PHC 文字列のラッパ)。
   - `user.rs`: `User` 集約 (`UserId`, `UserHandle`, `PasswordHash`, `created_at`, `updated_at`)。
-- `domain/ports/`:
-  - `clock.rs`: `Clock` トレイト (`now() -> DateTime<Utc>`)。
-  - `password_hasher.rs`: `PasswordHasher::hash(&self, raw: &RawPassword) -> Result<PasswordHash, DomainError>`、`verify`。
+- `domain/` 直下 (architecture.md §ディレクトリ構造に従い、現実概念のポートは `domain/ports/` ではなく `domain/` 直下に置く):
+  - `domain/clock.rs`: `Clock` トレイト (`now() -> DateTime<Utc>`)。
+  - `domain/password_hasher.rs`: `PasswordHasher::hash(&self, raw: &RawPassword) -> Result<PasswordHash, DomainError>`、`verify`。
 - `application/ports/`:
   - `user_repository.rs`: `UserRepository::insert(&self, user: &User) -> Result<(), UseCaseError>`、`find_by_handle(&self, &UserHandle) -> ...`。
   - `session_store.rs`: `SessionStore::create(&self, user_id: &UserId, expires_at: DateTime<Utc>) -> Result<SessionToken, UseCaseError>`。
