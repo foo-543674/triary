@@ -969,9 +969,14 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **API 変更**:
 
-- `PATCH /api/v1/sets/{set_id}`: 値の更新、`order` の変更も可。
+- `PATCH /api/v1/sets/{set_id}`: 値の更新、`order` の変更も可。200 で更新後の `Set` を返す (`api-design.md` §2.5)。
 - `DELETE /api/v1/sets/{set_id}`: 204。
-- 400: `out_of_range`、`incompatible_with_existing_sets` は本スライス対象外 (それは S17 でブロックの種目差し替え時に使う)。
+- エラー (`api-design.md` §2.5):
+  - 404 `not_found`
+  - 400 on `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`: `out_of_range`
+  - 400 `missing_required_measurement` on `reps` / `weight_kg` / `duration_seconds` (編集後に種目の必須計測項目が欠ける場合)
+  - 400 `empty` (全計測項目が null になる編集)
+- `incompatible_with_existing_sets` は本スライスでは扱わない (種目差し替えは S17 の PATCH /blocks)。
 
 **backend**:
 
