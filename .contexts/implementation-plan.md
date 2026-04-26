@@ -688,11 +688,12 @@
 **API 変更**:
 
 - `PATCH /api/v1/exercises/{exercise_id}`: request `{name?, measurement_kinds?}` (`parent_id` は S10 で対応)。
-- 403 `preset_not_modifiable` (パス非依存) / 404 (他人 or 不存在) / 400 `locked_by_existing_records` (records 紐付き ありの状態で kinds 変更要求)。
+- 403 `preset_not_modifiable` (パス非依存) / 404 (他人 or 不存在) / 400 `already_taken` on `name` (ユーザー内 + プリセット重複) / 400 `locked_by_existing_records` (records 紐付き ありの状態で kinds 変更要求)。
 
 **backend**:
 
 - 「records 紐付き」の判定: `SELECT EXISTS (SELECT 1 FROM exercise_blocks WHERE exercise_id = ?)`。
+- `name` を変更する場合: S06 と同様にユーザー内 + プリセット重複チェック (SELECT EXISTS、UNIQUE 制約と併用)、衝突時は 400 `already_taken` on `name` を返す。
 - `application/usecases/patch_exercise.rs` (parent 付け替えは S10)。
 
 **frontend**:
