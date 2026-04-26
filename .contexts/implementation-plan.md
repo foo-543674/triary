@@ -1202,8 +1202,9 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 ```
 
 レビューコメントを `code-reviewer agent` 由来と Copilot 由来に分類する。
-コミットは **観点単位** で分ける (§4.2、`memory/feedback_commit_granularity.md`)。
-ラウンド番号で 1 コミットにまとめない。
+コミットは **観点単位** で分ける (§4.2、`CLAUDE.md` §commit-convention の
+"Stage by intent, not by file. One commit, one purpose.")。ラウンド番号
+で 1 コミットにまとめない。
 
 メッセージ例:
 
@@ -1221,7 +1222,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 ### 9.3 修正コミットの分け方
 
 - レビュー指摘の「観点単位」で分ける。例: 「型安全性 5 件、エラーメッセージ 2 件、テスト追加 3 件」なら 3 コミット。
-- レビューラウンドを単位にしない (`memory/feedback_commit_granularity.md`)。複数ラウンドを跨いでも、観点が同じなら 1 コミットにまとめてよいし、観点が違えば同じラウンドでも分ける。
+- レビューラウンドを単位にしない (`CLAUDE.md` §commit-convention)。複数ラウンドを跨いでも、観点が同じなら 1 コミットにまとめてよいし、観点が違えば同じラウンドでも分ける。
 - 全件をすぐに返せない場合は PR 説明欄に「次回対応する観点」を明示する。
 
 ### 9.4 マージ判定
