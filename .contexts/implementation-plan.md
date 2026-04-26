@@ -474,9 +474,9 @@
 
 - `domain/user/user_id` の単体テスト (境界値: 2/3/32/33、文字種、予約語、大文字混在)。
 - `domain/user/password` の単体テスト (11/12/128/129 文字、文字種制約なし)。
-- `application/usecases/signup` のテスト (mock Repository / Hasher / Clock で全成功 / handle 重複 / 弱パスワード)。
 - `interfaces/http/routes/web/signup` の Axum oneshot テスト (Cookie ヘッダ付与確認)。
 - Postman: signup 成功・handle 重複・password 短い・不正文字 (4 ケース最低)。
+- ユースケース本体 (`application/usecases/signup`) は **単体テストを書かない** (`architecture.md` ADR 10 / §テスタビリティ戦略)。動作担保は infrastructure 統合テスト + Postman 統合テスト。
 
 **DoD**:
 
