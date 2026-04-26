@@ -904,7 +904,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **backend**:
 
 - `application/usecases/add_block.rs`。所有権チェック (session.user_id == viewer)。
-- `block_order` は `MAX(block_order) + 1` (1 トランザクション内で実施、`SELECT ... FOR UPDATE`)。
+- `block_order` の採番は 1 トランザクション内で `SELECT MAX(block_order) FROM exercise_blocks WHERE session_id = ? FOR UPDATE` で行い、`+1` した値で INSERT。`sessions` 行ロックでは並行 INSERT を防げないため、`exercise_blocks` の集約レンジロックが必要 (`data-model.md` §再採番戦略)。
 
 **frontend**:
 
