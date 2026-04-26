@@ -654,7 +654,7 @@
 **API 変更**:
 
 - `POST /api/v1/exercises`: request `{name, measurement_kinds: [...], parent_id?: IdString}`。
-- 400 codes: `required` (name / measurement_kinds)、`too_long` (name)、`invalid_charset` (name)、`empty` (measurement_kinds)、`already_taken` (name、ユーザー内 + プリセット重複)、`not_found` (parent_id)、`creates_cycle`/`exceeds_max_depth`/`exceeds_max_children` は parent_id 指定時のみ (S10 で完全対応するが、ここでも検査する)。
+- 400 codes: `empty` (name の空文字 / measurement_kinds の空配列)、`too_long` (name)、`invalid_charset` (name)、`already_taken` (name、ユーザー内 + プリセット重複)、`not_found` (parent_id)、`creates_cycle`/`exceeds_max_depth`/`exceeds_max_children` は parent_id 指定時のみ (S10 で完全対応するが、ここでも検査する) (`api-design.md` §2.2)。
 - 201: `Exercise` (`api-design.md` §2.2)。
 
 **backend**:
