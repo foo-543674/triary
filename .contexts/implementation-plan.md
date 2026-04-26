@@ -156,7 +156,7 @@
 
 ### 4.4 DB マイグレーション
 
-- ファイル名: `YYYYMMDDHHMMSS__<snake_case_purpose>.sql` (現状の `20260407000000_init.sql` 形式を踏襲し、ダブルアンダースコアで意図を区切る)。
+- ファイル名: `YYYYMMDDHHMMSS_<snake_case_purpose>.sql` (現状の `20260407000000_init.sql` 形式と sqlx-cli の既定 `<timestamp>_<description>.sql` を踏襲し、シングルアンダースコアで区切る)。
 - ファイル単位でロールバック不可なので、1 マイグレーション = 1 目的に絞る (例: 「users と user_sessions を作る」「exercises 群を作る」「sessions 集約を作る」「preset シードを入れる」)。
 - マイグレーション追加時は `cd backend && cargo sqlx migrate run` の後に `make db-prepare` で sqlx offline metadata を更新する。
 
@@ -271,19 +271,19 @@
 **目的**: `data-model.md` の DDL を実 migration に落とし込む。プレース
 ホルダを置き換える。
 
-**マイグレーションファイル** (順序固定):
+**マイグレーションファイル** (順序固定、§4.4 のシングルアンダースコア規則に従う):
 
-1. `20260501000001__drop_placeholder.sql`
+1. `20260501000001_drop_placeholder.sql`
    - `DROP TABLE IF EXISTS _migration_placeholder;`
-2. `20260501000002__init_users_and_sessions.sql`
+2. `20260501000002_init_users_and_sessions.sql`
    - `users` (`user_id BINARY(16) PK`, `user_handle VARCHAR(32) UK`, `password_hash VARCHAR(255)`, `created_at`, `updated_at`)
    - `user_sessions` (`session_token_hash BINARY(32) PK`, `user_id FK`, `created_at`, `expires_at`, `last_seen_at`)
-3. `20260501000003__init_exercises.sql`
+3. `20260501000003_init_exercises.sql`
    - `exercises` (本計画 §1 / `data-model.md` §exercises 参照)
    - `exercise_measurement_kinds`
-4. `20260501000004__init_session_records.sql`
+4. `20260501000004_init_session_records.sql`
    - `sessions` / `exercise_blocks` / `workout_sets`
-5. `20260501000005__seed_preset_exercises.sql`
+5. `20260501000005_seed_preset_exercises.sql`
    - 初版プリセット種目 (§5.4 で定義)
 
 **`data-model.md` の DDL を 1 文字単位で踏襲**する。違いを入れる場合は
