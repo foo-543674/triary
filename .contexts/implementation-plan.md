@@ -922,7 +922,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 - `POST /api/v1/blocks/{block_id}/sets`: request `{reps?, weight_kg?, duration_seconds?, interval_seconds?}`。
 - バリデーション: 種目の必須計測項目すべてに値があること、必須でない項目は省略可。値の範囲は §specification §境界値表。
 - 201: `Set` (`api-design.md` §2.4)。
-- 400 codes: `missing_required_measurement` on `sets[0]` (種目の必須計測項目欠落、§1.6 専用コード)、`out_of_range` on 各値フィールド、`empty` (全フィールド NULL は不可)。
+- 400 codes: `missing_required_measurement` on `reps` / `weight_kg` / `duration_seconds` (該当する欠落フィールドを field に入れる、複数欠落時は `errors[]` を複数要素)、`out_of_range` on 各値フィールド、`empty` (全フィールド NULL は不可)。
 
 **backend**:
 
