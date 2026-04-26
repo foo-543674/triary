@@ -451,7 +451,7 @@
   - `user_repository.rs`: `UserRepository::insert(&self, user: &User) -> Result<(), UseCaseError>`、`find_by_handle(&self, &UserHandle) -> ...`。
   - `session_store.rs`: `SessionStore::create(&self, user_id: &UserId, expires_at: DateTime<Utc>) -> Result<SessionToken, UseCaseError>`。
 - `application/usecases/signup.rs`:
-  - `SignupInput { user_id, password }` → `SignupOutput { user, session_token }`。
+  - `SignupInput { user_handle: String, password: String }` → `SignupOutput { user, session_token }`。フィールド名は内部 ULID の `UserId` と区別するため公開識別子側を `user_handle` と命名する (`user_id` だと内部 PK 概念と紛らわしい)。
   - 予約語チェック (定数リスト: `admin`, `api`, `system`, `triary`, `root`)、handle 重複チェック、ハッシュ化、insert、session 発行。
 - `infrastructure/`:
   - `repositories/mysql_user_repository.rs`、`repositories/mysql_session_store.rs` (sqlx)。
