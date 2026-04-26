@@ -217,6 +217,11 @@ jobs:
   #       `workflow_dispatch`, supplying the PR number as input. The
   #       `workflow_dispatch` path bypasses `checkHumanActor` entirely, so
   #       the review runs successfully.
+  #
+  #       Security note: this job is restricted to `github.actor == 'Copilot'`,
+  #       which is the same-repo Copilot Coding Agent. It cannot be triggered
+  #       from forks, so dispatching against a head ref does not widen the
+  #       attack surface to untrusted code.
   trigger-copilot-review:
     name: ai / trigger review for Copilot push
     if: >-
@@ -230,10 +235,28 @@ jobs:
     permissions:
       actions: write
     steps:
+      # NOTE: `--ref` points at the PR head branch so the dispatched run
+      #       executes the workflow definition that lives on the PR itself,
+      #       not the (possibly older) copy on the default branch. This is
+      #       required for two reasons:
+      #         1. Bootstrap. The PR that introduces `allowed_bots:
+      #            "github-actions"` and this `trigger-copilot-review` job
+      #            must be reviewable by its own version of the workflow,
+      #            because the default branch does not yet have those
+      #            changes.
+      #         2. Self-review of future workflow edits. When Copilot
+      #            modifies `ai-review.yml` itself, the modification must
+      #            be reviewed by the modified workflow, not by the old
+      #            one on the default branch.
+      #       GitHub still requires `ai-review.yml` to exist on the default
+      #       branch for `workflow_dispatch` to be invokable; that
+      #       prerequisite is satisfied because the file already lives on
+      #       `main`.
       - name: dispatch ai-review workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run ai-review.yml \
             --repo "${{ github.repository }}" \
+            --ref "${{ github.event.pull_request.head.ref }}" \
             --field pr_number=${{ github.event.pull_request.number }}
