@@ -614,9 +614,9 @@
 
 **API 変更**:
 
-- `GET /api/v1/exercises`: 200 `{items: Exercise[]}` (preset + 自分の種目混在、ページング無し)。
-- `GET /api/v1/exercises/{exercise_id}`: 200 `Exercise`。404 `not_found` (パスの ID 不存在 or 他人のユーザー種目)。
-- `Exercise` schema (`api-design.md` §2.2 参照): `{id: IdString, owner: 'preset'|'user', name, measurement_kinds: [{kind: 'reps'|'weight'|'time', required: bool}], parent_id: IdString?}`。
+- `GET /api/v1/exercises?q=<name 部分一致>&owned_only=<bool>`: 200 `{items: Exercise[]}` (preset + 自分の種目混在、ページング無し) (`api-design.md` §2.2)。
+- `GET /api/v1/exercises/{exercise_id}`: 200 `Exercise & {created_at: Timestamp}` (詳細は list 要素 + `created_at`、`api-design.md` §2.2)。404 `not_found` (パスの ID 不存在 or 他人のユーザー種目)。
+- `Exercise` schema (`api-design.md` §2.2 参照): `{id: IdString, owner: 'preset'|'user', name, measurement_kinds: [{kind: 'reps'|'weight'|'time', required: bool}], parent_id: IdString?, depth: int}` (`depth` はツリー上の深さ、0 が根)。
 
 **backend**:
 
