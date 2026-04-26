@@ -303,7 +303,8 @@ mod helpers_self_test {
     fn contains_token_skips_legitimate_words() {
         assert!(!contains_token("Engineer", "Engine"));
         assert!(!contains_token("Servicing", "Service"));
-        assert!(!contains_token("Helpline", "Help"));
+        assert!(!contains_token("Helpline", "Helper")); // Helper is not a substring of Helpline
+        assert!(contains_token("FormHelper", "Helper")); // FormHelper ends with the banned token
         // Boundary spec: only the character AFTER the token is checked, not
         // the one before. So PascalCase composition matches even when the
         // preceding char is lowercase, but a fully lowercase word does not
