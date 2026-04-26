@@ -688,8 +688,13 @@
 
 **API 変更**:
 
-- `PATCH /api/v1/exercises/{exercise_id}`: request `{name?, measurement_kinds?}` (`parent_id` は S10 で対応)。
-- 403 `preset_not_modifiable` (パス非依存) / 404 (他人 or 不存在) / 400 `already_taken` on `name` (ユーザー内 + プリセット重複) / 400 `locked_by_existing_records` (records 紐付き ありの状態で kinds 変更要求)。
+- `PATCH /api/v1/exercises/{exercise_id}`: request `{name?, measurement_kinds?}` (`parent_id` は S10 で対応)。200 で更新後の `Exercise` を返す (`api-design.md` §2.2)。
+- エラー (`api-design.md` §2.2):
+  - 404 `not_found` (パスの種目が不存在 / 他ユーザー)
+  - 403 `preset_not_modifiable` (preset に対する PATCH)
+  - 400 on `name`: `empty` / `too_long` / `invalid_charset` / `already_taken`
+  - 400 on `measurement_kinds`: `empty` / `locked_by_existing_records` (records 紐付きありの状態で kinds 変更要求)
+  - 400 on `parent_id` (S10 で対応): `not_found` / `creates_cycle` / `exceeds_max_depth` / `exceeds_max_children`
 
 **backend**:
 
