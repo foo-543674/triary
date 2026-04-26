@@ -208,7 +208,7 @@
 
 - `backend/src/interfaces/http/error.rs`:
   - `ErrorBody` を `ErrorEnvelope { errors: Vec<ErrorItem> }` に変更。
-  - `ErrorItem { code: &'static str, field: Option<String>, message: String }`。
+  - `ErrorItem { code: &'static str, field: Option<String>, message: String }`。`field` には `#[serde(skip_serializing_if = "Option::is_none")]` を付け、None のときは JSON キー自体を出力しない (フィールド非依存コード `unauthenticated` / `internal_error` 等で `field: null` が出ないようにする)。
   - `AppError` の variant を「単一エラー」「複数エラー (`Vec<DomainError>` 由来)」両対応に。`From<DomainError>` と `From<Vec<DomainError>>` を実装。
 - `backend/src/interfaces/http/mod.rs` (新規):
   - `pub mod error;` `pub mod dto;` `pub mod routes;` を整理。
