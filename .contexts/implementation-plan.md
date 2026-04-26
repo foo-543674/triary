@@ -880,7 +880,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **API 変更**:
 
 - 200: `Session { id, workout_date, started_at, ended_at?, note?, blocks: Block[] }` (`api-design.md` §2.3)。
-- `Block { id, session_id, exercise_id, exercise_name, exercise_measurement_kinds: [{kind, required}], order, sets: Set[] }` (denormalize された flat 形式、`api-design.md` §2.3)。
+- `Block { id, exercise_id, exercise_name, exercise_measurement_kinds: [{kind, required}], order, sets: Set[] }` (`api-design.md` §2.3 GET /sessions/{id} の nested 形。親 session_id は親オブジェクトから自明なので省略する。S14 の standalone POST 応答では `session_id` を含む点に注意)。
 - `Set { id, order, reps?, weight_kg?, duration_seconds?, interval_seconds? }`。
 
 **backend**:
