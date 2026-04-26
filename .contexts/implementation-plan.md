@@ -1094,7 +1094,7 @@ session_id DESC` 順のカーソルページングが動く。
 
 **変更点**:
 
-- `frontend/vite.config.ts` に `vite-plugin-pwa` を追加 (依存追加は §AI-delegation で要確認)。
+- `frontend/vite.config.ts` の `vite-plugin-pwa` 設定を有効化する (`architecture.md` §コンテキスト で導入済み、`frontend/package.json` / `vite.config.ts` 既存)。
 - `frontend/public/manifest.webmanifest`、アイコン (`512x512`, `192x192`)。
 - Service Worker 戦略: アセット (JS / CSS / fonts) は `CacheFirst`、API は **キャッシュしない** (オンライン必須)。
 
@@ -1247,7 +1247,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 3. **エラー envelope は単一・複数共に `errors[]` 配列** — 既存 `AppError` を S5.1 で置換。
 4. **OpenAPI 1 ファイル維持** (MVP) — 分割は MVP 後に検討。
 5. **DB マイグレーションは「目的単位」** — ファイル名で意図を表現。
-6. **依存追加は本計画レベルでは確定しない** — 各スライスで必要になったら個別にユーザーに確認 (`vite-plugin-pwa`、ドラッグ並び替え lib 等)。
+6. **依存追加は本計画レベルでは確定しない** — 各スライスで必要になったら個別にユーザーに確認 (例: ドラッグ並び替え lib 等)。`vite-plugin-pwa` は `architecture.md` §コンテキスト で既に導入済みのため対象外。
 7. **note の最大長は仮 2000 文字** — 本計画 §11 で正式化候補。
 8. **レート制限は MVP ではメモリ内** — Redis 等の外部依存は追加しない。
 9. **PWA は CacheFirst (assets) + Network Only (API)** — オンライン前提仕様の踏襲。
@@ -1268,7 +1268,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 | ~~ブロック上限超過の error code~~ | 確定済み (`api-design.md` §1.6 / §2.3) | `exceeds_max_blocks` on `blocks` を採用 |
 | ~~履歴の日付フィルタ仕様~~ | 確定済み (`api-design.md` §2.6) | `from` / `to` クエリパラメータで実装する (S19) |
 | ドラッグ並び替えの依存追加 | S16 / S17 着手時 | 既定は不採用 (上下ボタン) |
-| PWA プラグイン (`vite-plugin-pwa`) | S21 着手時 | 採用提案。ユーザー確認必須 |
+| ~~PWA プラグイン (`vite-plugin-pwa`)~~ | 確定済み (`architecture.md` §コンテキスト) | 既に `frontend/package.json` / `vite.config.ts` で導入済み |
 | Postman 結合テストの fixture 投入方法 | S24 着手時 | Newman pre-request スクリプトで signup 経由 |
 
 ---
