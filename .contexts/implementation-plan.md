@@ -1280,6 +1280,7 @@ gh api repos/foo-543674/triary/pulls/<PR#>/comments
 7. **note の最大長は仮 2000 文字** — 本計画 §11 で正式化候補。
 8. **レート制限は MVP ではメモリ内** — Redis 等の外部依存は追加しない。
 9. **PWA は CacheFirst (assets) + Network Only (API)** — オンライン前提仕様の踏襲。
+10. **S09 クローン suffix リトライ上限 = 5 回** — 仕様 NF の同時利用ユーザー数が「想定 10 人未満」(MVP 規模) で、SELECT → INSERT race の発生確率は実質ゼロ。`already_taken` で 1 回再試行すれば確実に解決する想定だが、保守的バッファとして 5 回まで許容、超えたら `UseCaseError::Internal`。MVP 後にスケールする場合はこの値を見直す。
 
 ---
 
