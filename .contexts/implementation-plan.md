@@ -432,7 +432,7 @@
 
 - `POST /web/v1/signup`
   - request: `{user_id: string, password: string}`
-  - 200: `{user: {user_id: string}}` + `Set-Cookie: triary_session=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`
+  - 201: `{user_id: string}` + `Set-Cookie: triary_session=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` (`api-design.md` §2.1 と一致)
   - 400: `ErrorEnvelope` — `code` 例: `too_short`/`too_long`/`invalid_charset`/`reserved`/`already_taken` (field: `user_id` または `password`)
 
 **DB 変更**: なし (P0-C で `users` / `user_sessions` 完成済み)。
@@ -501,7 +501,7 @@
 
 **API 変更**:
 
-- `POST /web/v1/login`: request `{user_id, password}`、200 `{user: {user_id}}` + Set-Cookie、401 `invalid_credentials`。
+- `POST /web/v1/login`: request `{user_id, password}`、200 `{user_id}` + Set-Cookie、401 `invalid_credentials` (`api-design.md` §2.1)。
 - `GET /web/v1/me`: 200 `{user_id}`、401 `unauthenticated`。
 
 **DB 変更**: なし。
@@ -552,7 +552,7 @@
 
 **API 変更**:
 
-- `POST /web/v1/logout`: 200 `{}` + `Set-Cookie: triary_session=; Max-Age=0`。401 unauthenticated 時はそのまま 401。
+- `POST /web/v1/logout`: 204 + `Set-Cookie: triary_session=; Max-Age=0` (`api-design.md` §2.1)。401 unauthenticated 時はそのまま 401。
 
 **backend**:
 
@@ -584,7 +584,7 @@
 
 **API 変更**:
 
-- request `{current_password, new_password}`、200 `{}`、400 (新パスワード長違反)、401 (現パスワード一致せず → `invalid_credentials`)。
+- request `{current_password, new_password}`、204、400 (新パスワード長違反)、401 (現パスワード一致せず → `invalid_credentials`) (`api-design.md` §2.1)。
 
 **backend**:
 
