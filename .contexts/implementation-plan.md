@@ -472,7 +472,8 @@
 
 **テスト**:
 
-- `domain/user/user_id` の単体テスト (境界値: 2/3/32/33、文字種、予約語、大文字混在)。
+- `domain/user/user_handle` の単体テスト (境界値: 2/3/32/33、文字種、予約語、大文字混在)。
+- `domain/user/user_id` の単体テスト (ULID parse の正常ケース・不正文字列)。長さや文字種は `UserId::parse` が ULID 仕様で保証するため境界値テストは書かない。
 - `domain/user/password` の単体テスト (11/12/128/129 文字、文字種制約なし)。
 - `interfaces/http/routes/web/signup` の Axum oneshot テスト (Cookie ヘッダ付与確認)。
 - Postman: signup 成功・handle 重複・password 短い・不正文字 (4 ケース最低)。
