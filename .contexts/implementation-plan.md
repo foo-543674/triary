@@ -1121,7 +1121,7 @@ IP / 1 時間 5 アカウント を 429 で返す。
 
 **変更点**:
 
-- `tower::Layer` で簡易のメモリ内レート制限 (MVP のスケールが小さいので問題ない)。永続化は不要。
+- `tower::Layer` の実装は `interfaces/http/middleware/` に置く (`domain` / `application` への `tower` import は CLAUDE.md レイヤールールで禁止)。簡易のメモリ内レート制限 (MVP のスケールが小さいので問題ない)。永続化は不要。
 - IP は `X-Forwarded-For` を見るか直 socket addr を見るか。MVP は 直 socket addr。
 
 **テスト**:
