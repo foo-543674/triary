@@ -430,7 +430,7 @@
 **API 変更** (OpenAPI):
 
 - `POST /web/v1/signup`
-  - request: `{user_id: string, password: string}`
+  - request: `{user_id: string, password: string}` — **API フィールド名は `user_id` のまま** (`api-design.md` §2.1)。`field` も `user_id` を返す。`SignupInput.user_handle` という application 内部の型名 (後述) と紛らわしいが、外部 API 表現は変更しない。
   - 201: `{user_id: string}` + `Set-Cookie: triary_session=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` (`api-design.md` §2.1 と一致)
   - 400: `ErrorEnvelope` — `code` 例: `too_short`/`too_long`/`invalid_charset`/`reserved`/`already_taken` (field: `user_id` または `password`)
 
@@ -501,7 +501,7 @@
 
 **API 変更**:
 
-- `POST /web/v1/login`: request `{user_id, password}`、200 `{user_id}` + Set-Cookie、401 `invalid_credentials` (`api-design.md` §2.1)。
+- `POST /web/v1/login`: request `{user_id, password}` — API フィールド名は `user_id` (内部の `UserHandle` 型と区別しない、`api-design.md` §2.1)。200 `{user_id}` + Set-Cookie、401 `invalid_credentials`。
 - `GET /web/v1/me`: 200 `{user_id}`、401 `unauthenticated`。
 
 **DB 変更**: なし。
