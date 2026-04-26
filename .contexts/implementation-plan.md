@@ -394,7 +394,7 @@
 | **S22** | レート制限 | NF | login / signup の 429 | S01, S02 |
 | **S23** | 構造化ログ整備 | NF | tracing で構造化、PII 出さない | S22 |
 | **S24** | E2E グリーン化 | NF | Postman / Newman を CI で回す | S21 |
-| **S25** | UI 仕上げ + アクセシビリティ | NF | 11y, error UX, empty state | S21 |
+| **S25** | UI 仕上げ + アクセシビリティ | NF | a11y, error UX, empty state | S21 |
 
 **並列化の指針**: S01〜S04 (auth) と S05〜S11 (exercises) は途中から並列化
 可能 (S05 は S02 まで進めば前提 OK)。S12 系は exercises がある程度
