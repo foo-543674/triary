@@ -751,7 +751,7 @@ URL について: REST のリソース指向に寄せるなら `/exercise-copies
 - エラー:
   - 404 `not_found`（パス上の block が存在しない / 他ユーザー）
   - 400 on `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`: `out_of_range`
-  - 400 on `reps` / `weight_kg` / `duration_seconds`: `required`（種目の必須計測項目が欠けている場合）
+  - 400 `missing_required_measurement` on `sets[0]`（種目が必須としている計測項目がセットに欠けている、§1.6 の専用コード）
   - 400 `empty`（全計測項目が null の場合、`field` はセット自体）
 
 備考: 完全に空のセット（全フィールドが null）はサーバー側で「保存しない」
@@ -774,7 +774,7 @@ URL について: REST のリソース指向に寄せるなら `/exercise-copies
 - エラー:
   - 404 `not_found`
   - 400 on `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`: `out_of_range`
-  - 400 on 必須計測項目フィールド: `required`
+  - 400 `missing_required_measurement` on `sets[0]`（編集後に種目の必須計測項目が欠ける場合、§1.6 の専用コード）
   - 400 `empty`（全計測項目が null になる編集）
 
 #### DELETE /api/v1/sets/{set_id}
