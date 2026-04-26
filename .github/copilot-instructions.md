@@ -51,7 +51,7 @@ Naming, anywhere in the codebase:
 
 ## Quality gates
 
-Before suggesting a commit, the following must pass:
+Before committing, the following must pass:
 - `cargo fmt --check`, `cargo clippy --all-targets`, `cargo nextest run`
 - `pnpm run lint:ci`, `pnpm run typecheck`, `pnpm run test:run`,
   `pnpm run arch:test`
