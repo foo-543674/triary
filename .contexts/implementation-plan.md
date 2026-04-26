@@ -1059,7 +1059,7 @@ session_id DESC` 順のカーソルページングが動く。
 
 - `GET /api/v1/history/sessions?from=<YYYY-MM-DD>&to=<YYYY-MM-DD>&cursor=<base64url>&limit=<1..100>` (`api-design.md` §2.6)。
 - `from` / `to` はいずれも任意。両方未指定なら全期間、`from` のみなら以降、`to` のみなら以前。
-- 200: `{items: Session[], page_info: PageInfo}`。
+- 200: `{items: SessionHistoryItem[], page_info: PageInfo}`。`SessionHistoryItem` はセッション完全形ではなく **summary 形**: `{id, workout_date, started_at, ended_at, block_count, set_count, exercise_summary: [{exercise_id, exercise_name}]}` (over-fetching 防止のため blocks / sets の詳細は返さない、詳細は `GET /sessions/{id}` で取得、`api-design.md` §2.6)。
 - 400: `invalid_format` (cursor / from / to デコード失敗)。
 
 **backend**:
