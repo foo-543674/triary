@@ -322,8 +322,7 @@
 
 **実装ルール**:
 
-- ULID は固定値 (シードを再実行しても同じ ID になるよう、ハードコード)。
-- ID は `01H` プレフィックスで始まる Crockford base32 26 文字。`exr_` API プレフィックスは付けない (DB は raw)。
+- ULID は固定値 (Crockford base32 26 文字) を SQL に直接埋め込む。シードを再実行しても同じ ID が再現されるよう、生成時刻に依存しないハードコード値を使う (時刻プレフィックスは年代依存で揺れるため期待しない)。`exr_` API プレフィックスは付けない (DB は raw)。
 - `exercise_measurement_kinds` は `(exercise_id, kind, is_required)` を `INSERT ... SELECT` で展開する。
 
 **DoD**:
