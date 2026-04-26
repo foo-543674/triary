@@ -1092,9 +1092,10 @@ session_id DESC` 順のカーソルページングが動く。
 
 **API 変更**:
 
-- `GET /api/v1/history/exercises/{id}?include_descendants=bool&cursor=...&limit=...`。
-- 200: `{items: BlockHistoryItem[], page_info: PageInfo, previous_summary?: ...}`。
-- `BlockHistoryItem`: `{block_id, session_id, workout_date, exercise: {id, name}, sets: SetSummary[]}`。
+- `GET /api/v1/history/exercises/{id}?include_descendants=bool&cursor=...&limit=...` (`api-design.md` §2.6)。
+- 200: `{items: BlockHistoryItem[], page_info: PageInfo, previous_summary?: PreviousSummary}`。`previous_summary` は先頭ページにのみ含める (cursor 指定時は省略)。
+- `BlockHistoryItem` (flat 形、`api-design.md` §2.6): `{block_id, session_id, workout_date, started_at, exercise_id, exercise_name, is_root_exercise: bool, sets: Set[]}`。`is_root_exercise` は「リクエストされた種目そのものの記録か (true)、子孫種目への記録か (false)」を示し、フロントが UI 上で段階を強調表示するために使う。
+- `PreviousSummary`: `{exercise_id, exercise_name, workout_date, sets: [...]}`。
 
 **backend**:
 
