@@ -52,16 +52,26 @@ jobs:
   ai-review:
     name: ai / code review (foo-skills)
     # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`,
-    #       and PRs opened by dependabot (dependabot only edits dependency
+    #       PRs opened by dependabot (dependabot only edits dependency
     #       manifests / lockfiles / workflow `uses:` lines, which the human
     #       reviewer handles together with the `pnpm.overrides` ledger in
-    #       `.contexts/security-overrides.md`).
-    #       The `Copilot` actor (GitHub Copilot Coding Agent) is handled
-    #       by passing `allowed_bots: "Copilot"` to the action so that it
-    #       bypasses the human-actor check inside the composite action.
+    #       `.contexts/security-overrides.md`), and events where
+    #       `github.actor` is `Copilot`.
+    #       The `Copilot` actor is used by the GitHub Copilot Coding Agent
+    #       when it pushes commits. It is not a real GitHub user account,
+    #       so `anthropics/claude-code-action@v1`'s `checkHumanActor`
+    #       fails with `GET /users/Copilot - 404` before it can even reach
+    #       the `allowed_bots` check (upstream issue
+    #       anthropics/claude-code-action#900, unfixed as of v1).
+    #       Copilot-triggered pushes are reviewed via the `trigger-copilot-review`
+    #       job below, which dispatches a `workflow_dispatch` run of this
+    #       workflow; the `workflow_dispatch` path does not invoke
+    #       `checkHumanActor` and therefore succeeds. Human pushes to the
+    #       same branch still trigger this job normally.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
+       github.actor != 'Copilot' &&
        github.event.pull_request.user.login != 'dependabot[bot]' &&
        !contains(github.event.pull_request.title, '[skip ai-review]'))
     runs-on: ubuntu-latest
@@ -130,12 +140,6 @@ jobs:
           #       check and relies on the `permissions:` block declared
           #       above for repo access.
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # NOTE: Allow the Copilot actor (GitHub Copilot Coding Agent) so
-          #       the action's human-actor check does not reject it. The
-          #       Copilot actor is not a standard GitHub user account, so
-          #       the action would otherwise reject it before reaching the
-          #       bot-allow logic.
-          allowed_bots: "Copilot"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
@@ -196,3 +200,33 @@ jobs:
           header: ai-review-foo-skills
           number: ${{ env.PR_NUMBER }}
           path: ai-review-report.md
+
+  # NOTE: When the Copilot Coding Agent pushes commits, the ai-review job
+  #       above is intentionally skipped because `checkHumanActor` inside
+  #       `anthropics/claude-code-action@v1` cannot resolve the `Copilot`
+  #       actor name (it is not a standard GitHub user account) and fails
+  #       with a 404 before `allowed_bots` is evaluated.
+  #       This job fires instead: it dispatches the ai-review workflow via
+  #       `workflow_dispatch`, supplying the PR number as input. The
+  #       `workflow_dispatch` path bypasses `checkHumanActor` entirely, so
+  #       the review runs successfully.
+  trigger-copilot-review:
+    name: ai / trigger review for Copilot push
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.actor == 'Copilot' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      !contains(github.event.pull_request.title, '[skip ai-review]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: dispatch ai-review workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ai-review.yml \
+            --repo "${{ github.repository }}" \
+            --field pr_number=${{ github.event.pull_request.number }}
