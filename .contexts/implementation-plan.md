@@ -358,7 +358,7 @@
 **DoD**:
 
 - [ ] `pnpm run typecheck` `pnpm run lint:ci` `pnpm run test:run` が pass。
-- [ ] `<RequireAuth>` の単体テスト (MSW で 401 を返したらリダイレクトされる) が通る。
+- [ ] `<RequireAuth>` は Container 相当 (薄いグルー) のため単体テストを書かない (`architecture.md` §テスタビリティ戦略)。動作は S02 完了後に Postman で「未認証で保護ルートに 401 が返る」「Cookie 付きで 200 が返る」を確認することで担保する。
 
 ---
 
