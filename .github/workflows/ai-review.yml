@@ -44,9 +44,14 @@ on:
         required: true
         type: number
 
-concurrency:
-  group: ai-review-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
+# NOTE: Concurrency is set per-job (on `ai-review` only) rather than at the
+#       workflow level on purpose. If we set it here, the `workflow_dispatch`
+#       run that `trigger-copilot-review` programmatically launches via
+#       `gh workflow run` would land in the same concurrency group as the
+#       `pull_request` run that just spawned it, and `cancel-in-progress:
+#       true` would cancel the still-running `trigger-copilot-review` job —
+#       turning the "ai / trigger review for Copilot push" check into a
+#       false-positive failure even when the dispatched review succeeds.
 
 jobs:
   ai-review:
@@ -76,6 +81,11 @@ jobs:
        !contains(github.event.pull_request.title, '[skip ai-review]'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # NOTE: Per-job concurrency. See the workflow-level note above for why
+    #       this is not declared at the top of the file.
+    concurrency:
+      group: ai-review-${{ github.event.pull_request.number || inputs.pr_number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -232,6 +242,14 @@ jobs:
       !contains(github.event.pull_request.title, '[skip ai-review]')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # NOTE: `actions: write` is the only permission this job needs (it
+    #       calls `gh workflow run` to dispatch the ai-review workflow).
+    #       This permission is broad — it can launch any workflow in the
+    #       repository — so it is paired with the `if:` guard above that
+    #       restricts execution to `github.actor == 'Copilot'` (the
+    #       same-repo Copilot Coding Agent, which cannot be triggered from
+    #       forks). If the `if:` condition is ever loosened, re-evaluate
+    #       whether this permission is still safe.
     permissions:
       actions: write
     steps:

@@ -277,13 +277,10 @@ fn strip_comment(line: &str) -> String {
     let mut rest = line;
     loop {
         match (rest.find("/*"), rest.find("*/")) {
-            (Some(open), Some(close_after_open))
-                if close_after_open > open
-                    && rest[open..].find("*/").map(|c| open + c) == Some(close_after_open) =>
-            {
+            (Some(open), Some(close)) if close > open => {
                 buf.push_str(&rest[..open]);
                 buf.push(' ');
-                rest = &rest[close_after_open + "*/".len()..];
+                rest = &rest[close + "*/".len()..];
             }
             _ => {
                 buf.push_str(rest);
