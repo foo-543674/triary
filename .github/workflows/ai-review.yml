@@ -140,6 +140,13 @@ jobs:
           #       check and relies on the `permissions:` block declared
           #       above for repo access.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # NOTE: Allow `github-actions` so that workflow_dispatch runs
+          #       triggered programmatically by `trigger-copilot-review`
+          #       (via `gh workflow run`) pass the human-actor check.
+          #       Unlike the `Copilot` actor, `github-actions[bot]` is a
+          #       real GitHub account, so the `allowed_bots` lookup
+          #       succeeds (no 404).
+          allowed_bots: "github-actions"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
