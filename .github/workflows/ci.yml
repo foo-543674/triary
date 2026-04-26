@@ -118,6 +118,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: dependency-cruiser (architecture rules)
+        run: pnpm run arch:test
       - name: vitest run
         run: pnpm exec vitest run
       - name: build storybook

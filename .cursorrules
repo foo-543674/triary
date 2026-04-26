@@ -1,0 +1,68 @@
+# triary — Cursor rules
+
+A workout-logging and scoring PWA. Read `CLAUDE.md` for the full project
+guide. This file is the always-on context Cursor should respect.
+
+## Stack
+
+- Backend: Rust 2024 + Axum 0.8 + sqlx + MySQL 8.0 (`backend/`)
+- Frontend: TypeScript + SolidJS + TanStack Query + Tailwind + CSS Modules,
+  PWA (`frontend/`)
+- API: schema first via `openapi/openapi.yaml`
+- Migrations: plain SQL via sqlx-cli (no ORM model generation)
+- Frontend lint/format: Biome only
+- Integration tests: Postman / Newman
+
+## Backend layer rules (hard constraints)
+
+- `backend/src/domain/` MUST NOT import `axum`, `axum_extra`, `sqlx`,
+  `tower`, `tower_http`, `tracing`, `tracing_subscriber`, or `hyper`.
+- `backend/src/application/` MUST NOT import infrastructure crates.
+- Repository traits live in `application/ports/`; implementations in
+  `infrastructure/repositories/`.
+- `Clock`, `PasswordHasher`, and other "real-world concept" ports live in
+  `domain/`.
+- `sqlx::FromRow`-derived types stay in `infrastructure/`. They MUST NOT
+  appear in `domain` or `application` function signatures.
+
+## Vocabulary rules (anywhere)
+
+- Banned structural names in any layer: `Service`, `Manager`, `Helper`,
+  `Util`, `Utils`, `Processor`, `Worker`, `Engine`.
+- `Handler` is permitted only inside `interfaces::http`.
+- Names must pass the "verb + object responsibility in one sentence" test.
+
+## Coding conventions
+
+- TDD: write the failing test first. Use `proptest` / `@fast-check/vitest`
+  for property-based tests where applicable.
+- Validators return `Result<T, Vec<DomainError>>` (collected errors).
+- API errors come back as `errors[]` arrays, never `{error: {...}}`.
+- HTTP status reserved for protocol concerns; domain rule violations are
+  always HTTP 400 with a domain-specific `code` in the body.
+- IDs at the API boundary are `{prefix}_{ulid}` strings (`usr_`, `exr_`,
+  `ses_`, `blk_`, `set_`).
+- `panic!` and unchecked exceptions are reserved for programmer bugs only.
+- Frontend state: discriminated unions over flag soup. State lives outside
+  presentational components; presentational components have no side effects.
+- Function nesting <= 3, function length <= 50 lines as the default.
+
+## Quality gates before committing
+
+- Backend: `cargo fmt --all -- --check`, `cargo clippy --all-targets`,
+  `cargo nextest run`
+- Frontend: `pnpm run lint:ci`, `pnpm run typecheck`, `pnpm run test:run`,
+  `pnpm run arch:test`
+
+## Commit message format
+
+Prefix one of: `[feat]` `[fix]` `[update]` `[improve]` `[refactor]`
+`[chore]` `[docs]` `[test]` `[style]`. One commit, one purpose.
+
+## Authoritative references
+
+- `.contexts/architecture.md` — layer / aggregate / ADR
+- `.contexts/api-design.md` — HTTP API contract
+- `.contexts/data-model.md` — DB schema and ID strategy
+- `.contexts/specification.md` — user stories
+- `openapi/openapi.yaml` — API source of truth

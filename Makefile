@@ -61,3 +61,19 @@ db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx
 .PHONY: api-generate
 api-generate: ## Regenerate TypeScript types from the OpenAPI schema (frontend/src/api/schema.gen.ts)
 	cd frontend && pnpm run api:generate
+
+# ---------- Architecture tests ----------
+
+.PHONY: arch-test
+arch-test: ## Run architecture tests for both backend and frontend
+	# Scope note: this target runs ONLY the architecture-test binary
+	# (`--test architecture`) so a developer can validate layer rules in
+	# isolation, without compiling and running the rest of the backend
+	# test suite. CI's `backend-test` job (`.github/workflows/ci.yml`)
+	# runs `cargo nextest run --all-features --no-tests=pass` without the
+	# `--test` filter, so the architecture tests run there too — alongside
+	# every other test in the workspace. Both invocations pass
+	# `--no-tests=pass` so that a binary which currently has no tests
+	# (e.g. before any `domain/` files are added) is treated as success.
+	cd backend && cargo nextest run --test architecture --all-features --no-tests=pass
+	cd frontend && pnpm run arch:test

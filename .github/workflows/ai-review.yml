@@ -44,25 +44,48 @@ on:
         required: true
         type: number
 
-concurrency:
-  group: ai-review-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
+# NOTE: Concurrency is set per-job (on `ai-review` only) rather than at the
+#       workflow level on purpose. If we set it here, the `workflow_dispatch`
+#       run that `trigger-copilot-review` programmatically launches via
+#       `gh workflow run` would land in the same concurrency group as the
+#       `pull_request` run that just spawned it, and `cancel-in-progress:
+#       true` would cancel the still-running `trigger-copilot-review` job —
+#       turning the "ai / trigger review for Copilot push" check into a
+#       false-positive failure even when the dispatched review succeeds.
 
 jobs:
   ai-review:
     name: ai / code review (foo-skills)
-    # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`, and
+    # NOTE: Skip draft PRs, PRs whose title contains `[skip ai-review]`,
     #       PRs opened by dependabot (dependabot only edits dependency
     #       manifests / lockfiles / workflow `uses:` lines, which the human
     #       reviewer handles together with the `pnpm.overrides` ledger in
-    #       `.contexts/security-overrides.md`). workflow_dispatch always runs.
+    #       `.contexts/security-overrides.md`), and events where
+    #       `github.actor` is `Copilot`.
+    #       The `Copilot` actor is used by the GitHub Copilot Coding Agent
+    #       when it pushes commits. It is not a real GitHub user account,
+    #       so `anthropics/claude-code-action@v1`'s `checkHumanActor`
+    #       fails with `GET /users/Copilot - 404` before it can even reach
+    #       the `allowed_bots` check (upstream issue
+    #       anthropics/claude-code-action#900, unfixed as of v1).
+    #       Copilot-triggered pushes are reviewed via the `trigger-copilot-review`
+    #       job below, which dispatches a `workflow_dispatch` run of this
+    #       workflow; the `workflow_dispatch` path does not invoke
+    #       `checkHumanActor` and therefore succeeds. Human pushes to the
+    #       same branch still trigger this job normally.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false &&
+       github.actor != 'Copilot' &&
        github.event.pull_request.user.login != 'dependabot[bot]' &&
        !contains(github.event.pull_request.title, '[skip ai-review]'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # NOTE: Per-job concurrency. See the workflow-level note above for why
+    #       this is not declared at the top of the file.
+    concurrency:
+      group: ai-review-${{ github.event.pull_request.number || inputs.pr_number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -117,6 +140,23 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # NOTE: Pass GITHUB_TOKEN explicitly so the action skips the
+          #       Anthropic-side App-token exchange. That exchange checks
+          #       the OIDC `actor` (= commit author) for repo write access,
+          #       which can fail with `App token exchange failed: 401
+          #       Unauthorized - User does not have write access on this
+          #       repository` when a bot account authored the head commit.
+          #       Using the workflow-scoped GITHUB_TOKEN sidesteps that
+          #       check and relies on the `permissions:` block declared
+          #       above for repo access.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # NOTE: Allow `github-actions` so that workflow_dispatch runs
+          #       triggered programmatically by `trigger-copilot-review`
+          #       (via `gh workflow run`) pass the human-actor check.
+          #       Unlike the `Copilot` actor, `github-actions[bot]` is a
+          #       real GitHub account, so the `allowed_bots` lookup
+          #       succeeds (no 404).
+          allowed_bots: "github-actions"
           # NOTE: `--plugin-dir` loads foo-skills as a local plugin so the
           #       agent can be addressed as `foo-skills:code-reviewer`.
           claude_args: "--plugin-dir ./.foo-skills"
@@ -177,3 +217,64 @@ jobs:
           header: ai-review-foo-skills
           number: ${{ env.PR_NUMBER }}
           path: ai-review-report.md
+
+  # NOTE: When the Copilot Coding Agent pushes commits, the ai-review job
+  #       above is intentionally skipped because `checkHumanActor` inside
+  #       `anthropics/claude-code-action@v1` cannot resolve the `Copilot`
+  #       actor name (it is not a standard GitHub user account) and fails
+  #       with a 404 before `allowed_bots` is evaluated.
+  #       This job fires instead: it dispatches the ai-review workflow via
+  #       `workflow_dispatch`, supplying the PR number as input. The
+  #       `workflow_dispatch` path bypasses `checkHumanActor` entirely, so
+  #       the review runs successfully.
+  #
+  #       Security note: this job is restricted to `github.actor == 'Copilot'`,
+  #       which is the same-repo Copilot Coding Agent. It cannot be triggered
+  #       from forks, so dispatching against a head ref does not widen the
+  #       attack surface to untrusted code.
+  trigger-copilot-review:
+    name: ai / trigger review for Copilot push
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.actor == 'Copilot' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      !contains(github.event.pull_request.title, '[skip ai-review]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # NOTE: `actions: write` is the only permission this job needs (it
+    #       calls `gh workflow run` to dispatch the ai-review workflow).
+    #       This permission is broad — it can launch any workflow in the
+    #       repository — so it is paired with the `if:` guard above that
+    #       restricts execution to `github.actor == 'Copilot'` (the
+    #       same-repo Copilot Coding Agent, which cannot be triggered from
+    #       forks). If the `if:` condition is ever loosened, re-evaluate
+    #       whether this permission is still safe.
+    permissions:
+      actions: write
+    steps:
+      # NOTE: `--ref` points at the PR head branch so the dispatched run
+      #       executes the workflow definition that lives on the PR itself,
+      #       not the (possibly older) copy on the default branch. This is
+      #       required for two reasons:
+      #         1. Bootstrap. The PR that introduces `allowed_bots:
+      #            "github-actions"` and this `trigger-copilot-review` job
+      #            must be reviewable by its own version of the workflow,
+      #            because the default branch does not yet have those
+      #            changes.
+      #         2. Self-review of future workflow edits. When Copilot
+      #            modifies `ai-review.yml` itself, the modification must
+      #            be reviewed by the modified workflow, not by the old
+      #            one on the default branch.
+      #       GitHub still requires `ai-review.yml` to exist on the default
+      #       branch for `workflow_dispatch` to be invokable; that
+      #       prerequisite is satisfied because the file already lives on
+      #       `main`.
+      - name: dispatch ai-review workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ai-review.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.event.pull_request.head.ref }}" \
+            --field pr_number=${{ github.event.pull_request.number }}
