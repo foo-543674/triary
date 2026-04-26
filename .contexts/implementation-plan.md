@@ -655,7 +655,7 @@
 
 - `POST /api/v1/exercises`: request `{name, measurement_kinds: [...], parent_id?: IdString}`。
 - 400 codes: `required` (name / measurement_kinds)、`too_long` (name)、`invalid_charset` (name)、`empty` (measurement_kinds)、`already_taken` (name、ユーザー内 + プリセット重複)、`not_found` (parent_id)、`creates_cycle`/`exceeds_max_depth`/`exceeds_max_children` は parent_id 指定時のみ (S10 で完全対応するが、ここでも検査する)。
-- 200: `Exercise`。
+- 201: `Exercise` (`api-design.md` §2.2)。
 
 **backend**:
 
@@ -746,7 +746,7 @@
 
 **API 変更**:
 
-- `POST /api/v1/exercises/{exercise_id}/clones`: request 任意 (空でよい)、200 `Exercise` (新規ユーザー種目)。
+- `POST /api/v1/exercises/{exercise_id}/clones`: request 任意 (空でよい)、201 `Exercise` (新規ユーザー種目) (`api-design.md` §2.2)。
 - 403 if path id is not preset (この API は preset 専用)。
 - 名前は `{元の名前} (コピー)` から始まり、衝突する場合は `(コピー 2)`、`(コピー 3)`... と suffix を増やす。
 - measurement_kinds は preset と同じ。parent は preset 自身。
@@ -835,7 +835,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **API 変更**:
 
 - request `{workout_date: WorkoutDate}` (フロントが組み立てたローカル日付)。`note` は任意。
-- 200: `Session` (空 blocks)。
+- 201: `Session` (空 blocks) (`api-design.md` §2.3)。
 - 400 codes: `required` workout_date、`invalid_format`、`in_future`。
 
 **backend**:
@@ -892,7 +892,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **API 変更**:
 
 - `POST /api/v1/sessions/{session_id}/blocks`: request `{exercise_id}`。
-- 200: `Block` (空 sets, order は末尾)。
+- 201: `Block` (空 sets, order は末尾) (`api-design.md` §2.3)。
 - 400: `not_found` (exercise_id)、`already_taken` は **使わない** (同じ種目を 2 回入れるのは仕様で許可)。
 
 **backend**:
@@ -922,6 +922,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 - `POST /api/v1/blocks/{block_id}/sets`: request `{reps?, weight_kg?, duration_seconds?, interval_seconds?}`。
 - バリデーション: 種目の必須計測項目すべてに値があること、必須でない項目は省略可。値の範囲は §specification §境界値表。
+- 201: `Set` (`api-design.md` §2.4)。
 - 400 codes: `required` (必須項目欠落)、`out_of_range`、`empty` (全部 NULL は不可)。
 
 **backend**:
