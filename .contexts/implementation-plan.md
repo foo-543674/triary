@@ -1029,10 +1029,13 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **API 変更**:
 
-- `PATCH /api/v1/sessions/{id}`: `{workout_date?, note?, ended_at?}`。`ended_at` 渡しでも OK だが、フロントは `/end` を使う。
-- `POST /api/v1/sessions/{id}/end`: `ended_at` を `Clock::now()` にする。
+- `PATCH /api/v1/sessions/{id}`: `{workout_date?, note?, ended_at?}`。200 で更新後のセッション完全形 (S13 と同じ集約) を返す。フロントは ended_at をこちらでなく `/end` で更新する。
+- `POST /api/v1/sessions/{id}/end`: `ended_at` を `Clock::now()` にする。200 で更新後のセッション完全形を返す。**冪等**: 既に終了済み (ended_at が非 null) のセッションに対しても 200 で同じ表現を返す (多重実行で害なし、`api-design.md` §2.3)。
 - `DELETE /api/v1/sessions/{id}`: 204。
-- 400 codes: `in_future` (workout_date)、`before_start` (`ended_at < started_at`)。
+- エラー (`api-design.md` §2.3):
+  - 404 `not_found`
+  - 400 on `workout_date`: `invalid_format` / `in_future`
+  - 400 on `ended_at`: `before_start` (`ended_at < started_at`)
 
 **frontend**:
 
