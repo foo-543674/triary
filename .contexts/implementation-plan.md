@@ -875,6 +875,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **backend**:
 
 - 1 リクエスト = 4 SQL (sessions / blocks / sets / 関連 exercises) を join なしで取り、メモリで組み立てる (集約構築の責務は application/usecases に置く)。
+- N+1 回避: 関連 `exercises` は `WHERE id IN (block.exercise_id の集合)` で一括取得する。ブロックごとに個別 SELECT しない。同様に `sets` も `WHERE block_id IN (...)` で一括取得し、`block_id` でメモリ上で grouping する。
 
 **frontend**:
 
