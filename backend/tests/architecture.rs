@@ -249,6 +249,10 @@ fn strip_comment(line: &str) -> &str {
 }
 
 fn collect_files(root: &Path) -> Vec<PathBuf> {
+    // Intentionally return empty rather than panic when the root directory does
+    // not exist yet. This lets the tests pass during early project stages before
+    // `domain/` and `application/` directories are created, without requiring a
+    // separate guard in every caller.
     if !root.exists() {
         return Vec::new();
     }

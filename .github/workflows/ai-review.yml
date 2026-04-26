@@ -130,6 +130,12 @@ jobs:
         #       short-circuits as a human and never touches the bot
         #       branch. We only override when the original actor is
         #       Copilot so human runs still report the real actor.
+        #       ASSUMPTION: personal repository (owner is type "User").
+        #       If this repo is ever transferred to an organization, the
+        #       `github.repository_owner` fallback may resolve to an
+        #       Organization account instead of a User, breaking the same
+        #       `checkHumanActor` lookup it is meant to bypass. In that case
+        #       remove this override or hard-code the owner's user login.
         env:
           GITHUB_ACTOR: ${{ github.actor == 'Copilot' && github.repository_owner || github.actor }}
         with:
