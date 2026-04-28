@@ -628,32 +628,15 @@ backend/migrations/
   (`UNHEX('01HZ00000000000000000000000001')` 等)。Rust 側で乱数生成
   しない。理由: 再現可能なマイグレーションを保つため。同じ DB をリセット
   しても同じ ID になる
-- **プリセット種目の初版リスト**: `implementation-plan.md §5.4` で
-  確定済み。同期した内容を以下に再掲する (両文書を変更する際は両方を
-  揃えること):
-
-  | 種目 | measurement_kinds | parent |
-  |---|---|---|
-  | ベンチプレス | reps (req), weight (req) | null |
-  | バックスクワット | reps (req), weight (req) | null |
-  | デッドリフト | reps (req), weight (req) | null |
-  | オーバーヘッドプレス | reps (req), weight (req) | null |
-  | 懸垂 | reps (req), weight (opt) | null |
-  | ディップス | reps (req), weight (opt) | null |
-  | プッシュアップ | reps (req), weight (opt) | null |
-  | パイクプッシュアップ | reps (req) | null |
-  | 倒立腕立て (HSPU) | reps (req) | パイクプッシュアップ |
-  | ピストルスクワット | reps (req) | バックスクワット |
-  | フロントレバー | time (req) | null |
-  | バックレバー | time (req) | null |
-  | プランク | time (req) | null |
-  | ランニング | time (req) | null |
-  | バーピー | reps (req) | null |
-
-  最終的な確定はマイグレーション作成時 (Phase 0 の P0-D 着手時、
-  すなわち最初のスライス S01 より前) にユーザー確認のうえ行う。本
-  ドキュメントではスキーマ設計を妨げないための存在証明として、
-  `implementation-plan.md §5.4` と同じ 15 種目を保持する
+- **プリセット種目の初版リスト**: 確定リストは
+  `implementation-plan.md §5.4` を **真の源** として参照する (15 種目、
+  measurement_kinds と parent 関係を含む)。本ドキュメントではフォー
+  マットの差異から両側を手作業で同期するリスクを避けるため、表を二重
+  に持たない。最終確定はマイグレーション作成時 (Phase 0 の P0-D
+  着手時、すなわち最初のスライス S01 より前) にユーザー確認のうえ
+  行う。スキーマ設計上は「`exercises` テーブルに `owner_user_id IS NULL`
+  の行が複数入る」「`parent_id` で自己参照ツリーを成す」という存在
+  証明があれば足りる
 
 ### 10.3 破壊的変更の段階適用 (捨てやすさ §8)
 
