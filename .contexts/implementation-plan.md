@@ -961,7 +961,11 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 **backend**:
 
 - `domain/session/workout_set.rs`: 値オブジェクト群 (`Reps`, `WeightKg`, `DurationSeconds`, `IntervalSeconds`) に範囲検査。
-- `application/usecases/add_set.rs`。
+- `application/usecases/add_set.rs`。所有権チェック (block 経由で session.user_id == viewer)。
+- `set_order` の採番は S14 と同様、1 トランザクション内で次の手順を踏む (`data-model.md` §9 ギャップロック注意書き、§再採番戦略 を参照):
+  1. `SELECT id FROM exercise_blocks WHERE id = ? FOR UPDATE` で **exercise_blocks 行を先行ロック** (`workout_sets` に対する集約ルートロック)。`workout_sets` が空のとき MySQL 8.0 REPEATABLE READ ではギャップロックが期待通り効かないケースがあるため、親行ロックで「同じブロックへの並行セット追加」を直列化する。
+  2. `SELECT MAX(set_order) FROM workout_sets WHERE exercise_block_id = ?` で末尾を取得。
+  3. `+1` した値で INSERT。
 
 **frontend**:
 
