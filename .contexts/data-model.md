@@ -628,8 +628,9 @@ backend/migrations/
   (`UNHEX('01HZ00000000000000000000000001')` 等)。Rust 側で乱数生成
   しない。理由: 再現可能なマイグレーションを保つため。同じ DB をリセット
   しても同じ ID になる
-- **プリセット種目の初版リスト**: MVP 初回マイグレーション作成時に
-  決定する。候補 (あくまで初版たたき台):
+- **プリセット種目の初版リスト**: `implementation-plan.md §5.4` で
+  確定済み。同期した内容を以下に再掲する (両文書を変更する際は両方を
+  揃えること):
 
   | 種目 | measurement_kinds | parent |
   |---|---|---|
@@ -638,16 +639,20 @@ backend/migrations/
   | デッドリフト | reps (req), weight (req) | null |
   | オーバーヘッドプレス | reps (req), weight (req) | null |
   | 懸垂 | reps (req), weight (opt) | null |
-  | プッシュアップ | reps (req), weight (opt) | null |
   | ディップス | reps (req), weight (opt) | null |
+  | プッシュアップ | reps (req), weight (opt) | null |
+  | パイクプッシュアップ | reps (req) | null |
+  | 倒立腕立て (HSPU) | reps (req) | パイクプッシュアップ |
+  | ピストルスクワット | reps (req) | バックスクワット |
+  | フロントレバー | time (req) | null |
+  | バックレバー | time (req) | null |
   | プランク | time (req) | null |
-  | ハンドスタンドプッシュアップ | reps (req) | null |
-  | パイクプッシュアップ | reps (req) | (HSPU) |
-  | デクラインプッシュアップ | reps (req) | (HSPU) |
-  | ピストルスクワット | reps (req), weight (opt) | null |
+  | ランニング | time (req) | null |
+  | バーピー | reps (req) | null |
 
-  実際のリストはマイグレーション作成時にユーザー確認のうえ確定する。
-  本ドキュメントではスキーマ設計を妨げないための存在証明として置く
+  最終的な確定はマイグレーション作成時 (S05 着手時) にユーザー確認の
+  うえ行う。本ドキュメントではスキーマ設計を妨げないための存在証明
+  として、`implementation-plan.md §5.4` と同じ 15 種目を保持する
 
 ### 10.3 破壊的変更の段階適用 (捨てやすさ §8)
 
