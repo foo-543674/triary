@@ -217,10 +217,19 @@
   - `code() -> &'static str`、`field() -> Option<String>`、`message() -> String` を実装。
 - `backend/src/application/error.rs` (新規):
   - `UseCaseError` enum を定義。`Domain(Vec<DomainError>)`、`Unauthorized`、`Forbidden`、`NotFound`、`Internal(anyhow::Error)` 等。
-  - `From<UseCaseError> for AppError` を実装。
   - `anyhow` は `backend/tests/architecture.rs` の `FORBIDDEN_INFRA_CRATES` (`axum / axum_extra / sqlx / tower / tower_http / tracing / tracing_subscriber / hyper`) に含まれていないため、`application` 層から依存して問題ない。将来 `FORBIDDEN_INFRA_CRATES` に変更を加える場合は本箇所も再評価する。
 - `backend/src/interfaces/http/dto/error.rs` (新規):
   - JSON シリアライズ用の wire 型。
+- `backend/src/interfaces/http/error.rs` (続き):
+  - `From<UseCaseError> for AppError` および `From<DomainError> / From<Vec<DomainError>> for AppError` をここで実装する。`AppError` は interfaces 層の型なので `application` 層から参照しない (`CLAUDE.md` §Layer rules に従い、依存方向は interfaces → application のみ)。
+  - `DomainError → ErrorItem` への変換 (code / field / message の決定) もこの層で行う。`application` 層は `UseCaseError` を返すだけで、HTTP 表現には踏み込まない。
+
+**役割分担** (`architecture.md` ADR #8 型付きパイプラインに準拠):
+
+- 値オブジェクト (例: `UserHandle::try_new`、`ExerciseName::try_new`) は単一の `DomainError` を返す。
+- 複数フィールドを束ねる収集は `CreateUserValidator` 等のバリデータ層 (`domain/<aggregate>/factories.rs`) が `Result<Validated, Vec<DomainError>>` で行う。1 つの値オブジェクトの中で複数違反が出るケース (例: `ExerciseName` の長さと文字種) は `try_new` が `Result<_, Vec<DomainError>>` を返してよい (`api-design.md` §1.6 参照)。
+- ユースケース層は `UseCaseError::Domain(Vec<DomainError>)` 等で持ち上げる。
+- HTTP レスポンスへの整形 (DomainError → ErrorItem) は interfaces/http/error.rs が担う。
 
 **OpenAPI**:
 
