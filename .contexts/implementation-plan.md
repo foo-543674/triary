@@ -222,6 +222,7 @@
 - `backend/src/application/error.rs` (新規):
   - `UseCaseError` enum を定義。`Domain(Vec<DomainError>)`、`Unauthorized`、`Forbidden`、`NotFound`、`Internal(anyhow::Error)` 等。
   - `anyhow` は `backend/tests/architecture.rs` の `FORBIDDEN_INFRA_CRATES` (`axum / axum_extra / sqlx / tower / tower_http / tracing / tracing_subscriber / hyper`) に含まれていないため、`application` 層から依存して問題ない。将来 `FORBIDDEN_INFRA_CRATES` に変更を加える場合は本箇所も再評価する。
+  - `UseCaseError::Internal(anyhow::Error)` は本 enum の **内部実装に留め**、`application/ports/` のトレイトメソッドのシグネチャや `domain` の型定義に `anyhow::Error` を直接露出させない。ポート / ユースケースの戻り値はあくまで `Result<_, UseCaseError>` で表し、infrastructure 実装側で発生した低レベル失敗 (sqlx エラーなど) を `anyhow::Error::new(e)` で包んで `UseCaseError::Internal(...)` に詰め替える。これにより `anyhow` 依存はクレート境界の片側 (構築側) のみで完結する。
 - `backend/src/interfaces/http/dto/error.rs` (新規):
   - JSON シリアライズ用の wire 型。
 - `backend/src/interfaces/http/error.rs` (続き):
