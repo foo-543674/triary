@@ -153,6 +153,7 @@ and why). The ones most often consulted on this project:
 | `cd frontend && pnpm run typecheck` | TypeScript type check |
 | `cd frontend && pnpm run test:run` | Frontend unit tests |
 | `cd frontend && pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
+| `make arch-test` | Architecture tests for both backend and frontend |
 | `cd frontend && pnpm run dev` | Frontend dev server |
 
 ## devcontainer and local infra
