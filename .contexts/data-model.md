@@ -609,20 +609,20 @@ exercises.parent_exercise_id → exercises.exercise_id  [SET NULL on delete]
 
 ```
 backend/migrations/
-├── 20260401000001__init_users_and_sessions.sql
-├── 20260401000002__init_exercises.sql
-├── 20260401000003__init_session_records.sql
-├── 20260401000004__seed_preset_exercises.sql
+├── 20260401000001_init_users_and_sessions.sql
+├── 20260401000002_init_exercises.sql
+├── 20260401000003_init_session_records.sql
+├── 20260401000004_seed_preset_exercises.sql
 ```
 
 - 1 ファイル = 1 論理トピック。将来の変更で diff が読みやすい
-- `__init_*` はスキーマ作成、`__seed_*` は初期データ
+- `_init_*` はスキーマ作成、`_seed_*` は初期データ
 - タイムスタンプ形式 `YYYYMMDDHHMMSS` は sqlx-cli が自動付与する (新規
   マイグレーション作成コマンド経由)
 
 ### 10.2 シード (プリセット種目) の扱い
 
-- プリセット種目は `20260401000004__seed_preset_exercises.sql` 内で
+- プリセット種目は `20260401000004_seed_preset_exercises.sql` 内で
   `INSERT INTO exercises` する
 - `exercise_id` は **SQL リテラル** として固定 ULID を書く
   (`UNHEX('01HZ00000000000000000000000001')` 等)。Rust 側で乱数生成
