@@ -444,7 +444,7 @@
 **API 変更** (OpenAPI):
 
 - `POST /web/v1/signup`
-  - request: `{user_id: string, password: string}` — **API フィールド名は `user_id` のまま** (`api-design.md` §2.1)。`field` も `user_id` を返す。`SignupInput.user_handle` という application 内部の型名 (後述) と紛らわしいが、外部 API 表現は変更しない。
+  - request: `{user_id: string, password: string}` — **外部 API のフィールド名は `user_id` で `api-design.md §2.1` にて確定済み**。本実装計画では変更しない。`field` も `user_id` を返す。後述の `SignupInput.user_handle` は application 内部の型名で、外部表現とは別概念 (内部 PK の `UserId: ULID` と区別するため `user_handle` を採用、Round 7 で確定)。
   - 201: `{user_id: string}` + `Set-Cookie: triary_session=...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` (`api-design.md` §2.1 と一致)
   - 400: `ErrorEnvelope` — `code` 例: `too_short`/`too_long`/`invalid_charset`/`reserved`/`already_taken` (field: `user_id` または `password`)
 
