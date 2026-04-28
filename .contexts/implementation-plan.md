@@ -1225,7 +1225,7 @@ PR を出す前 / マージ前に以下が同時に green であること。
 | backend fmt | `cd backend && cargo fmt --all -- --check` | |
 | backend lint | `cd backend && cargo clippy --all-targets -- -D warnings` | |
 | backend test | `cd backend && cargo nextest run` | architecture テストも含む |
-| backend offline metadata | `cd backend && cargo sqlx prepare --check -- --tests` | スキーマ変更時 |
+| backend offline metadata | `cd backend && cargo sqlx prepare --check -- --tests` | スキーマ変更時。`--check` は CI 検証用 (差分があれば失敗)。ローカルで再生成するときは `make db-prepare` (= `cargo sqlx prepare -- --tests`、`CLAUDE.md §Common commands`) を使う |
 | frontend lint/format | `cd frontend && pnpm run lint:ci` | Biome のみ |
 | frontend type | `cd frontend && pnpm run typecheck` | |
 | frontend unit | `cd frontend && pnpm run test:run` | |
