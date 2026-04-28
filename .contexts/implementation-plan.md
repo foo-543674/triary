@@ -264,7 +264,7 @@
 | `ErrorItem` | `{code: string, field: string?, message: string}` | エラー要素 |
 | `ErrorEnvelope` | `{errors: ErrorItem[]}` | 全エラーレスポンス |
 | `PageInfo` | `{next_cursor: string?, has_next: boolean}` | カーソルページング共通 |
-| `IdString` | `string`、`pattern: ^[a-z]{3}_[0-9A-HJKMNP-TV-Z]{26}$` | ULID プレフィックス付き ID。pattern は Crockford Base32 (32 文字、混同しやすい `I` / `L` / `O` / `U` を除外) でエンコードされた 26 文字の ULID 本体に 3 文字のリソースプレフィックス + アンダースコアを付けた形 (`api-design.md` §3 ID 表記法)。OpenAPI に反映する際はこの解説をコメントとして残す |
+| `IdString` | `string`、`pattern: ^[a-z]{3}_[0-9A-HJKMNP-TV-Z]{26}$` | ULID プレフィックス付き ID。pattern の本体側は **アルファベット 32 種** (Crockford Base32、混同しやすい `I` / `L` / `O` / `U` を除外) で 128bit ULID を **26 文字** にエンコードしたもの。先頭にリソース種別を表す 3 文字 + `_` が付く (`api-design.md` §3 ID 表記法)。OpenAPI に反映する際はこの解説をコメントとして残す |
 | `WorkoutDate` | `string`、`format: date` | `YYYY-MM-DD` |
 | `Timestamp` | `string`、`format: date-time` | RFC 3339 UTC |
 
