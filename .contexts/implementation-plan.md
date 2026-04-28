@@ -1114,12 +1114,12 @@ session_id DESC` 順のカーソルページングが動く。
 - `GET /api/v1/history/exercises/{id}?include_descendants=bool&cursor=...&limit=...` (`api-design.md` §2.6)。
 - 200: `{items: BlockHistoryItem[], page_info: PageInfo, previous_summary?: PreviousSummary}`。`previous_summary` は先頭ページにのみ含める (cursor 指定時は省略)。
 - `BlockHistoryItem` (flat 形、`api-design.md` §2.6): `{block_id, session_id, workout_date, started_at, exercise_id, exercise_name, is_root_exercise: bool, sets: Set[]}`。`is_root_exercise` は「リクエストされた種目そのものの記録か (true)、子孫種目への記録か (false)」を示し、フロントが UI 上で段階を強調表示するために使う。
-- `PreviousSummary`: `{exercise_id, exercise_name, workout_date, sets: [...]}`。
+- `PreviousSummary`: `{exercise_id, exercise_name, workout_date, sets: Set[]}` (`api-design.md` §2.6)。`sets` は直近 1 ブロックの **全セット** を返す (`specification.md` US-10 受け入れ基準「直近の種目ブロックのセット内容」に従う、要約はしない)。
 
 **backend**:
 
 - `include_descendants=true` のとき: `WITH RECURSIVE` で子孫 ID を取り、`exercise_blocks.exercise_id IN (...)` で絞る。
-- `previous_summary`: 直近のブロックのセット概要 (sets 数・最大 weight 等) を返す。MVP では「sets 数と最初のセットの値」を返す簡易版で開始。
+- `previous_summary`: 該当種目 (および `include_descendants=true` のときは子孫含む) の最も新しいブロックを 1 件特定し、そのブロックの **全セット** (`workout_sets` の `Set[]`) を返す。要約 (sets 数・最大 weight 等) は行わない (`specification.md` US-10 / `api-design.md` §2.6 と整合)。
 
 **frontend**:
 
