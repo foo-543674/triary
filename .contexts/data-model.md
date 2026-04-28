@@ -592,6 +592,13 @@ exercises.parent_exercise_id → exercises.exercise_id  [SET NULL on delete]
   名前衝突チェックは `SELECT ... FOR UPDATE` でロックを取るか、UNIQUE
   制約違反を掴んで domain エラーに変換する (後者のほうがロック範囲が
   小さい)
+- **空集合のギャップロック注意**: `MAX(block_order) FOR UPDATE` 等を子テーブルに
+  対して撃ったとき、対象集合が空 (= 初回 INSERT 直前) の場合、`REPEATABLE
+  READ` のギャップロックが期待通り効かないケースがある。集約ルートを先行
+  ロック (例: `SELECT id FROM sessions WHERE id = ? FOR UPDATE`) してから
+  子テーブルの `MAX` を取ることで race を直列化する。`exercise_blocks` /
+  `workout_sets` への並行 INSERT は、それぞれ親 (`sessions` / `exercise_blocks`)
+  の集約ルート行を先にロックしてから採番を確定する
 - **再採番の実装**: 実装フェーズで検討。スキーマ設計の問題ではない
 
 ## 10. マイグレーション計画
@@ -602,45 +609,38 @@ exercises.parent_exercise_id → exercises.exercise_id  [SET NULL on delete]
 
 ```
 backend/migrations/
-├── 20260401000001__init_users_and_sessions.sql
-├── 20260401000002__init_exercises.sql
-├── 20260401000003__init_session_records.sql
-├── 20260401000004__seed_preset_exercises.sql
+├── 20260401000001_init_users_and_sessions.sql
+├── 20260401000002_init_exercises.sql
+├── 20260401000003_init_session_records.sql
+├── 20260401000004_seed_preset_exercises.sql
 ```
 
 - 1 ファイル = 1 論理トピック。将来の変更で diff が読みやすい
-- `__init_*` はスキーマ作成、`__seed_*` は初期データ
+- `_init_*` はスキーマ作成、`_seed_*` は初期データ
 - タイムスタンプ形式 `YYYYMMDDHHMMSS` は sqlx-cli が自動付与する (新規
   マイグレーション作成コマンド経由)
+- 上記の `20260401...` は **例示値**。実際のタイムスタンプは
+  `cargo sqlx migrate add <name>` を実行した時刻で決まる。
+  `implementation-plan.md §2.3` では着手予定日を考慮した別の例示値
+  (`20260501...`) を使っているが、いずれも例であって規定値ではない
 
 ### 10.2 シード (プリセット種目) の扱い
 
-- プリセット種目は `20260401000004__seed_preset_exercises.sql` 内で
+- プリセット種目は `20260401000004_seed_preset_exercises.sql` 内で
   `INSERT INTO exercises` する
 - `exercise_id` は **SQL リテラル** として固定 ULID を書く
   (`UNHEX('01HZ00000000000000000000000001')` 等)。Rust 側で乱数生成
   しない。理由: 再現可能なマイグレーションを保つため。同じ DB をリセット
   しても同じ ID になる
-- **プリセット種目の初版リスト**: MVP 初回マイグレーション作成時に
-  決定する。候補 (あくまで初版たたき台):
-
-  | 種目 | measurement_kinds | parent |
-  |---|---|---|
-  | ベンチプレス | reps (req), weight (req) | null |
-  | バックスクワット | reps (req), weight (req) | null |
-  | デッドリフト | reps (req), weight (req) | null |
-  | オーバーヘッドプレス | reps (req), weight (req) | null |
-  | 懸垂 | reps (req), weight (opt) | null |
-  | プッシュアップ | reps (req), weight (opt) | null |
-  | ディップス | reps (req), weight (opt) | null |
-  | プランク | time (req) | null |
-  | ハンドスタンドプッシュアップ | reps (req) | null |
-  | パイクプッシュアップ | reps (req) | (HSPU) |
-  | デクラインプッシュアップ | reps (req) | (HSPU) |
-  | ピストルスクワット | reps (req), weight (opt) | null |
-
-  実際のリストはマイグレーション作成時にユーザー確認のうえ確定する。
-  本ドキュメントではスキーマ設計を妨げないための存在証明として置く
+- **プリセット種目の初版リスト**: 確定リストは
+  `implementation-plan.md §5.4` を **真の源** として参照する (15 種目、
+  measurement_kinds と parent 関係を含む)。本ドキュメントではフォー
+  マットの差異から両側を手作業で同期するリスクを避けるため、表を二重
+  に持たない。最終確定はマイグレーション作成時 (Phase 0 の P0-D
+  着手時、すなわち最初のスライス S01 より前) にユーザー確認のうえ
+  行う。スキーマ設計上は「`exercises` テーブルに `owner_user_id IS NULL`
+  の行が複数入る」「`parent_id` で自己参照ツリーを成す」という存在
+  証明があれば足りる
 
 ### 10.3 破壊的変更の段階適用 (捨てやすさ §8)
 
