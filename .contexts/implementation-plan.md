@@ -531,7 +531,7 @@
   - handle で user 検索 → ハッシュ verify → 失敗時は **`Unauthorized` のみ返す** (ID 存在の有無を露呈しない、`specification.md` US-2)。
   - 成功時 SessionStore::create → token を返す。
 - `interfaces/http/routes/web/login.rs`、`me.rs`。
-- session トークンは「raw 256bit を生成し、Cookie には raw を送る、DB には SHA-256 ハッシュを保存」(§data-model.md §user_sessions)。
+- session トークンは「raw 256bit を生成し、Cookie には raw を送る、DB には SHA-256 ハッシュを保存」(`data-model.md §4.2 user_sessions`)。
 
 **frontend 触点**:
 
@@ -933,7 +933,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
   1. `SELECT id FROM sessions WHERE id = ? FOR UPDATE` で **session 行を先行ロック** (集約ルートロック)。`exercise_blocks` が空のとき MySQL 8.0 REPEATABLE READ ではギャップロックが期待通り効かないケースがあるため、session 行ロックで「同じセッションへの並行ブロック追加」を直列化する。
   2. `SELECT MAX(block_order) FROM exercise_blocks WHERE session_id = ?` で末尾を取得 (この時点で session 行ロックにより並行 INSERT は阻止されている)。
   3. `+1` した値で INSERT。
-  - 詳細は `data-model.md` §再採番戦略 を参照。
+  - 詳細は `data-model.md` §4.6 (`exercise_blocks` の `block_order` 設計) と §9 (トランザクション境界) を参照。
 
 **frontend**:
 
@@ -963,7 +963,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 - `domain/session/workout_set.rs`: 値オブジェクト群 (`Reps`, `WeightKg`, `DurationSeconds`, `IntervalSeconds`) に範囲検査。
 - `application/usecases/add_set.rs`。所有権チェック (block 経由で session.user_id == viewer)。
-- `set_order` の採番は S14 と同様、1 トランザクション内で次の手順を踏む (`data-model.md` §9 ギャップロック注意書き、§再採番戦略 を参照):
+- `set_order` の採番は S14 と同様、1 トランザクション内で次の手順を踏む (`data-model.md` §9 トランザクション境界 のギャップロック注意書きおよび §4.7 `workout_sets` の DDL を参照):
   1. `SELECT id FROM exercise_blocks WHERE id = ? FOR UPDATE` で **exercise_blocks 行を先行ロック** (`workout_sets` に対する集約ルートロック)。`workout_sets` が空のとき MySQL 8.0 REPEATABLE READ ではギャップロックが期待通り効かないケースがあるため、親行ロックで「同じブロックへの並行セット追加」を直列化する。
   2. `SELECT MAX(set_order) FROM workout_sets WHERE block_id = ?` で末尾を取得 (`workout_sets.block_id` は `data-model.md §4.7` の DDL 列名)。
   3. `+1` した値で INSERT。
@@ -999,7 +999,7 @@ NULL 化できる。循環・深さ・子数の検査が動く。
 
 **backend**:
 
-- 並び順変更: `swap` 形式 (request に `order: number` を渡す → 同一ブロック内で詰め直し) を採用。実装は「変更後の order 配列を組んで全行 UPDATE」(`data-model.md` §再採番戦略 を参照)。
+- 並び順変更: `swap` 形式 (request に `order: number` を渡す → 同一ブロック内で詰め直し) を採用。実装は「変更後の order 配列を組んで全行 UPDATE」 (`data-model.md` §9 トランザクション境界 の「ブロック並び替え」行および §4.6 `block_order` 設計 を参照)。
 
 **frontend**:
 
