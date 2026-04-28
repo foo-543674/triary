@@ -1265,7 +1265,7 @@ gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/pulls/<PR#>
 
 - すべての必須 CI が green。
 - コメントへの reply / 修正がすべて済んでいる。
-- ユーザー (foo-543674) の最終 LGTM (本人が押すまで AI はマージしない)。
+- リポジトリオーナー (本人) の最終 LGTM (本人が押すまで AI はマージしない)。
 
 ---
 
