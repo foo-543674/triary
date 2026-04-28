@@ -158,6 +158,10 @@
 
 - ファイル名: `YYYYMMDDHHMMSS_<snake_case_purpose>.sql` (現状の `20260407000000_init.sql` 形式と sqlx-cli の既定 `<timestamp>_<description>.sql` を踏襲し、シングルアンダースコアで区切る)。
 - ファイル単位でロールバック不可なので、1 マイグレーション = 1 目的に絞る (例: 「users と user_sessions を作る」「exercises 群を作る」「sessions 集約を作る」「preset シードを入れる」)。
+- 1 スライスで複数マイグレーションを起こす場合は、`cargo sqlx migrate add <name>` を **連続実行すると同一秒に当たって衝突する**。回避策はいずれか:
+  - 1 件ずつ追加する間に `sleep 1` を挟む。
+  - 同時に作りたいときはコマンド出力の `<timestamp>` を確認し、後発ファイルの末尾秒を `+1`、`+2` … と手動でリネームする (タイムスタンプの単調増加を保つ)。
+  - `§5.3` のように「1 スライス内で連続したファイル群」を計画段階で出す場合は、設計時点で末尾連番 (例: `..001`、`..002`) を手で振っておき、`migrate add` を使わず `touch` で空ファイルを作って書き込む。
 - マイグレーション追加時は `cd backend && cargo sqlx migrate run` の後に `make db-prepare` で sqlx offline metadata を更新する。
 
 ### 4.5 PR 作成
