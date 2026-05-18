@@ -47,9 +47,9 @@
   },
   "dependencies": {
     "@solidjs/router": "^0.16.1",
-    "@tanstack/solid-query": "^5.99.0",
+    "@tanstack/solid-query": "^5.100.10",
     "openapi-fetch": "^0.17.0",
-    "solid-js": "^1.9.12"
+    "solid-js": "^1.9.13"
   },
   "pnpm": {
     "overrides": {
