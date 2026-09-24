@@ -153,6 +153,7 @@ and why). The ones most often consulted on this project:
 | `cd frontend && pnpm run typecheck` | TypeScript type check |
 | `cd frontend && pnpm run test:run` | Frontend unit tests |
 | `cd frontend && pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
+| `make arch-test` | Architecture tests for both backend and frontend |
 | `cd frontend && pnpm run dev` | Frontend dev server |
 
 ## devcontainer and local infra
@@ -170,6 +171,9 @@ database, you do not have to run `make infra-up`.
 - `.contexts/architecture.md`: layer/aggregate/CQRS decisions, ADRs
 - `.contexts/api-design.md`: HTTP API contract
 - `.contexts/data-model.md`: persistence model, ID strategy, indexes
+- `.contexts/implementation-plan.md`: slice ordering, Phase 0 setup, per-slice
+  scope / prerequisites / task breakdown / DoD — start here when you're told
+  "implement the next thing"
 - `.contexts/setup-plan.md`: environment build plan
 - `.contexts/bootstrap-decisions.md`: AI context bootstrap decisions
 - `.contexts/security-overrides.md`: ledger for the pnpm.overrides patches
