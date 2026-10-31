@@ -73,6 +73,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 - `.agents/skills/`、`.claude/` (`settings.json`、hook、エージェント定義)
 - アーキテクチャテスト (`backend/tests/architecture.rs`、`frontend/.dependency-cruiser.cjs`、`frontend/scripts/check-arch.mjs`)
 - git hook (`.githooks/`)、判定ツール (`tools/review-gate/`)
+- 開発コマンドの入口 (`dev`) と開発イメージ (`tools/dev-image/`)。決定的ゲートが何の上で走るかを決めるため
 - CI の workflow と設定 (`.github/`)、`Makefile`、`.devcontainer/`
 - `.github/CODEOWNERS` 自身
 

@@ -1,0 +1,4 @@
+{
+  "extends": "../review-gate/tsconfig.json",
+  "include": ["test/**/*.ts"]
+}

@@ -9,6 +9,7 @@ mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMRD)
 if touches '^backend/' "${STAGED[@]}"; then run_rust_lint || fail "backend fmt/clippy failed"; fi
 if touches '^frontend/' "${STAGED[@]}"; then run_frontend_lint || fail "frontend biome/tsc failed"; fi
 if touches '^tools/review-gate/' "${STAGED[@]}"; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
+if touches '^(dev|tools/dev-image/.*)$' "${STAGED[@]}"; then run_dev_selftest || fail "./dev self-test failed"; fi
 
 # DO NOT REMOVE OR WEAKEN: this step is the only thing that stops a commit
 # whose staged diff was never reviewed. "No review record" must stay a

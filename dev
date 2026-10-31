@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# dev: run a project command inside the triary dev image.
+#
+#   ./dev cargo nextest run        # from backend/
+#   ./dev pnpm run lint:ci         # from frontend/
+#   ./dev --image-ref              # print the image this checkout uses
+#
+# Language toolchains live only in the dev image (tools/dev-image/Dockerfile);
+# why: .contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)". This
+# script never falls back to a toolchain on the calling machine: if it cannot
+# run the image, it fails.
+#
+# Inside the dev image (TRIARY_DEV_IMAGE=1) or the devcontainer
+# (TRIARY_DEV_DIRECT=1, set in devcontainer.json) the command runs directly.
+# NOTE: the devcontainer's toolchain is NOT the image's yet: it installs
+# rust "latest", unpinned nextest / sqlx-cli and no cargo-audit, so versions
+# can differ from CI and `./dev cargo audit` fails there. Aligning it is part
+# of stage 2 of the rollout (same document).
+# Otherwise podman is preferred (the ai-box ships rootless single-UID Podman),
+# then docker (the owner's machine).
+#
+# Environment:
+#   TRIARY_DEV_IMAGE_REF  use this image instead of the content-derived tag
+#                         (CI uses it for the image it has just built)
+#   TRIARY_DEV_ENGINE     force "podman" or "docker"
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REGISTRY_IMAGE="ghcr.io/foo-543674/triary-dev"
+DOCKERFILE="$ROOT/tools/dev-image/Dockerfile"
+
+die() {
+  echo "dev: $*" >&2
+  exit 1
+}
+
+image_ref() {
+  if [[ -n "${TRIARY_DEV_IMAGE_REF:-}" ]]; then
+    printf '%s\n' "$TRIARY_DEV_IMAGE_REF"
+    return
+  fi
+  [[ -r "$DOCKERFILE" ]] || die "missing $DOCKERFILE"
+  local sum
+  if command -v sha256sum >/dev/null 2>&1; then
+    sum="$(sha256sum "$DOCKERFILE")" || die "cannot hash $DOCKERFILE"
+  else
+    # macOS ships shasum instead of sha256sum; the digest is the same.
+    sum="$(shasum -a 256 "$DOCKERFILE")" || die "cannot hash $DOCKERFILE"
+  fi
+  printf '%s:df-%s\n' "$REGISTRY_IMAGE" "${sum:0:12}"
+}
+
+pick_engine() {
+  if [[ -n "${TRIARY_DEV_ENGINE:-}" ]]; then
+    command -v "$TRIARY_DEV_ENGINE" >/dev/null 2>&1 || die "TRIARY_DEV_ENGINE=$TRIARY_DEV_ENGINE is not installed"
+    printf '%s\n' "$TRIARY_DEV_ENGINE"
+  elif command -v podman >/dev/null 2>&1; then
+    echo podman
+  elif command -v docker >/dev/null 2>&1; then
+    echo docker
+  else
+    die "neither podman nor docker is available. Do not install cargo/pnpm on this machine instead; update the ai-box (it ships podman) or install docker."
+  fi
+}
+
+if [[ "${1:-}" == "--image-ref" ]]; then
+  image_ref
+  exit 0
+fi
+[[ $# -gt 0 ]] || die "usage: ./dev <command> [args...]   (or ./dev --image-ref)"
+
+if [[ "${TRIARY_DEV_IMAGE:-}" == "1" || "${TRIARY_DEV_DIRECT:-}" == "1" ]]; then
+  exec "$@"
+fi
+
+WORKDIR="$(pwd -P)"
+case "$WORKDIR/" in
+  "$ROOT"/*) ;;
+  *) die "run ./dev from inside the repository ($ROOT); the container only sees the repository" ;;
+esac
+
+ENGINE="$(pick_engine)"
+IMAGE="$(image_ref)"
+
+if ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo "dev: pulling $IMAGE" >&2
+  "$ENGINE" pull --quiet "$IMAGE" >&2 ||
+    die "cannot pull $IMAGE. If tools/dev-image/Dockerfile changed on this branch, the image is published only after it reaches main (.github/workflows/dev-image.yml)."
+fi
+
+args=(run --rm -i
+  --volume "$ROOT:$ROOT"
+  --workdir "$WORKDIR"
+  --volume triary-dev-cargo-registry:/usr/local/cargo/registry
+  --volume triary-dev-cargo-git:/usr/local/cargo/git
+  --volume triary-dev-corepack:/cache/corepack
+  --volume triary-dev-pnpm-store:/cache/pnpm-store
+  --env TRIARY_DEV_ROOT="$ROOT")
+[[ -t 0 && -t 1 ]] && args+=(--tty)
+
+for name in DATABASE_URL TEST_DATABASE_URL SQLX_OFFLINE RUSTFLAGS CARGO_TERM_COLOR RUST_LOG RUST_BACKTRACE CI TERM REVIEW_GATE_BASE; do
+  [[ -n "${!name:-}" ]] && args+=(--env "$name")
+done
+
+case "$ENGINE" in
+  docker)
+    # Files written to the work tree must stay owned by the caller.
+    args+=(--user "$(id -u):$(id -g)")
+    # Reach the local MySQL (docker-compose.yml) when it is running.
+    if docker network inspect triary-network >/dev/null 2>&1; then
+      args+=(--network triary-network)
+    fi
+    ;;
+  podman)
+    # Rootless Podman maps the container's root to the caller, so files are
+    # owned by the caller without --user. The ai-box configures netns=host
+    # (containers.conf). NOTE: unverified here; both come from the foo-skills
+    # ai-box SKILL "プロジェクトのコマンドを動かす仕組み", and this box had no
+    # podman. Check in an updated box: `podman info` (idMappings, network)
+    # and the owner of a file created with `./dev touch x`.
+    ;;
+esac
+
+# The bind mount resolves $ROOT on the engine's host. When that host does not
+# see this path (for example docker-outside-of-docker in a devcontainer that
+# lacks TRIARY_DEV_DIRECT), the engine mounts an empty directory instead; stop
+# rather than run against it.
+exec "$ENGINE" "${args[@]}" "$IMAGE" bash -c '
+  [[ -f "$TRIARY_DEV_ROOT/dev" && -f "$TRIARY_DEV_ROOT/tools/dev-image/Dockerfile" ]] || {
+    echo "dev: the repository is not visible inside the container at $TRIARY_DEV_ROOT (is the engine running on another host? in a devcontainer set TRIARY_DEV_DIRECT=1)" >&2
+    exit 125
+  }
+  exec "$@"' dev "$@"

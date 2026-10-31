@@ -1,0 +1,132 @@
+name: dev-image
+
+# Builds the dev image (tools/dev-image/Dockerfile) that ./dev runs every
+# language command in, proves the project's checks pass inside it, and
+# publishes it to GHCR from main. The tag comes from `./dev --image-ref`
+# (content hash of the Dockerfile), so a checkout always pulls the image
+# built from its own Dockerfile.
+#
+# Pull requests only build and test: an image built from unreviewed code is
+# never published. NOTE (unverified): whether a new GHCR package of this
+# public repository is publicly pullable without login; check with an
+# anonymous `docker pull` after the first publish and, if it is private,
+# make the package public in its settings.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - dev
+      - tools/dev-image/**
+      - .github/workflows/dev-image.yml
+  push:
+    branches: [main]
+    paths:
+      - dev
+      - tools/dev-image/**
+      - .github/workflows/dev-image.yml
+  workflow_dispatch:
+
+concurrency:
+  group: dev-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  SQLX_OFFLINE: "true"
+  TRIARY_DEV_ENGINE: docker
+
+jobs:
+  # Runs code from the PR (Dockerfile RUN steps, build scripts, install
+  # scripts), so it gets a read-only token and no persisted credentials.
+  build:
+    name: dev-image / build and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve image reference
+        id: ref
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          IMAGE: ${{ steps.ref.outputs.ref }}
+        run: docker build --pull --tag "$IMAGE" tools/dev-image
+
+      # Run the project's own checks through ./dev against the image just
+      # built, so a published image is known to work for this checkout.
+      - name: Toolchain versions
+        env:
+          TRIARY_DEV_IMAGE_REF: ${{ steps.ref.outputs.ref }}
+        run: |
+          ./dev cargo --version
+          ./dev cargo nextest --version
+          ./dev cargo audit --version
+          ./dev sqlx --version
+          ./dev node --version
+          (cd frontend && ../dev pnpm --version)
+
+      - name: Backend checks
+        working-directory: backend
+        env:
+          TRIARY_DEV_IMAGE_REF: ${{ steps.ref.outputs.ref }}
+        run: |
+          ../dev cargo fmt --all -- --check
+          ../dev cargo clippy --all-targets --all-features
+          ../dev cargo nextest run --all-features --no-tests=pass
+
+      - name: Frontend checks
+        working-directory: frontend
+        env:
+          TRIARY_DEV_IMAGE_REF: ${{ steps.ref.outputs.ref }}
+        run: |
+          ../dev pnpm install --frozen-lockfile
+          ../dev pnpm run lint:ci
+          ../dev pnpm run typecheck
+          ../dev pnpm run test:run
+          ../dev pnpm run arch:test
+
+      - name: Files written through ./dev belong to the runner user
+        run: |
+          owner="$(stat -c %u frontend/node_modules)"
+          [ "$owner" = "$(id -u)" ] || { echo "frontend/node_modules is owned by uid $owner, not $(id -u)"; exit 1; }
+
+  # Only reviewed code on main reaches this job. It rebuilds from main rather
+  # than reusing anything the build job produced.
+  publish:
+    name: dev-image / publish
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve image reference
+        id: ref
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        env:
+          IMAGE: ${{ steps.ref.outputs.ref }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          docker build --pull --tag "$IMAGE" tools/dev-image
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "$IMAGE"

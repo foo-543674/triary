@@ -17,6 +17,8 @@
 /.githooks/                       @foo-543674
 /.devcontainer/                   @foo-543674
 /tools/review-gate/               @foo-543674
+/dev                              @foo-543674
+/tools/dev-image/                 @foo-543674
 /backend/tests/architecture.rs    @foo-543674
 /frontend/.dependency-cruiser.cjs @foo-543674
 /frontend/scripts/check-arch.mjs  @foo-543674

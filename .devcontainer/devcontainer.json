@@ -12,6 +12,9 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
+  "containerEnv": {
+    "TRIARY_DEV_DIRECT": "1"
+  },
   "runArgs": ["--network=triary-network"],
   "initializeCommand": "docker network create triary-network 2>/dev/null || true",
   "postCreateCommand": "bash .devcontainer/post-create.sh",
