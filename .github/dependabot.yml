@@ -19,9 +19,17 @@ updates:
         dependency-type: "development"
       runtime-dependencies:
         dependency-type: "production"
-    # NOTE: Do not configure `ignore` here on purpose. We want to be notified
+    # NOTE: Keep `ignore` minimal on purpose. We want to be notified
     #       whenever an upstream of a transitive dep currently patched via
-    #       `pnpm.overrides` ships a fix.
+    #       `pnpm.overrides` ships a fix, so only exact, documented exclusions
+    #       go here.
+    ignore:
+      # TypeScript 7 breaks `storybook build` and makes dependency-cruiser
+      # analyse nothing (observed 2026-10-31 on PR #41). Excluded by the
+      # owner's decision in issue #44; 6.x minor / patch updates still come.
+      # Remove this entry once Storybook and dependency-cruiser support 7.
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
 
   # ---------- Backend (cargo) ----------
   - package-ecosystem: "cargo"
