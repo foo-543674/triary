@@ -80,6 +80,103 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/login:
+    post:
+      tags: [web-v1]
+      summary: Sign in (US-2)
+      description: |
+        Starts a new browser session. The handle is matched
+        case-insensitively. A wrong password and an unknown user get the same
+        answer, so the reply does not reveal which handles exist.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "400":
+          description: "`invalid_format` without field for an unreadable body."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "`invalid_credentials`: unknown user or wrong password."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/me:
+    get:
+      tags: [web-v1]
+      summary: The signed-in user
+      description: Lets the PWA check on start whether its session is still valid.
+      operationId: getMe
+      responses:
+        "200":
+          description: The session is valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "401":
+          description: "`unauthenticated`: no cookie, or an unknown or expired session."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/logout:
+    post:
+      tags: [web-v1]
+      summary: Sign out (US-2)
+      description: Deletes the session on the server at once and clears the cookie.
+      operationId: logout
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`"
+              schema:
+                type: string
+        "401":
+          description: "`unauthenticated`: there was no valid session to end."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 # Every operation needs the session cookie unless it declares `security: []`
 # (`.contexts/api-design.md` §1.3).
 security:

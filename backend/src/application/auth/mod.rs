@@ -1,6 +1,9 @@
 //! Browser session lifecycle: sign-up and, in later slices, login, logout
 //! and the current user (api-design §2.1).
 
+pub mod current_user;
+pub mod login;
+pub mod logout;
 pub mod signup;
 
 use std::sync::Arc;

@@ -19,6 +19,7 @@ pub struct SignupRequest {
     pub password: String,
 }
 
+/// Body of sign-up, login and `me`.
 #[derive(Debug, Serialize)]
 pub struct SignedInResponse {
     pub user_id: String,

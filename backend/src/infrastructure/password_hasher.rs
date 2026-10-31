@@ -78,6 +78,23 @@ mod tests {
         assert_ne!(first, second);
     }
 
+    /// login checks unknown users against `DUMMY_HASH` so they cost a real
+    /// Argon2id run. A malformed constant would fail to parse and make
+    /// `verify` return at once, bringing the timing difference back.
+    #[test]
+    fn the_login_dummy_hash_is_a_real_hash_with_these_parameters() {
+        use crate::application::auth::login::DUMMY_HASH;
+        assert!(DUMMY_HASH.starts_with(&format!(
+            "$argon2id$v=19$m={MEMORY_KIB},t={ITERATIONS},p={PARALLELISM}$"
+        )));
+        assert!(PhcString::new(DUMMY_HASH).is_ok());
+        let hasher = Argon2idHasher::new();
+        assert!(!hasher.verify(
+            &password("any password"),
+            &PasswordHash::new(DUMMY_HASH.into())
+        ));
+    }
+
     #[test]
     fn a_malformed_stored_hash_is_a_mismatch() {
         let hasher = Argon2idHasher::new();

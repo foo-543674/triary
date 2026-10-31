@@ -44,6 +44,68 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/web/v1/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sign in (US-2)
+     * @description Starts a new browser session. The handle is matched
+     *     case-insensitively. A wrong password and an unknown user get the same
+     *     answer, so the reply does not reveal which handles exist.
+     */
+    post: operations['login'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/web/v1/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The signed-in user
+     * @description Lets the PWA check on start whether its session is still valid.
+     */
+    get: operations['getMe'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/web/v1/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sign out (US-2)
+     * @description Deletes the session on the server at once and clears the cookie.
+     */
+    post: operations['logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -219,6 +281,135 @@ export interface operations {
        *     `invalid_format` without field for an unreadable body.
        */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Unexpected error, in the common error envelope. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Credentials'];
+      };
+    };
+    responses: {
+      /** @description Signed in. */
+      200: {
+        headers: {
+          /** @description `triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` */
+          'Set-Cookie'?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SignedInUser'];
+        };
+      };
+      /** @description `invalid_format` without field for an unreadable body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description `invalid_credentials`: unknown user or wrong password. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Unexpected error, in the common error envelope. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  getMe: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The session is valid. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SignedInUser'];
+        };
+      };
+      /** @description `unauthenticated`: no cookie, or an unknown or expired session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Unexpected error, in the common error envelope. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Signed out. */
+      204: {
+        headers: {
+          /** @description `triary_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0` */
+          'Set-Cookie'?: string;
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description `unauthenticated`: there was no valid session to end. */
+      401: {
         headers: {
           [name: string]: unknown;
         };
