@@ -88,6 +88,30 @@ export interface components {
       | 'preset_not_modifiable'
       | 'rate_limited'
       | 'internal_error';
+    /** @description Cursor pagination state of a list response (`api-design.md` §1.5). */
+    PageInfo: {
+      /** @description Opaque base64url cursor for the next page; null on the last page. */
+      next_cursor: string | null;
+      has_next: boolean;
+    };
+    /**
+     * @description Resource ID: a type prefix (`usr_`, `exr_`, `ses_`, `blk_`, `set_`)
+     *     and a ULID in Crockford base32 (`api-design.md` §3).
+     * @example exr_01HZX3Y5Q8K2M4N6P8R0T2V4W6
+     */
+    IdString: string;
+    /**
+     * Format: date
+     * @description Calendar date of the workout (`YYYY-MM-DD`) in the client's time zone.
+     * @example 2026-10-31
+     */
+    WorkoutDate: string;
+    /**
+     * Format: date-time
+     * @description UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
+     * @example 2026-10-31T09:30:00Z
+     */
+    Timestamp: string;
   };
   responses: never;
   parameters: never;

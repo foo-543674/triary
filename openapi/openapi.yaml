@@ -11,13 +11,18 @@ servers:
     description: Local development environment
 tags:
   - name: health
-    description: Service health checks
+    description: Service health checks (not versioned)
+  - name: web-v1
+    description: Web UI BFF for the PWA (`/web/v1`); browser session lifecycle
+  - name: api-v1
+    description: REST API over the domain resources (`/api/v1`)
 paths:
   /health:
     get:
       tags: [health]
       summary: Service health check
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: Service is up and running.
@@ -31,7 +36,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+# Every operation needs the session cookie unless it declares `security: []`
+# (`.contexts/api-design.md` §1.3).
+security:
+  - cookieAuth: []
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: triary_session
+      description: |
+        Server-issued random 256-bit session token, set by signup and login
+        with `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`.
   schemas:
     Health:
       type: object
@@ -106,3 +123,31 @@ components:
         - preset_not_modifiable
         - rate_limited
         - internal_error
+    PageInfo:
+      type: object
+      description: Cursor pagination state of a list response (`api-design.md` §1.5).
+      required: [next_cursor, has_next]
+      properties:
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque base64url cursor for the next page; null on the last page.
+        has_next:
+          type: boolean
+    IdString:
+      type: string
+      description: |
+        Resource ID: a type prefix (`usr_`, `exr_`, `ses_`, `blk_`, `set_`)
+        and a ULID in Crockford base32 (`api-design.md` §3).
+      pattern: "^(usr|exr|ses|blk|set)_[0-9A-HJKMNP-TV-Z]{26}$"
+      examples: ["exr_01HZX3Y5Q8K2M4N6P8R0T2V4W6"]
+    WorkoutDate:
+      type: string
+      format: date
+      description: Calendar date of the workout (`YYYY-MM-DD`) in the client's time zone.
+      examples: ["2026-10-31"]
+    Timestamp:
+      type: string
+      format: date-time
+      description: UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
+      pattern: "Z$"
+      examples: ["2026-10-31T09:30:00Z"]
