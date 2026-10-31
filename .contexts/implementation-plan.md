@@ -79,7 +79,7 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
   `PageInfo`, `IdString`, `WorkoutDate`, `Timestamp`,
   `securitySchemes.cookieAuth`、`tags`)。
 - 主参照: `api-design.md §1.6 / §3 / §認証`。
-- DoD: `make api-generate` 成功、`npx @redocly/cli lint openapi/openapi.yaml`
+- DoD: `make api-generate` 成功、`./dev npx @redocly/cli lint openapi/openapi.yaml`
   pass。
 
 ### 2.3 P0-C DB スキーマ初版
@@ -91,7 +91,7 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
 - 着手時の確認: P0-D のシード値も同じトランザクション群で投入する
   (P0-D を別マイグレーションとして連番末尾に置く)。
 - DoD: `make infra-reset && make db-migrate` 冪等、
-  `make db-migrate-test` 通過、`cargo sqlx prepare -- --tests` 成功。
+  `make db-migrate-test` 通過、`make db-prepare` 成功。
 
 ### 2.4 P0-D プリセット種目 初版リスト
 
@@ -109,8 +109,8 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
   `frontend/src/features/auth/components/RequireAuth.tsx`、
   `frontend/src/routes/`。
 - 主参照: `architecture.md §フロントエンドアーキテクチャ` 全節 / ADR #11。
-- DoD: `pnpm run lint:ci && pnpm run typecheck && pnpm run test:run &&
-  pnpm run arch:test` がすべて green。
+- DoD: `frontend/` で `../dev pnpm run lint:ci`、`../dev pnpm run typecheck`、
+  `../dev pnpm run test:run`、`../dev pnpm run arch:test` がすべて green。
 
 ---
 
