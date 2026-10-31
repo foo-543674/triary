@@ -1,6 +1,6 @@
 import { fc, test } from '@fast-check/vitest';
 import { describe, expect, it } from 'vitest';
-import { handleErrors, passwordErrors } from './credentials';
+import { handleErrors, loginErrors, passwordErrors } from './credentials';
 
 describe('handleErrors', () => {
   it.each([
@@ -38,5 +38,13 @@ describe('passwordErrors', () => {
   it('counts characters, not UTF-16 units', () => {
     expect(passwordErrors('😀'.repeat(12))).toEqual([]);
     expect(passwordErrors('😀'.repeat(11))).toEqual(['too_short']);
+  });
+});
+
+describe('loginErrors', () => {
+  it('only asks for both fields', () => {
+    expect(loginErrors('', '')).toEqual({ user_id: ['required'], password: ['required'] });
+    expect(loginErrors('  ', 'x')).toEqual({ user_id: ['required'], password: [] });
+    expect(loginErrors('a', 'short')).toEqual({ user_id: [], password: [] });
   });
 });

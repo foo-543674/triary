@@ -5,6 +5,7 @@
  */
 
 const handleMessages: Readonly<Record<string, string>> = {
+  required: 'ユーザー ID を入力してください',
   too_short: 'ユーザー ID は 3 文字以上にしてください',
   too_long: 'ユーザー ID は 32 文字以内にしてください',
   invalid_charset: 'ユーザー ID に使えるのは半角英数字と _ - だけです',
@@ -15,6 +16,7 @@ const handleMessages: Readonly<Record<string, string>> = {
 };
 
 const passwordMessages: Readonly<Record<string, string>> = {
+  required: 'パスワードを入力してください',
   too_short: 'パスワードは 12 文字以上にしてください',
   too_long: 'パスワードは 128 文字以内にしてください',
 };

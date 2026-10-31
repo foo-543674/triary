@@ -2,6 +2,9 @@ import { type Accessor, createMemo, createSignal } from 'solid-js';
 import { type ApiError, codesForField, generalErrors } from '../../../lib/api-error';
 import { credentialErrors, type FieldErrors, hasErrors } from '../credentials';
 
+/** The browser-side rules a form applies before sending. */
+export type CredentialRules = (userId: string, password: string) => FieldErrors;
+
 export type CredentialsFormState = {
   readonly userId: Accessor<string>;
   readonly password: Accessor<string>;
@@ -21,13 +24,15 @@ export type CredentialsFormState = {
  * first submit attempt, and a server error goes away as soon as the user
  * edits the form.
  */
-export const createCredentialsFormState = (): CredentialsFormState => {
+export const createCredentialsFormState = (
+  rules: CredentialRules = credentialErrors,
+): CredentialsFormState => {
   const [userId, setUserIdSignal] = createSignal('');
   const [password, setPasswordSignal] = createSignal('');
   const [attempted, setAttempted] = createSignal(false);
   const [serverError, setServerError] = createSignal<ApiError | undefined>();
 
-  const clientErrors = createMemo(() => credentialErrors(userId(), password()));
+  const clientErrors = createMemo(() => rules(userId(), password()));
 
   const fieldErrors = createMemo((): FieldErrors => {
     const local = attempted() ? clientErrors() : { user_id: [], password: [] };

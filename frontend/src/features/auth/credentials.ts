@@ -48,3 +48,9 @@ export const credentialErrors = (userId: string, password: string): FieldErrors 
 
 export const hasErrors = (errors: FieldErrors): boolean =>
   errors.user_id.length > 0 || errors.password.length > 0;
+
+/** Login asks only that both fields are filled; anything else is the server's call (US-2). */
+export const loginErrors = (userId: string, password: string): FieldErrors => ({
+  user_id: userId.trim() === '' ? ['required'] : [],
+  password: password === '' ? ['required'] : [],
+});
