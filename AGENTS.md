@@ -188,15 +188,20 @@ Whether GitHub actually blocks merges right now is recorded only in
 `docs/remote-acceptance.md` ("マージを止められるか"); read it there instead of
 relying on a copy. Until it says rulesets block the merge: treat a passing
 verdict as "machine checks passed", not as human approval or an acceptance
-guarantee, never approve PRs yourself, and keep to the merge conditions below
-as discipline.
+guarantee, never approve PRs yourself (the verifier's automerge job below is
+not you), and keep to the merge conditions below as discipline.
 
 #### Merging without human approval
 
 `docs/remote-acceptance.md` ("人間の承認なしでマージしてよい変更") is the
-source. **No change may currently be merged without human approval**; the
-conditions there are an unagreed draft. Treat every change as needing
-approval, keep working, and keep the draft in the decision queue.
+source. The only class is Dependabot's Rust / npm dependency updates that pass
+the verdict (owner decision in #43). For those, the protected
+`acceptance / automerge dependency update` job in
+`.github/workflows/acceptance.yml` approves as GitHub Actions and enables
+auto-merge; no review ledger is required. Every other change needs human
+approval, including GitHub Actions updates until #43 settles how they fit the
+code owner rule. The AI never approves or merges a PR itself; the rules below
+are about what the AI may propose, and about checking what the job did.
 
 - Never activate a revision of the conditions yourself, including one that
   narrows the scope. Propose it and get human approval. The only thing you
@@ -205,10 +210,11 @@ approval, keep working, and keep the draft in the decision queue.
 - Your own claim that a change is in scope is not evidence; collect the
   evidence the conditions name.
 - Until the full ruleset is verified, GitHub does not check the verdict for
-  you: do not merge when the verdict fails, evidence is missing, a decision it
-  depends on is open, or a condition revision is unapproved, even if an
-  approval exists. Never push to `main` directly instead.
-- List anything merged without approval in your status report (change,
+  you: do not ask for a merge (and never merge yourself) when the verdict
+  fails, evidence is missing, a decision it depends on is open, or a
+  condition revision is unapproved, even if an approval exists. Never push to
+  `main` directly instead.
+- List what the automerge job merged in your status report (change,
   condition version, verification evidence, open items, how to revert).
   Report serious incidents immediately.
 
