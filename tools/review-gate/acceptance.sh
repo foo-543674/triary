@@ -17,7 +17,9 @@ REQUIRED_JOBS='[
   "frontend / lint (biome ci)",
   "frontend / test (vitest + storybook smoke)",
   "frontend / build (vite)",
-  "openapi / spectral lint"
+  "openapi / spectral lint",
+  "security / cargo audit",
+  "security / pnpm audit"
 ]'
 CLI=(node tools/review-gate/src/cli.ts)
 
