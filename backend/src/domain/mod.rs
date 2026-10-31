@@ -14,3 +14,7 @@
 //! Submodules are split per feature (e.g. `workout`, `exercise`, `user`).
 
 pub mod validation;
+
+pub mod clock;
+pub mod password_hasher;
+pub mod user;

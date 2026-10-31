@@ -21,6 +21,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/web/v1/signup': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sign up and sign in (US-1)
+     * @description Creates the user and starts a browser session. The handle is stored
+     *     lower-cased. Every violation of the handle and the password is
+     *     reported at once. A taken handle is `already_taken`, the same answer
+     *     as any other unusable handle from the user's point of view.
+     */
+    post: operations['signup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -112,6 +135,22 @@ export interface components {
      * @example 2026-10-31T09:30:00Z
      */
     Timestamp: string;
+    /**
+     * @description The name a user signs in with (`user_id` in the API). 3-32 of
+     *     `a-z 0-9 _ -`, case-insensitive: stored and returned in lower case.
+     *     Reserved names are refused.
+     * @example alice
+     */
+    UserHandle: string;
+    Credentials: {
+      /** @description A handle as typed; checked and lower-cased by the server (see `UserHandle`). */
+      user_id: string;
+      /** @description 12-128 characters of any kind. */
+      password: string;
+    };
+    SignedInUser: {
+      user_id: components['schemas']['UserHandle'];
+    };
   };
   responses: never;
   parameters: never;
@@ -137,6 +176,54 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Health'];
+        };
+      };
+      /** @description Unexpected error, in the common error envelope. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  signup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Credentials'];
+      };
+    };
+    responses: {
+      /** @description Signed up and signed in. */
+      201: {
+        headers: {
+          /** @description `triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000` */
+          'Set-Cookie'?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SignedInUser'];
+        };
+      };
+      /**
+       * @description `user_id`: `too_short`, `too_long`, `invalid_charset`, `reserved`,
+       *     `already_taken`. `password`: `too_short`, `too_long`. Or
+       *     `invalid_format` without field for an unreadable body.
+       */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
         };
       };
       /** @description Unexpected error, in the common error envelope. */

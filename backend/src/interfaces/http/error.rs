@@ -458,14 +458,14 @@ mod extractor_tests {
 
     #[tokio::test]
     async fn wrong_method_keeps_405_in_the_envelope() {
-        let (status, body) = call(crate::app(), "/health", "{}").await;
+        let (status, body) = call(crate::app(crate::testing::state()), "/health", "{}").await;
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(body["errors"][0]["code"], "invalid_format");
     }
 
     #[tokio::test]
     async fn unknown_route_is_answered_in_the_envelope() {
-        let (status, body) = call(crate::app(), "/nowhere", "{}").await;
+        let (status, body) = call(crate::app(crate::testing::state()), "/nowhere", "{}").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["errors"][0]["code"], "not_found");
     }

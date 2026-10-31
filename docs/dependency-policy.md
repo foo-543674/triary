@@ -44,6 +44,9 @@
 | crate | 区分 | 用途 | 追加 | 確認 |
 |---|---|---|---|---|
 | `anyhow` | dependencies | main の起動エラー | 2026-10-31 以前 | 既存 (この台帳より前。審査記録なし) |
+| `argon2` | dependencies | パスワードハッシュ (Argon2id、S01) | 2026-10-31 (S01) | 名前: RustCrypto の公式 crate (architecture.md の argon2id 指定)。出所: `github.com/RustCrypto/password-hashes`、crates.io 所有者 `newpavlov` (RustCrypto のメンテナ)。実績: 総 6,960 万 DL、0.6.0 は 2026-08-27 公開 (cooldown 超)、yank なし。build.rs / proc macro なし。ライセンス MIT OR Apache-2.0。feature は既定 (`alloc`、`getrandom`、`password-hash`)。確認: `cargo info argon2`、`https://crates.io/api/v1/crates/argon2`、`.../owner_user`、cargo-deny |
+| `getrandom` | dependencies | セッショントークンの 256 bit 乱数 (OS の CSPRNG、S01) | 2026-10-31 (S01) | 名前: rust-random の crate (rand の基盤)。出所: `github.com/rust-random/getrandom`、所有者 `dhardy`。実績: 総 24.4 億 DL、0.4.3 は 2026-06-17 公開、既に lock に推移的依存として入っている版。ライセンス MIT OR Apache-2.0。確認: `cargo info getrandom`、`https://crates.io/api/v1/crates/getrandom`、`.../owner_user`、cargo-deny |
+| `sha2` | dependencies | セッショントークンのハッシュ保存 (SHA-256、data-model §4.2、S01) | 2026-10-31 (S01) | 名前: RustCrypto の公式 crate。出所: `github.com/RustCrypto/hashes`。実績: 総 11.5 億 DL、0.10.9 は 2025-04-30 公開、既に lock に入っている版 (sqlx が使用) を選び重複を避けた。ライセンス MIT OR Apache-2.0。確認: `cargo info sha2`、`https://crates.io/api/v1/crates/sha2`、cargo-deny |
 | `axum` | dependencies | HTTP サーバー | 2026-10-31 以前 | 既存 (同上) |
 | `chrono` | dependencies | 日付・時刻 | 2026-10-31 以前 | 既存 (同上) |
 | `serde` | dependencies | シリアライズ | 2026-10-31 以前 | 既存 (同上) |

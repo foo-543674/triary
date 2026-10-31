@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT EXISTS(SELECT 1 FROM users WHERE user_handle = ?) AS found",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "found",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "max_size": 1
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e31a26bf001248d493b8beb9ef6403fb368eedfaba6aa5276bfd4a7d8c0145a2"
+}

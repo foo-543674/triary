@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "triary integration smoke",
-    "description": "Smoke tests that verify the backend is at least up and serving requests.",
+    "name": "triary integration",
+    "description": "Language-agnostic integration tests against a running backend and database (AGENTS.md \"Integration tests are language agnostic\"). Scenarios create their own users with unique handles, so they can run repeatedly against the same database.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,8 +18,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/health",
-          "host": ["{{baseUrl}}"],
-          "path": ["health"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
         }
       },
       "event": [
@@ -36,6 +40,703 @@
               "  pm.expect(body.status).to.eql('ok');",
               "});"
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /web/v1/signup (US-1)",
+      "item": [
+        {
+          "name": "signup: creates the user and signs them in (handle normalized)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "const handle = unique(20);",
+                  "pm.collectionVariables.set('signupHandle', handle);",
+                  "pm.collectionVariables.set('signupHandleUpper', handle.toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});",
+                  "pm.test('answers the lower-cased handle', function () {",
+                  "  pm.expect(pm.response.json()).to.eql({ user_id: pm.collectionVariables.get('signupHandle') });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{signupHandleUpper}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: the same handle in another case is already taken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"already_taken\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{signupHandleUpper}}\", \"password\": \"anotherpassword1\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 2 characters is too short",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_short\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"ab\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 3 characters passes the length rule",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';",
+                  "pm.collectionVariables.set('handle3', Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted, or refused only because a previous run took it', function () {",
+                  "  if (pm.response.code === 201) { return; }",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => e.code)).to.eql(['already_taken']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle3}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 32 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('handle32', unique(32));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle32}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 33 characters is too long",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('handle33', unique(33));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_long\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle33}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle with a disallowed character",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"invalid_charset\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"bad handle\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: reserved handle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"reserved\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"Admin\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 11 characters is too short",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h11', unique(20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"password\", \"too_short\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h11}}\", \"password\": \"12345678901\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 12 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h12', unique(20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h12}}\", \"password\": \"123456789012\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 128 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h128', unique(20));",
+                  "pm.collectionVariables.set('p128', 'p'.repeat(128));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h128}}\", \"password\": \"{{p128}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 129 characters is too long",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h129', unique(20));",
+                  "pm.collectionVariables.set('p129', 'p'.repeat(129));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"password\", \"too_long\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h129}}\", \"password\": \"{{p129}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: every problem is reported at once",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_short\"], [\"user_id\", \"invalid_charset\"], [\"password\", \"too_short\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"a!\", \"password\": \"short\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: a body that is not the expected JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('invalid_format without field', function () {",
+                  "  const errors = pm.response.json().errors;",
+                  "  pm.expect(errors.length).to.eql(1);",
+                  "  pm.expect(errors[0].code).to.eql('invalid_format');",
+                  "  pm.expect(errors[0]).to.not.have.property('field');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": 1}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
           }
         }
       ]

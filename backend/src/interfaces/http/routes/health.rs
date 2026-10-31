@@ -25,7 +25,7 @@ pub struct HealthResponse {
     pub status: HealthStatus,
 }
 
-pub fn router() -> Router {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new().route("/health", get(health))
 }
 
@@ -50,7 +50,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_health_returns_ok() {
-        let response = app()
+        let response = app(crate::testing::state())
             .oneshot(
                 Request::builder()
                     .uri("/health")

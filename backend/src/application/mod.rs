@@ -10,3 +10,6 @@
 //! - Inputs and outputs are explicit DTOs received from the `interfaces`
 //!   layer.
 //! - Transaction boundaries are defined here, not in handlers or repositories.
+
+pub mod auth;
+pub mod ports;

@@ -36,6 +36,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/signup:
+    post:
+      tags: [web-v1]
+      summary: Sign up and sign in (US-1)
+      description: |
+        Creates the user and starts a browser session. The handle is stored
+        lower-cased. Every violation of the handle and the password is
+        reported at once. A taken handle is `already_taken`, the same answer
+        as any other unusable handle from the user's point of view.
+      operationId: signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "201":
+          description: Signed up and signed in.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "400":
+          description: |
+            `user_id`: `too_short`, `too_long`, `invalid_charset`, `reserved`,
+            `already_taken`. `password`: `too_short`, `too_long`. Or
+            `invalid_format` without field for an unreadable body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 # Every operation needs the session cookie unless it declares `security: []`
 # (`.contexts/api-design.md` §1.3).
 security:
@@ -151,3 +195,28 @@ components:
       description: UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
       pattern: "Z$"
       examples: ["2026-10-31T09:30:00Z"]
+    UserHandle:
+      type: string
+      description: |
+        The name a user signs in with (`user_id` in the API). 3-32 of
+        `a-z 0-9 _ -`, case-insensitive: stored and returned in lower case.
+        Reserved names are refused.
+      minLength: 3
+      maxLength: 32
+      examples: ["alice"]
+    Credentials:
+      type: object
+      required: [user_id, password]
+      properties:
+        user_id:
+          type: string
+          description: A handle as typed; checked and lower-cased by the server (see `UserHandle`).
+        password:
+          type: string
+          description: 12-128 characters of any kind.
+    SignedInUser:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          $ref: "#/components/schemas/UserHandle"

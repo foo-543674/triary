@@ -77,6 +77,18 @@ impl Violation {
     }
 }
 
+/// Violations of `field` for the rules that are broken (`true`), in order.
+pub fn broken_rules(
+    field: &FieldPath,
+    rules: impl IntoIterator<Item = (bool, ViolationCode)>,
+) -> Vec<Violation> {
+    rules
+        .into_iter()
+        .filter(|(broken, _)| *broken)
+        .map(|(_, code)| Violation::new(field.clone(), code))
+        .collect()
+}
+
 /// Runs every check and keeps every violation, so callers can validate
 /// several fields without stopping at the first failure.
 ///
