@@ -58,6 +58,18 @@ db-migrate-test: ## Apply migrations to the test DB
 db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx/)
 	cd backend && "$(DEV)" cargo sqlx prepare -- --tests
 
+# ---------- Running the app ----------
+
+# The backend reads DATABASE_URL from its environment only; this Makefile
+# exports the variables of .env (see the top), so run it through make.
+.PHONY: run-backend
+run-backend: ## Run the backend on :8080 against DATABASE_URL from .env
+	cd backend && "$(DEV)" cargo run
+
+.PHONY: run-frontend
+run-frontend: ## Run the Vite dev server on :3000 (proxies /api and /web to :8080)
+	cd frontend && "$(DEV)" pnpm install --frozen-lockfile && "$(DEV)" pnpm run dev
+
 # ---------- Frontend ----------
 
 .PHONY: api-generate
