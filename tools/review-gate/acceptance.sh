@@ -58,6 +58,25 @@ BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
   exit 0
 }
 MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+mapfile -t changed < <(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" \
+  -q '.[] | .filename, (.previous_filename // empty)')
+
+# --- 0. is this a dependency update that needs no review ledger? -------------------
+# Dependency updates that merge without human approval (#43, owner decision;
+# contract: docs/remote-acceptance.md "人間の承認なしでマージしてよい変更").
+# DO NOT REMOVE OR WEAKEN: the rules live in tools/review-gate/src/dependency.ts
+# (author, files, and every commit authored by Dependabot, committed and signed
+# by GitHub). The compare range ends at HEAD_SHA, so the answer is about the
+# judged head even if the PR moves meanwhile. Any failure means "not a
+# dependency update", i.e. the normal path with a review ledger.
+compare_file="$(mktemp)"
+dependency_update=false
+if gh api "repos/$REPO/compare/$MERGE_BASE...$HEAD_SHA" >"$compare_file"; then
+  classification="$("${CLI[@]}" classify-dependency --pr-author "$(jq -r .user.login <<<"$pr_json")" \
+    --head "$HEAD_SHA" --compare-file "$compare_file" || echo '{}')"
+  dependency_update="$(jq -r 'if .dependencyUpdate == true then "true" else "false" end' <<<"$classification")"
+  jq -r '.reasons[]? | "not a dependency update: " + .' <<<"$classification"
+fi
 DIFF_HASH="$("${CLI[@]}" range-hash --from "$MERGE_BASE" --to "$HEAD_SHA")"
 CONTRACT_VERSION="$("${CLI[@]}" contract-version --base HEAD)"
 
@@ -103,6 +122,12 @@ fi
 
 # --- 2. review ledger snapshot matches this version and meets the contract -------
 # DO NOT REMOVE OR WEAKEN: no snapshot / broken snapshot / stale snapshot fails.
+# The only exception is a dependency update as decided in step 0 (#43).
+if [[ "$dependency_update" == "true" ]]; then
+  : >"$SNAPSHOT_FILE"
+  snapshot_verdict='{"ok":true,"reasons":[],"decisionRefs":[],"contentHash":null}'
+  review_state="not required (Dependabot dependency update, #43)"
+else
 gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" |
   jq -rs --argjson allowed "$ALLOWED_SNAPSHOT_AUTHORS" '
     [.[][] | select((.user.login as $u | $allowed | index($u)) and (.body | contains("<!-- triary-review-snapshot -->")))]
@@ -114,6 +139,7 @@ snapshot_verdict="$("${CLI[@]}" accept --snapshot-file "$SNAPSHOT_FILE" \
 mapfile -t snapshot_reasons < <(jq -r '.reasons[]' <<<"$snapshot_verdict")
 [[ ${#snapshot_reasons[@]} -gt 0 ]] && reasons+=("${snapshot_reasons[@]/#/review }")
 review_state="$(jq -r 'if .ok then "passed" else "failed" end' <<<"$snapshot_verdict")"
+fi
 
 # --- 3. no unresolved decision request this change depends on --------------------
 while read -r ref; do
@@ -130,7 +156,6 @@ done < <(jq -r '.decisionRefs[]' <<<"$snapshot_verdict")
 
 # --- 4. base files changed -> human approval required (enforced by the ruleset) ---
 mapfile -t owned_patterns < <(grep -Ev '^\s*(#|$)' .github/CODEOWNERS | awk '{print $1}')
-mapfile -t changed < <(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" -q '.[].filename')
 base_changes=()
 for file in "${changed[@]}"; do
   for pattern in "${owned_patterns[@]}"; do
@@ -172,6 +197,12 @@ if [[ ${#reasons[@]} -gt 0 ]]; then
 fi
 if [[ ${#base_changes[@]} -gt 0 ]]; then
   post_status success "machine checks passed; base files changed: code owner approval required, no acceptance guarantee"
+elif [[ "$dependency_update" == "true" ]]; then
+  post_status success "machine checks passed (Dependabot dependency update; merges without human approval, #43)"
+  # Read by the automerge job in .github/workflows/acceptance.yml.
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    printf 'automerge=true\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
+  fi
 else
   post_status success "machine checks passed (CI + review ledger)"
 fi

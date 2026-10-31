@@ -62,7 +62,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 PR 差分のレビュー証跡と、CI の成功は別の証拠として扱い、どちらを検証したかを結果に別項目で出す。
 
-Dependabot の PR も同じ条件で判定する。取り込む AI が手元でレビューし、スナップショットを提出する。
+Dependabot の PR も同じ条件で判定する。取り込む AI が手元でレビューし、スナップショットを提出する。例外は「人間の承認なしでマージしてよい変更」の区分に当たる依存更新で、スナップショットを求めない。
 
 ## 保護する基準ファイル
 
@@ -109,31 +109,27 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 | 8 | 最終判定の欠落・失敗 | マージ不可 | 実 PR | 未 |
 | 9 | HEAD は同じで base や契約の版だけ進んだ後の古い成功 | マージ不可 | 単体テスト + 実 PR | 単体テスト済み (契約の版・merge-base)。実 PR は未 |
 | 10 | 依存する未裁定の判断依頼が残っている | 不合格 (人間の判断待ち) | 実 PR | 未 |
-| 11 | 範囲外の変更を承認なしでマージ | マージ不可 | 実 PR | 条件が未合意のため全 PR が承認必須 |
+| 11 | 範囲外の変更を承認なしでマージ | マージ不可 | 実 PR | 未。検証器の区分判定は 2026-10-31 に `DRY_RUN=1` で確認 (Dependabot の #50 は区分内、AI の #59 は区分外でスナップショットを要求) |
 | 12 | 条件の改訂を承認なしで有効化 | マージ不可 | 実 PR | 条件はこのファイル (基準ファイル) にある |
 
 ## 人間の承認なしでマージしてよい変更
 
-**現在、承認なしでマージしてよい変更はない。** 2026-10-31 にオーナーが #43 で「依存パッケージの更新は、CI などで壊れなければ自動でマージしてよい」と回答した。下の案より広い (major を含む)。具体化と未確認の 2 点 (GitHub Actions の更新を含めるか、台帳のスナップショットを求めるか) は #43 で確認中で、検証器と ruleset の実装もまだない。実装した PR が承認されてマージされるまでは、すべての変更を承認ありとして扱う。
+条件の版: 2026-10-31 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。この PR のマージで有効になる。
 
-### 案 (未合意・無効)
-
-| 区分 | 変更 | 検証器が確かめる証拠 |
+| 区分 | 変更 | 検証器が確かめる証拠 (`tools/review-gate/acceptance.sh` の手順 0) |
 |---|---|---|
-| 承認なし (案) | Dependabot による Rust / npm 依存の **patch / minor** 更新で、変更がロックファイルとマニフェストのバージョン指定だけのもの | PR 作成者が `dependabot[bot]`、変更ファイルが `backend/Cargo.lock` / `frontend/pnpm-lock.yaml` / `frontend/package.json` のみ、`package.json` の差分がバージョン指定行のみ、Dependabot のメタデータの update-type が patch / minor、上記「何を確かめるか」がすべて合格 |
-| 人間の承認が要る | 上記以外のすべて。特に: 基準ファイル (`.github/` の workflow を含むので GitHub Actions の更新も該当)、major 更新、新しい依存の追加、認証・セッション・暗号、マイグレーション、`openapi/openapi.yaml`、`.contexts/` の設計判断 | — |
+| 承認なし | Dependabot による Rust / npm の依存更新 (patch / minor / major を問わない) | 判定は `tools/review-gate/src/dependency.ts` (単体テスト `dependency.test.ts`)。PR 作成者が `dependabot[bot]`。merge-base から判定した HEAD までの変更ファイル (リネーム元を含む) が `backend/Cargo.toml` / `backend/Cargo.lock` / `frontend/package.json` / `frontend/pnpm-lock.yaml` だけ。その範囲の全コミットについて、作成者が `dependabot[bot]`、コミッターが `web-flow` (GitHub)、署名検証が通っている (作成者は push する人が自由に書けるので、それだけでは足りない)。必須の CI ジョブがその SHA ですべて成功。台帳のスナップショットは求めない |
+| 人間の承認が要る | 上記以外のすべて。GitHub Actions の更新も今は含む (下記) | — |
 
+- 合格すると、`acceptance.yml` の `acceptance / automerge dependency update` ジョブが GitHub Actions として承認し、判定した HEAD に限って auto-merge を有効にする。前提となるリポジトリ設定: 「Allow GitHub Actions to create and approve pull requests」(承認に必要。オーナーの操作) と「Allow auto-merge」(`gh pr merge --auto` に必要。2026-10-31 に API の `allow_auto_merge: true` で有効を確認)。この設定で PR のコードから書き込みトークンに届くと自分の PR を承認できてしまうので、PR のコードを動かす workflow はトークンを読み取り専用にした (`permissions: contents: read`)
+- 承認の後に Dependabot のブランチへ別のコミットが push された場合、その承認を使わせない仕組みは ruleset の `dismiss_stale_reviews_on_push` と `require_last_push_approval` (`docs/rulesets/main.json`) である。ruleset が無効の間はこれが効かない。そのため、ruleset を有効にするまでの防御は `--match-head-commit` (判定した HEAD 以外をマージしない) だけになる
+- NOTE: 未確認 — Dependabot のブランチで、作成者を偽った上で `web-flow` の署名付きコミットを作れるか (GitHub の Web UI や contents API で作ったコミットを `web-flow` が署名するかどうか、`author` を指定できるかどうかも確かめていない)。書き込み権限が要る操作で、今の書き込み権限者はオーナーと AI の App だけ。確かめ方: テスト用のブランチで contents API に `author` を指定してコミットし、`author.login` と `committer.login` を見る。より強い対策は、`dependabot/**` への push を Dependabot に限る ruleset (オーナーの操作)
+- **GitHub Actions の更新はまだ承認ありのまま。** オーナーは含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。どちらを取るかを #43 でオーナーに確認している。それまでの暫定: Actions の更新 PR はオーナーが承認してマージする
+- NOTE: 未確認 — GITHUB_TOKEN で行ったマージは `main` への push の workflow を起動しない (GitHub のドキュメント「Triggering a workflow from a workflow」による)。そのため、この区分のマージでは `main` の CI が走らない。根拠は、ruleset の「ブランチを最新にする」で最新の HEAD に対して走った PR の CI とする
 - 変更されたパスは判定の材料の 1 つで、パスだけで安全と決めない。検証器が機械的に確かめられない部分は承認ありとする
-- 戻し方: `git revert` でロックファイルを戻す。データ変更・外部への作用は起きない (デプロイの仕組みがまだないため)。デプロイが入ったら見直す
-- 改訂できる人: オーナー (`foo-543674`)。AI は改訂案を出せるが、自分で有効にしない (範囲を狭める改訂も同じ)。すぐにやってよいのは、条件を変えずに承認なしのマージを一時的に止めることだけ
+- 戻し方: `git revert` でロックファイルとマニフェストを戻す。データ変更・外部への作用は起きない (デプロイの仕組みがまだないため)。デプロイが入ったら見直す
+- 改訂できる人: オーナー (`foo-543674`)。AI は改訂案を出せるが、自分で有効にしない (範囲を狭める改訂も同じ)。すぐにやってよいのは、条件を変えずに承認なしのマージを一時的に止めることだけ (`acceptance.yml` の automerge ジョブを無効にする PR、またはリポジトリ設定で Actions の承認を切る)
 - 見直すきっかけ: 承認なしでマージした変更での見逃し、デプロイの導入、条件に当てはまる変更の実績が 10 件たまったとき
-- 有効にするには、検証器にこの条件の判定を足し、ruleset の承認必須を「CODEOWNERS 対象 + 条件外」に限る構成に変える必要がある (今の ruleset はすべての PR に承認を求める)
-
-合意のための例 (判断依頼に載せる):
-
-- 典型: `serde_json` 1.0.149 → 1.0.150 (Cargo.lock のみ) → 承認なし (案)
-- 危険: `typescript` 6 → 7 (major。Storybook のビルドと dependency-cruiser の解析が壊れることを確認済み) → 承認が要る
-- 判断が分かれそう: `actions/checkout` 6 → 7 (major、かつ workflow = 基準ファイル) → 承認が要る / Dependabot のグループ更新で major と minor が混ざる → 承認が要る
 
 ### 承認なしでマージした変更の報告
 

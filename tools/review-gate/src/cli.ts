@@ -12,6 +12,9 @@
 //             --merge-base <sha> --diff-hash <h> --contract-version <v>
 //                                                        remote verifier: print a JSON verdict
 //   range-hash --from <sha> --to <sha>                   hash an explicit diff range
+//   classify-dependency --pr-author <login> --head <sha> --compare-file <f>
+//                                                        remote verifier: is this a Dependabot
+//                                                        dependency update (#43)? prints JSON
 //
 // The rules live in docs/review-contract.md and docs/remote-acceptance.md.
 
@@ -29,6 +32,7 @@ import {
   parseSubmission,
   type Scope,
 } from "./ledger.ts";
+import { classifyDependencyUpdate, type CompareResponse } from "./dependency.ts";
 import { buildSnapshot, judgeAcceptance, parseSnapshotComment, renderSnapshotComment } from "./snapshot.ts";
 
 const DEFAULT_BASE = "origin/main";
@@ -195,6 +199,16 @@ const commands: Record<string, (values: Record<string, string | undefined>) => n
     console.log(rangeHash(required(v.from, "from"), required(v.to, "to")));
     return 0;
   },
+  "classify-dependency": (v) => {
+    const compare = JSON.parse(readFileSync(required(v["compare-file"], "compare-file"), "utf8")) as CompareResponse;
+    const result = classifyDependencyUpdate({
+      prAuthor: required(v["pr-author"], "pr-author"),
+      headSha: required(v.head, "head"),
+      compare,
+    });
+    console.log(JSON.stringify(result));
+    return 0;
+  },
   "contract-version": (v) => {
     console.log(contractVersionAt(v.base ?? "HEAD"));
     return 0;
@@ -227,6 +241,8 @@ const main = (argv: readonly string[]): number => {
         "contract-version",
         "from",
         "to",
+        "pr-author",
+        "compare-file",
       ].map((name) => [name, { type: "string" as const }]),
     ),
   });
