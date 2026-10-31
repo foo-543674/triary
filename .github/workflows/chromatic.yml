@@ -6,6 +6,14 @@ on:
   push:
     branches: [main]
 
+# The token is read-only. Once GitHub Actions may approve pull requests
+# (needed to auto-merge Dependabot updates, #43), a writable token reachable
+# from PR code could approve its own PR; this workflow runs PR code.
+# NOTE: unverified that chromaui/action needs nothing more than read; it
+# reports through the Chromatic GitHub App. Check the first PR run.
+permissions:
+  contents: read
+
 concurrency:
   group: chromatic-${{ github.ref }}
   cancel-in-progress: true
@@ -19,7 +27,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # NOTE: Chromatic needs the full git history to compute the
           #       baseline diff against the previous build.
@@ -40,12 +48,12 @@ jobs:
             echo "::warning::CHROMATIC_PROJECT_TOKEN secret is not set; skipping chromatic run"
           fi
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         if: steps.token.outputs.has_token == 'true'
         with:
           package_json_file: frontend/package.json
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         if: steps.token.outputs.has_token == 'true'
         with:
           node-version: "22"
@@ -58,7 +66,7 @@ jobs:
 
       - name: publish to chromatic
         if: steps.token.outputs.has_token == 'true'
-        uses: chromaui/action@v18
+        uses: chromaui/action@f305ef908327aee3b80b0e6b3bbb60a742eaa049 # v18
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: frontend

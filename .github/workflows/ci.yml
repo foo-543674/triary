@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
 
+# The token is read-only. Once GitHub Actions may approve pull requests
+# (needed to auto-merge Dependabot updates, #43), a writable token reachable
+# from PR code could approve its own PR; this workflow runs PR code.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -32,13 +38,13 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: Resolve dev image
         id: dev
         working-directory: .
         run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-lint-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
@@ -56,13 +62,13 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: Resolve dev image
         id: dev
         working-directory: .
         run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-test-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
@@ -79,13 +85,13 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: Resolve dev image
         id: dev
         working-directory: .
         run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
@@ -102,7 +108,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev pnpm install --frozen-lockfile
       - name: biome ci
@@ -118,7 +124,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev pnpm install --frozen-lockfile
       - name: dependency-cruiser (architecture rules)
@@ -141,7 +147,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev pnpm install --frozen-lockfile
       - run: ../dev pnpm exec vite build
@@ -157,7 +163,7 @@ jobs:
     outputs:
       ready: ${{ steps.check.outputs.ready }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - id: check
         run: |
           if compgen -G "backend/migrations/*.sql" > /dev/null \
@@ -182,7 +188,7 @@ jobs:
     env:
       DATABASE_URL: mysql://triary:triary@triary-mysql-test:3306/triary_test
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: start the test database
         run: |
@@ -191,7 +197,7 @@ jobs:
       - name: Resolve dev image
         id: dev
         run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
@@ -223,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: spectral lint
         run: ./dev npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
@@ -237,7 +243,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev cargo audit
 
@@ -249,6 +255,6 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev pnpm audit --audit-level high
