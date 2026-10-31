@@ -51,6 +51,19 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    // Same-origin delivery in development (architecture.md "配信トポロジの前提"):
+    // the browser only talks to Vite, which forwards API calls. The target
+    // is the backend's default port; override it with the BACKEND_ORIGIN
+    // environment variable (read from the process environment, not from
+    // .env files).
+    // NOTE: not observed against a running backend yet; check with
+    //       `curl localhost:3000/health` while both servers run.
+    proxy: Object.fromEntries(
+      ['/api', '/web', '/health'].map((prefix) => [
+        prefix,
+        { target: process.env.BACKEND_ORIGIN ?? 'http://localhost:8080', changeOrigin: false },
+      ]),
+    ),
   },
   build: {
     target: 'esnext',
