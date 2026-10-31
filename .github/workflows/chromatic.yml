@@ -9,8 +9,10 @@ on:
 # The token is read-only. Once GitHub Actions may approve pull requests
 # (needed to auto-merge Dependabot updates, #43), a writable token reachable
 # from PR code could approve its own PR; this workflow runs PR code.
-# NOTE: unverified that chromaui/action needs nothing more than read; it
-# reports through the Chromatic GitHub App. Check the first PR run.
+# Read is enough for chromaui/action: on PR #60 (2026-10-31) the job passed
+# and published with this token. The Storybook Publish / UI Tests statuses
+# are posted by the Chromatic GitHub App (creator foo-543674), not by this
+# token.
 permissions:
   contents: read
 

@@ -121,7 +121,7 @@ jobs:
             --body "Dependabot dependency update; acceptance / verdict passed on ${head:0:7} (#43)."
           # --auto waits for the ruleset's requirements. --match-head-commit
           # refuses to merge if the head moved after the verdict.
-          # NOTE: unverified how `gh pr merge --auto` behaves while the ruleset
-          #       is disabled (nothing to wait for); check on the first
-          #       Dependabot PR after this lands.
+          # Observed 2026-10-31 with the ruleset active: on #50 (rstest) this
+          # job approved and the PR merged within seconds (run 41211333898).
+          # NOTE: unverified how it behaves with the ruleset disabled.
           gh pr merge "$PR" -R "$REPO" --auto --merge --match-head-commit "$head"
