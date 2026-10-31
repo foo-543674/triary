@@ -1,19 +1,28 @@
 {
   "name": "triary",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  // Built from the dev image's Dockerfile so the toolchain is the one CI and
+  // ./dev use (#56). Inside, ./dev runs commands directly: the image sets
+  // TRIARY_DEV_IMAGE=1. The image sets HOME=/home/dev for ./dev's callers;
+  // the editor user gets its own home through remoteEnv.
+  // NOTE: unverified — built and opened only on the owner's machine (the
+  //       ai-box cannot build images with apt-get, which common-utils needs).
+  "build": {
+    "dockerfile": "../tools/dev-image/Dockerfile",
+    "context": "../tools/dev-image"
+  },
   "features": {
-    "ghcr.io/devcontainers/features/rust:1": {
-      "version": "latest",
-      "profile": "default"
-    },
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "22"
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "installZsh": false,
+      "installOhMyZsh": false
     },
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "containerEnv": {
-    "TRIARY_DEV_DIRECT": "1"
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "HOME": "/home/vscode",
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}"
   },
   "runArgs": ["--network=triary-network"],
   "initializeCommand": "docker network create triary-network 2>/dev/null || true",

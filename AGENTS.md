@@ -420,7 +420,7 @@ because those must work wherever git and `./dev` run. Why:
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Type-check and test the review gate tool |
 | `make dev-test` | Type-check and test the `./dev` entrypoint |
-| `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer; NOTE: the devcontainer's toolchain is not aligned with the image yet, so results there can differ from CI). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
+| `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `node tools/review-gate/src/cli.ts check --scope commit` | Ask the review gate whether the staged diff may be committed |
 | `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
