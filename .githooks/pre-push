@@ -21,11 +21,11 @@ mapfile -t CHANGED < <(git diff --name-only "$(git merge-base "$BASE" HEAD)" HEA
 [[ ${#CHANGED[@]} -eq 0 ]] && exit 0
 
 if touches '^backend/' "${CHANGED[@]}"; then
-  (cd "$REPO_ROOT/backend" && cargo nextest run --all-features --no-tests=pass) || fail "backend tests failed"
+  (cd "$REPO_ROOT/backend" && "$DEV" cargo nextest run --all-features --no-tests=pass) || fail "backend tests failed"
 fi
 if touches '^frontend/' "${CHANGED[@]}"; then
   require_frontend_deps
-  (cd "$REPO_ROOT/frontend" && node scripts/check-arch.mjs && "$FRONTEND_BIN/vitest" run) ||
+  (cd "$REPO_ROOT/frontend" && "$DEV" bash -c 'node scripts/check-arch.mjs && node_modules/.bin/vitest run') ||
     fail "frontend architecture tests or unit tests failed"
 fi
 if touches '^tools/review-gate/' "${CHANGED[@]}"; then run_review_gate_selftest || fail "review-gate self-test failed"; fi

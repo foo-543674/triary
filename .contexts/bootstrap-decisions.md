@@ -481,5 +481,48 @@ audit を直す手段として「ai-box に Rust を入れる」を判断依頼�
   場所で動く必要があるため。型チェックは第 2 段で入口に通す
 - 入口とイメージは決定的ゲートが何の上で走るかを決めるので基準ファイルにした
   (`.github/CODEOWNERS`、`docs/remote-acceptance.md`)
-- NOTE: 未確認 — 新しい GHCR パッケージを匿名で pull できるか。最初の公開後
-  に確かめ、private ならパッケージの設定で public にする (オーナー作業)
+- GHCR のパッケージはログインなしで pull できる。2026-10-31 に、GHCR の資格
+  情報を持たない ai-box から最初に公開されたタグ (`df-d98c305832a9`) を
+  `podman pull` して確かめた (`podman login --get-login ghcr.io` は
+  `not logged into ghcr.io`)。public にする作業は不要だった
+
+### 第 2 段の実施 (2026-10-31, PR `chore/dev-entrypoint-stage2`)
+
+前提の確認: PR #52 のマージ後、`main` の `dev-image` workflow (run
+41195150162) が成功してイメージが公開された。オーナーが ai-box を podman
+入りの版に作り直した。箱の中で `podman info` の uidmap / gidmap が 0 → 1000
+(1 つだけ)、`~/.config/containers/containers.conf` が `netns = "host"`、
+`./dev touch` で作ったファイルの所有者が node であることを観測した。
+
+入口に通したもの:
+
+- git hook (`.githooks/`): fmt / clippy / biome / tsc / nextest / vitest /
+  check-arch、レビューゲートと入口のテストの型チェック。`node --test` と
+  レビューゲート本体は作業環境の Node 22 で動かす例外のまま
+- `Makefile`: `db-*`、`api-generate`、`arch-test`、`gate-test` /
+  `dev-test` の型チェック
+- `AGENTS.md` の開発コマンドと品質ゲート、派生ファイル (`.cursorrules`、
+  `.github/copilot-instructions.md`)、`README.md`
+- CI (`.github/workflows/ci.yml`): 全 job。job 名は受け入れ検証
+  (`tools/review-gate/acceptance.sh`) が照合するので変えていない。イメージ
+  が未公開 (その PR で Dockerfile を変えた) なら job の中でビルドする
+  (`.github/actions/dev-image`)。`integration / newman` は MySQL を
+  `docker-compose.yml` の `mysql-test` で `triary-network` に立て、バック
+  エンドと newman を 1 回の `./dev` の中で動かす (コレクションの `baseUrl`
+  が `127.0.0.1:8080` のため)
+
+観測した制約: ai-box の podman は vfs ストレージなので、`./dev` 1 回ごとに
+コンテナ起動で約 3.5 秒かかる (初回は約 8 秒)。hook では 1 つのゲートの
+コマンドを 1 回の `./dev bash -c` にまとめた。
+
+この段でやっていないこと:
+
+- `.claude/settings.json` の deny: 編集が Claude Code の auto mode に
+  自己改変として止められた。変更案は PR の説明に載せ、オーナーが当てる
+- `e2e.yml` (Playwright。ブラウザと `--with-deps` の apt がイメージにない。
+  `main` への push だけで動き、設定ファイルがないので skip 中) と
+  `chromatic.yml` は作業環境のツールのまま。e2e を有効にするときに入口へ
+  通す (イメージにブラウザを入れるか、Playwright のイメージを別に使うか)
+- devcontainer のツールチェーンをイメージに揃えること。オーナーの作業環境の
+  作り直しを伴い、ai-box からは devcontainer をビルドして確かめられないため、
+  方式をオーナーに確かめてから行う

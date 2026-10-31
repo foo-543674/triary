@@ -14,8 +14,9 @@
 # (TRIARY_DEV_DIRECT=1, set in devcontainer.json) the command runs directly.
 # NOTE: the devcontainer's toolchain is NOT the image's yet: it installs
 # rust "latest", unpinned nextest / sqlx-cli and no cargo-audit, so versions
-# can differ from CI and `./dev cargo audit` fails there. Aligning it is part
-# of stage 2 of the rollout (same document).
+# can differ from CI and `./dev cargo audit` fails there. Aligning it was
+# left out of stage 2: it rebuilds the owner's environment, so the approach
+# is confirmed with the owner first (same document, "第 2 段の実施").
 # Otherwise podman is preferred (the ai-box ships rootless single-UID Podman),
 # then docker (the owner's machine).
 #
@@ -115,10 +116,10 @@ case "$ENGINE" in
   podman)
     # Rootless Podman maps the container's root to the caller, so files are
     # owned by the caller without --user. The ai-box configures netns=host
-    # (containers.conf). NOTE: unverified here; both come from the foo-skills
-    # ai-box SKILL "プロジェクトのコマンドを動かす仕組み", and this box had no
-    # podman. Check in an updated box: `podman info` (idMappings, network)
-    # and the owner of a file created with `./dev touch x`.
+    # (~/.config/containers/containers.conf). Observed 2026-10-31 in the
+    # podman-enabled ai-box: `podman info` uidmap/gidmap = 0 -> 1000 (size 1),
+    # `netns = "host"` in containers.conf, and a file created with
+    # `./dev touch x` is owned by the caller (node).
     ;;
 esac
 
