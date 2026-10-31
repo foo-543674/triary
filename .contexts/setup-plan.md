@@ -158,7 +158,6 @@
 | `make infra-reset` | データリセット（ボリューム削除 + 再起動） |
 | `make infra-logs` | ログ表示 |
 | `make db-migrate` | マイグレーション実行 |
-| `make db-seed` | シードデータ投入 |
 
 ## CI パイプライン
 
