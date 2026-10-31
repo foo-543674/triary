@@ -113,6 +113,8 @@
 - **TS 禁止語**: `dependency-cruiser` は依存関係を見るツールで型名・クラ
   ス名のスキャンには向かないため、TS 側の禁止語チェックは `arch:test`
   には組み込まず、`code-reviewer` エージェント（Layer 3）に委ねる
+  (2026-10-31 注記: レビューの観点は `.agents/skills/code-review/SKILL.md`
+  に移った)
 
 ### CI 組み込み
 
@@ -245,22 +247,11 @@ bootstrap で追加したもの:
 - `backend/tests/architecture.rs`（Rust 側カスタムテスト）
 - `frontend/.dependency-cruiser.cjs`（TS 側設定）
 
-## 判断委任の境界（CLAUDE.md より転記）
+## 判断委任の境界
 
-AI が自律判断してよい:
-- 実装の詳細（関数・変数名、アルゴリズム選択、ライブラリ内部）
-- テストの追加・修正
-- 既存テストが全パスする範囲のリファクタリング
-- lint / format の修正
-- ドキュメントの更新
-
-確認が必要:
-- 新しい外部依存の追加（Cargo crate / npm パッケージ）
-- レイヤー構成・アーキテクチャルールの変更
-- OpenAPI スキーマ・`/api/v1/*` の破壊的変更
-- 認証・認可・暗号化に関わる判断
-- `.contexts/*.md` の書き換え（設計判断そのものの変更）
-- 要件解釈に曖昧さがある場合
+原典は `AGENTS.md`「AI delegation scope」。2026-04-25 の記録ではここに
+当時の CLAUDE.md の一覧を転記していたが、規則を転記しない方針に合わせて
+2026-10-31 に参照だけにした (転記は AGENTS.md の改訂と食い違っていた)。
 
 ## 次の更新タイミング
 
@@ -268,7 +259,7 @@ AI が自律判断してよい:
 記する:
 - philosophy / perspectives の適用範囲を変更したとき
 - アーキテクチャテストのルールを追加・変更したとき
-- code-reviewer の観点を増減したとき
+- レビューの観点 (`.agents/skills/code-review/SKILL.md`) を増減したとき
 - AI 委任範囲の境界を動かしたとき
 
 設計判断そのものは `.contexts/architecture.md` 等の本体側に記録する。
@@ -388,18 +379,14 @@ AI が自律判断してよい:
 
 ### マージを止められるか
 
-| 状態 | 根拠 |
-|---|---|
-| **PR に警告を出すだけ** | ruleset `main` は bootstrap 着手時 (05:30 頃) に無効・承認 0 件、同日 05:41 に有効・承認 1 件へ更新 (オーナーによる変更と推定)、06:16 にオーナーが「一回無効にした」と伝えたうえで再び無効になった。05:41〜06:16 の間は一部だけ止まっていた。AI の App は `current_user_can_bypass: never`。code owner の承認・承認の失効・`acceptance / verdict` の required check は `docs/rulesets/main.json` の適用待ち (#42、この PR のマージ後)。適用後に AI が読み戻し、`docs/remote-acceptance.md`「動作確認」の 12 ケースを確かめてから「保護ルールでマージを止める」に更新する |
+現在の状態、読み戻した履歴、AI の資格情報で確かめたことは
+`docs/remote-acceptance.md`「マージを止められるか」と「ruleset」に一元化
+した (ruleset はこの作業中にも 2 回変わり、複数か所に書くとずれるため)。
+この再実行での判断は、目標を「保護ルールでマージを止める」とし、適用は
+オーナーが行うこと (#42) だけである。
 
-AI の資格情報で確かめたこと: ブランチ保護の読み取りは 403、ruleset は読め
-る、`viewerPermission` は空、ruleset `main` は迂回できない。App が ruleset
-を変更できないことと、App のレビューが承認に数えられないことは **未確認**
-(code owner の承認が必須になるまで、App が他者の PR を承認すると数えられる
-可能性がある。AGENTS.md で AI による承認を禁じた)。
-
-なお、Phase 1 の作業 (Dependabot の PR 8 件のマージ) は 05:30 頃で、ruleset
-が有効になる前だった。
+なお、Phase 1 の作業 (Dependabot の PR 8 件のマージ) は 05:30 頃で、
+ruleset が有効になる前だった。
 
 ### 動作確認の結果
 
@@ -427,7 +414,7 @@ AI の資格情報で確かめたこと: ブランチ保護の読み取りは 40
 
 | Issue | 問い | 状態 (2026-10-31) |
 |---|---|---|
-| #42 | ruleset `main` を `docs/rulesets/main.json` の内容に強化して有効にするか | 適用コマンドを Issue に準備済み。この PR のマージ後にオーナーが適用 |
+| #42 | 現在無効の ruleset `main` を `docs/rulesets/main.json` の内容で有効にするか | 適用コマンドを Issue に準備済み。この PR のマージ後にオーナーが適用 |
 | #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。GitHub Actions の更新を含めるかと台帳の要否を確認中。実装は後続の PR |
 | #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。後続の PR |
 | #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。後続の PR |

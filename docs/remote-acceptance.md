@@ -15,14 +15,14 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 | 目標とする構成 | **GitHub の保護ルールでマージを止める** (2026-10-31 にオーナーが選択) |
 | 現在の状態 | **PR に警告を出すだけ** (2026-10-31 06:16 にオーナーが ruleset `main` を無効にしたことを読み戻して確認)。05:41〜06:16 の間は有効で、PR 必須・承認 1 件、AI の App は迂回できなかった。`docs/rulesets/main.json` は生成済み・未適用で、適用コマンドは #42 にある。適用して読み戻すまで、受け入れ検証の結果は PR への警告にとどまり、AI は規律としてマージ条件を守る |
 | AI の主体 | GitHub App `foo-543674-ai-agent[bot]`。オーナー (`foo-543674`) とは別の主体 |
-| AI の資格情報で確かめたこと | ブランチ保護の読み取りが 403 (`Resource not accessible by integration`)、`viewerPermission` が空 (admin 権限なしと推定)。ruleset は読める。ruleset `main` の `current_user_can_bypass` が `never` (App は迂回できない)。**未確認**: App が ruleset を変更できないこと、App のレビューが承認として数えられないこと。code owner の承認が必須でない今は、書き込み権限を持つ App が他者の PR (Dependabot 等) を承認すると数えられる可能性がある。`main.json` の適用で code owner (オーナー) の承認が必須になれば塞がる |
+| AI の資格情報で確かめたこと | ブランチ保護の読み取りが 403 (`Resource not accessible by integration`)、`viewerPermission` が空 (admin 権限なしと推定)。ruleset は読める。ruleset `main` の `current_user_can_bypass` が `never` (App は迂回できない)。**未確認**: App が ruleset を変更できないこと、App のレビューが承認として数えられないこと。ruleset が「承認 1 件」だけを求める構成 (05:41〜06:16 の状態) では、書き込み権限を持つ App が他者の PR (Dependabot 等) を承認すると数えられる可能性がある。`main.json` で code owner (オーナー) の承認を必須にすると塞がる |
 | リポジトリ | public (GitHub Free でも ruleset が使える) |
 
-状態が変わったら、この表と `.contexts/bootstrap-decisions.md` を更新する。止められないのに、止められるかのように AGENTS.md や README に書かない。
+状態と履歴はこの節と「ruleset」節だけに書く (他の文書は参照する)。状態が変わったら読み戻してここを更新する。止められないのに、止められるかのように AGENTS.md や README に書かない。
 
 ## 何を確かめるか
 
-検証処理 `acceptance / verdict` が、PR の HEAD に対して次をすべて確かめる。
+検証処理 (workflow `Acceptance` の job `acceptance / judge`) が、PR の HEAD に対して次をすべて確かめ、結果を commit status `acceptance / verdict` として発行する。
 
 | 確かめること | 確かめ方 |
 |---|---|
@@ -44,7 +44,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 - 検証処理は `pull_request_target` / `workflow_run` / `issue_comment` / `workflow_dispatch` で起動する。これらは **base ブランチ (保護された `main`) 側の workflow 定義** で動くので、PR が `acceptance.yml` や `tools/review-gate/` を書き換えても、その PR の判定には効かない
 - 検証処理は PR のコードを **実行しない**。checkout するのは base の版だけで、PR の HEAD は diff ハッシュの計算のために git オブジェクトとして fetch するだけ。PR のコードを実行する CI (`ci.yml`) と、証跡を検証して結果を発行する処理を分けている
-- 結果は commit status `acceptance / verdict` として HEAD に発行する。ruleset では、この status を **GitHub Actions (integration id 15368) が発行したもの** に限って required check にする。AI の App が同名の status を発行しても数えられない
+- 結果は commit status `acceptance / verdict` として HEAD に発行する。ruleset では、この status を **GitHub Actions (integration id 15368) が発行したもの** に限って required check にする設計で、AI の App が同名の status を発行しても数えられないことを狙っている。NOTE: 未確認 — `integration_id` の指定が check run だけでなく REST の commit status にも効くかは確かめていない。確認方法: ruleset の適用後、App の資格情報で同名の status を発行し、マージが拒否されるかを見る (動作確認 #5)。効かなければ check run での発行に切り替える
 - PR 内で追加・変更した workflow は `pull_request` で走り、同名の status を発行できてしまう。これは `.github/` が基準ファイルで code owner の承認が要ることで塞いでいる (承認者は workflow の変更を見て判断する)。機械的な遮断ではないことをここに明記する
 - base が進んだ場合は、ruleset の「マージ前にブランチを最新にする」(`strict_required_status_checks_policy`) で HEAD の更新を強制し、新しい HEAD で再検証させる。HEAD が同じで base だけ進んだ古い成功は使えない。契約や検証器が変わった場合も、スナップショットの `contractVersion` が base 側の版と合わなくなるので不合格になる
 - 判断依頼の Issue を閉じても自動では再判定しない。`workflow_dispatch` (入力: PR 番号) か、スナップショットの再提出で再判定する
@@ -87,7 +87,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 | 状態 | |
 |---|---|
 | 生成済み | `docs/rulesets/main.json` |
-| 適用予定 | オーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行。既存の有効な ruleset を強化する操作になる。**この PR のマージ後に** 行う。先に適用すると、required check `acceptance / verdict` を発行する workflow が base にまだないので、この PR 自身が status を得られず止まる |
+| 適用予定 | オーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行。今は無効なので、規則を足したうえで有効にする操作になる (`main.json` は `enforcement: active`)。**この PR のマージ後に** 行う。先に適用すると、required check `acceptance / verdict` を発行する workflow が base にまだないので、この PR 自身が status を得られず止まる |
 | 有効化済み | 未 (05:41〜06:16 に一部が有効だったが、現在は無効)。`main.json` の適用後に AI が読み戻し、下記の動作確認をしてからこの表を更新する |
 
 主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)、ブランチを最新にする。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない (適用後に確かめる)。

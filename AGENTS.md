@@ -149,16 +149,12 @@ bypass it**:
    reviews the diff against `origin/main`. Findings go into the review ledger
    with IDs. Only the reviewer changes the ledger; writing or editing it by
    hand is forbidden.
-3. Fix findings and attach evidence (tests etc.), then get them re-reviewed.
-   If you do not fix one, the reviewer records why it is rejected or deferred.
-   Escalate what the delegated scope cannot decide: file a decision request
-   (see "Asking for decisions") and keep working. When you reject or defer an
-   Important finding, also write the reason in the commit message body.
-4. A changed diff needs a new review round. Re-review starts from the existing
-   findings. Never commit with an old record.
-5. Completion is decided by the ledger state. "LGTM", or a finding not
-   reappearing, is not completion. Missing review output is a failure, not
-   "no findings".
+3. Fix findings and hand the reviewer evidence (tests etc.); a changed diff
+   needs a new round. How findings are dispositioned, escalated, re-reviewed
+   and when a change counts as complete is defined in
+   `docs/review-contract.md`; follow it rather than this summary. When an
+   Important finding is rejected or deferred, also write the reason in the
+   commit message body (the ledger is not tracked).
 
 Forbidden: `--no-verify` / `-n`, changing `core.hooksPath`, disabling or
 weakening a hook, hand-written review records, `git commit -a` (stage
@@ -186,15 +182,12 @@ defined in `docs/remote-acceptance.md`. If it fails, fix the cause (missing or
 stale snapshot, gate failure, unapproved base-file change) and resubmit. Never
 weaken the verifier, CODEOWNERS or the ruleset to get through.
 
-Merge-blocking state (read back 2026-10-31; the current state and history
-are in `docs/remote-acceptance.md`): **warning only**. The ruleset `main` is
-disabled, so GitHub does not stop an AI merge; the full ruleset is
-`docs/rulesets/main.json` (apply command in decision #42). Until it is applied
-and read back, the verdict only warns: treat a passing verdict as "machine
-checks passed", not as human approval or an acceptance guarantee, never
-approve PRs yourself, and keep to the merge conditions below as discipline.
-Update this paragraph when `docs/remote-acceptance.md` records the ruleset as
-active.
+Whether GitHub actually blocks merges right now is recorded only in
+`docs/remote-acceptance.md` ("マージを止められるか"); read it there instead of
+relying on a copy. Until it says rulesets block the merge: treat a passing
+verdict as "machine checks passed", not as human approval or an acceptance
+guarantee, never approve PRs yourself, and keep to the merge conditions below
+as discipline.
 
 #### Merging without human approval
 
@@ -282,9 +275,10 @@ Do not do these before the ruling: irreversible operations, anything that
 affects the user's working environment, external effects (publishing,
 sending, deploying, production), relaxing rules / acceptance criteria /
 verifiers. Commits and pushes to work branches and filing decision requests
-are fine. Observed 2026-10-31 from the workflow triggers: pushing a branch
-with no PR triggers no workflow; opening or updating a PR runs CI, the
-acceptance verifier and a Storybook preview publish to Chromatic
+are fine. Read from the workflow trigger definitions on 2026-10-31 (not
+observed by running them): pushing a branch with no PR triggers no workflow;
+opening or updating a PR runs CI, the acceptance verifier (once
+`acceptance.yml` is on `main`) and a Storybook preview publish to Chromatic
 (`.github/workflows/chromatic.yml`). Nothing is deployed to production.
 Re-check this when a deploy workflow is added. A change with an open decision
 it depends on is not complete; do not merge it as provisional, even where
