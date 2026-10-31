@@ -13,6 +13,7 @@ const Signup = lazy(() => import('./routes/signup'));
 const Login = lazy(() => import('./routes/login'));
 const Exercises = lazy(() => import('./routes/exercises/index'));
 const ExerciseDetail = lazy(() => import('./routes/exercises/detail'));
+const SessionDetail = lazy(() => import('./routes/sessions/detail'));
 
 const queryClient = createAppQueryClient();
 
@@ -59,6 +60,7 @@ const App: Component = () => {
           />
           <Route path="/exercises" component={() => <Protected page={Exercises} />} />
           <Route path="/exercises/:id" component={() => <Protected page={ExerciseDetail} />} />
+          <Route path="/sessions/:id" component={() => <Protected page={SessionDetail} />} />
           <Route path="/signup" component={Signup} />
           <Route path="/login" component={Login} />
           <Route path="*" component={NotFound} />

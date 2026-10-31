@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO workout_sets (set_id, block_id, set_order, reps, weight_kg, duration_seconds, interval_seconds, created_at, updated_at)\n                 VALUES (?, ?, ?, ?, ? / 10, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "e77b79bb4c03f987ea2925e8f6c6b730c6a5567a310b87cafe9597834ad77215"
+}

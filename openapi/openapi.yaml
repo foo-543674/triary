@@ -243,6 +243,141 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions:
+    post:
+      tags: [api-v1]
+      summary: Start a workout session (US-7)
+      description: |
+        `started_at` is the server's current time. `workout_date` is
+        required: the server keeps no time zone, so the client sends its
+        local date. A date later than today's date anywhere on Earth
+        (UTC+14) is `in_future`.
+      operationId: startSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSessionRequest"
+      responses:
+        "201":
+          description: The new session, without blocks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: "`workout_date`: `required`, `invalid_format`, `in_future`. `note`: `too_long`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}:
+    get:
+      tags: [api-v1]
+      summary: A whole session with its blocks and sets (US-7 / US-8)
+      operationId: getSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}/blocks:
+    post:
+      tags: [api-v1]
+      summary: Add an exercise block at the end of the session (US-7)
+      operationId: appendBlock
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exercise_id]
+              properties:
+                exercise_id:
+                  $ref: "#/components/schemas/IdString"
+      responses:
+        "201":
+          description: The new, empty block.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseBlock"
+        "400":
+          description: |
+            `exercise_id`: `required`, or `not_found` for an exercise that is
+            missing or not visible to the user. `blocks`:
+            `exceeds_max_blocks` (50 per session).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/blocks/{block_id}/sets:
+    post:
+      tags: [api-v1]
+      summary: Add a set at the end of a block (US-7)
+      description: |
+        Values are checked against the block's exercise: every required
+        measurement present, every value in range, and no value for a
+        measurement the exercise does not record.
+      operationId: appendSet
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetValues"
+      responses:
+        "201":
+          description: The new set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutSet"
+        "400":
+          description: |
+            `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`:
+            `out_of_range`. `weight_kg`: `invalid_format` when not a multiple
+            of 0.1. `reps` / `weight_kg` / `duration_seconds`:
+            `missing_required_measurement`, or `invalid_format` for a
+            measurement the exercise does not record. `set`: `empty` when
+            reps, weight and duration are all missing. `sets`:
+            `exceeds_max_sets` (50 per block, specification US-7).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
 # Every operation needs the session cookie unless it declares `security: []`
 # (`.contexts/api-design.md` §1.3).
 security:
@@ -256,6 +391,19 @@ components:
       description: |
         Server-issued random 256-bit session token, set by signup and login
         with `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`.
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/IdString"
+    BlockId:
+      name: block_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/IdString"
   responses:
     Unauthenticated:
       description: "`unauthenticated`: no cookie, or an unknown or expired session."
@@ -345,6 +493,7 @@ components:
         - exceeds_max_depth
         - exceeds_max_children
         - exceeds_max_blocks
+        - exceeds_max_sets
         - missing_required_measurement
         - unauthenticated
         - invalid_credentials
@@ -377,7 +526,7 @@ components:
       type: string
       format: date-time
       description: UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
-      pattern: "Z$"
+      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
       examples: ["2026-10-31T09:30:00Z"]
     UserHandle:
       type: string
@@ -458,3 +607,90 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Exercise"
+    StartSessionRequest:
+      type: object
+      required: [workout_date]
+      properties:
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        note:
+          type: [string, "null"]
+          maxLength: 2000
+    SetValues:
+      type: object
+      description: |
+        A set's values. Weight is signed: positive adds load, negative is
+        assistance (kg, 0.1 steps).
+      properties:
+        reps:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 9999
+        weight_kg:
+          type: [number, "null"]
+          minimum: -500.0
+          maximum: 999.9
+          multipleOf: 0.1
+        duration_seconds:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 86400
+        interval_seconds:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 3600
+    WorkoutSet:
+      allOf:
+        - $ref: "#/components/schemas/SetValues"
+        - type: object
+          required: [id, order, reps, weight_kg, duration_seconds, interval_seconds]
+          properties:
+            id:
+              $ref: "#/components/schemas/IdString"
+            order:
+              type: integer
+              minimum: 0
+    ExerciseBlock:
+      type: object
+      required: [id, session_id, exercise_id, exercise_name, exercise_measurement_kinds, order, sets]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        session_id:
+          $ref: "#/components/schemas/IdString"
+        exercise_id:
+          $ref: "#/components/schemas/IdString"
+        exercise_name:
+          type: string
+        exercise_measurement_kinds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Measurement"
+        order:
+          type: integer
+          minimum: 0
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutSet"
+    Session:
+      type: object
+      required: [id, workout_date, started_at, ended_at, note, blocks]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        ended_at:
+          description: null while the session has not been ended.
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        note:
+          type: [string, "null"]
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExerciseBlock"

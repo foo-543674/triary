@@ -7,6 +7,7 @@
 
 pub mod exercise_repository;
 pub mod secrets;
+pub mod session_repository;
 pub mod session_store;
 pub mod user_repository;
 

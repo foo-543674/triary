@@ -18,4 +18,5 @@ pub mod validation;
 pub mod clock;
 pub mod exercise;
 pub mod password_hasher;
+pub mod session;
 pub mod user;

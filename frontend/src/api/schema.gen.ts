@@ -145,6 +145,85 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start a workout session (US-7)
+     * @description `started_at` is the server's current time. `workout_date` is
+     *     required: the server keeps no time zone, so the client sends its
+     *     local date. A date later than today's date anywhere on Earth
+     *     (UTC+14) is `in_future`.
+     */
+    post: operations['startSession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/sessions/{session_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A whole session with its blocks and sets (US-7 / US-8) */
+    get: operations['getSession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/sessions/{session_id}/blocks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add an exercise block at the end of the session (US-7) */
+    post: operations['appendBlock'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/blocks/{block_id}/sets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add a set at the end of a block (US-7)
+     * @description Values are checked against the block's exercise: every required
+     *     measurement present, every value in range, and no value for a
+     *     measurement the exercise does not record.
+     */
+    post: operations['appendSet'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -206,6 +285,7 @@ export interface components {
       | 'exceeds_max_depth'
       | 'exceeds_max_children'
       | 'exceeds_max_blocks'
+      | 'exceeds_max_sets'
       | 'missing_required_measurement'
       | 'unauthenticated'
       | 'invalid_credentials'
@@ -279,6 +359,42 @@ export interface components {
     ExerciseList: {
       items: components['schemas']['Exercise'][];
     };
+    StartSessionRequest: {
+      workout_date: components['schemas']['WorkoutDate'];
+      note?: string | null;
+    };
+    /**
+     * @description A set's values. Weight is signed: positive adds load, negative is
+     *     assistance (kg, 0.1 steps).
+     */
+    SetValues: {
+      reps?: number | null;
+      weight_kg?: number | null;
+      duration_seconds?: number | null;
+      interval_seconds?: number | null;
+    };
+    WorkoutSet: components['schemas']['SetValues'] & {
+      id: components['schemas']['IdString'];
+      order: number;
+    };
+    ExerciseBlock: {
+      id: components['schemas']['IdString'];
+      session_id: components['schemas']['IdString'];
+      exercise_id: components['schemas']['IdString'];
+      exercise_name: string;
+      exercise_measurement_kinds: components['schemas']['Measurement'][];
+      order: number;
+      sets: components['schemas']['WorkoutSet'][];
+    };
+    Session: {
+      id: components['schemas']['IdString'];
+      workout_date: components['schemas']['WorkoutDate'];
+      started_at: components['schemas']['Timestamp'];
+      /** @description null while the session has not been ended. */
+      ended_at: components['schemas']['Timestamp'] | null;
+      note: string | null;
+      blocks: components['schemas']['ExerciseBlock'][];
+    };
   };
   responses: {
     /** @description `unauthenticated`: no cookie, or an unknown or expired session. */
@@ -312,7 +428,10 @@ export interface components {
       };
     };
   };
-  parameters: never;
+  parameters: {
+    SessionId: components['schemas']['IdString'];
+    BlockId: components['schemas']['IdString'];
+  };
   requestBodies: never;
   headers: never;
   pathItems: never;
@@ -582,6 +701,156 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExerciseDetail'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  startSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartSessionRequest'];
+      };
+    };
+    responses: {
+      /** @description The new session, without blocks. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Session'];
+        };
+      };
+      /** @description `workout_date`: `required`, `invalid_format`, `in_future`. `note`: `too_long`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  getSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: components['parameters']['SessionId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The session. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Session'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  appendBlock: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: components['parameters']['SessionId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          exercise_id: components['schemas']['IdString'];
+        };
+      };
+    };
+    responses: {
+      /** @description The new, empty block. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExerciseBlock'];
+        };
+      };
+      /**
+       * @description `exercise_id`: `required`, or `not_found` for an exercise that is
+       *     missing or not visible to the user. `blocks`:
+       *     `exceeds_max_blocks` (50 per session).
+       */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  appendSet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        block_id: components['parameters']['BlockId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetValues'];
+      };
+    };
+    responses: {
+      /** @description The new set. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkoutSet'];
+        };
+      };
+      /**
+       * @description `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`:
+       *     `out_of_range`. `weight_kg`: `invalid_format` when not a multiple
+       *     of 0.1. `reps` / `weight_kg` / `duration_seconds`:
+       *     `missing_required_measurement`, or `invalid_format` for a
+       *     measurement the exercise does not record. `set`: `empty` when
+       *     reps, weight and duration are all missing. `sets`:
+       *     `exceeds_max_sets` (50 per block, specification US-7).
+       */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
         };
       };
       401: components['responses']['Unauthenticated'];

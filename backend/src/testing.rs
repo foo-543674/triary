@@ -13,11 +13,14 @@ use crate::application::exercises::ExerciseDeps;
 use crate::application::ports::BoxFuture;
 use crate::application::ports::exercise_repository::ExerciseRepository;
 use crate::application::ports::secrets::{IdSource, SecretSource, SessionToken};
+use crate::application::ports::session_repository::{BlockForSets, SessionRepository};
 use crate::application::ports::session_store::SessionStore;
 use crate::application::ports::user_repository::{InsertUserError, UserRepository};
+use crate::application::sessions::SessionDeps;
 use crate::domain::clock::Clock;
 use crate::domain::exercise::{Exercise, ExerciseId};
 use crate::domain::password_hasher::{PasswordHasher, PasswordHashingFailed};
+use crate::domain::session::{BlockId, ExerciseBlock, Session, SessionId, WorkoutSet};
 use crate::domain::user::{Password, PasswordHash, User, UserHandle, UserId};
 use crate::interfaces::http::state::AppState;
 
@@ -146,8 +149,8 @@ impl Clock for FixedClock {
 pub struct Sequence(AtomicU8);
 
 impl IdSource for Sequence {
-    fn user_id(&self) -> UserId {
-        UserId::from_bytes([self.0.fetch_add(1, Ordering::Relaxed); 16])
+    fn next_id(&self) -> [u8; 16] {
+        [self.0.fetch_add(1, Ordering::Relaxed); 16]
     }
 }
 
@@ -201,11 +204,106 @@ impl ExerciseRepository for MemoryExercises {
     }
 }
 
+#[derive(Default)]
+pub struct MemorySessionRecords(Mutex<Vec<Session>>);
+
+impl MemorySessionRecords {
+    /// Number of blocks of the session with this API ID.
+    pub fn blocks_of(&self, session_id: &str) -> usize {
+        let id = crate::interfaces::http::id::parse("ses", session_id).expect("a session ID");
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| *s.id.as_bytes() == id)
+            .map_or(0, |s| s.blocks.len())
+    }
+}
+
+impl SessionRepository for MemorySessionRecords {
+    fn insert_session<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, anyhow::Result<()>> {
+        self.0.lock().unwrap().push(session.clone());
+        Box::pin(async { Ok(()) })
+    }
+
+    fn find_session<'a>(
+        &'a self,
+        owner: UserId,
+        id: SessionId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| s.id == id && s.owner == owner)
+            .cloned();
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn insert_block<'a>(
+        &'a self,
+        session: &'a Session,
+        block: &'a ExerciseBlock,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        if let Some(stored) = self
+            .0
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|s| s.id == session.id)
+        {
+            stored.blocks.push(block.clone());
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn find_block<'a>(
+        &'a self,
+        owner: UserId,
+        id: BlockId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<BlockForSets>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|s| s.owner == owner)
+            .flat_map(|s| s.blocks.iter())
+            .find(|b| b.id == id)
+            .map(|b| BlockForSets {
+                id: b.id,
+                measurements: b.measurements.clone(),
+                set_count: b.sets.len(),
+            });
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn insert_set<'a>(
+        &'a self,
+        block: BlockId,
+        set: &'a WorkoutSet,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        if let Some(stored) = self
+            .0
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .flat_map(|s| s.blocks.iter_mut())
+            .find(|b| b.id == block)
+        {
+            stored.sets.push(set.clone());
+        }
+        Box::pin(async { Ok(()) })
+    }
+}
+
 /// Fakes with handles kept so tests can look inside.
 pub struct Fakes {
     pub users: Arc<MemoryUsers>,
     pub sessions: Arc<MemorySessions>,
     pub exercises: Arc<MemoryExercises>,
+    pub records: Arc<MemorySessionRecords>,
     pub deps: AuthDeps,
 }
 
@@ -215,6 +313,12 @@ impl Fakes {
             auth: self.deps.clone(),
             exercises: ExerciseDeps {
                 exercises: self.exercises.clone(),
+            },
+            sessions: SessionDeps {
+                sessions: self.records.clone(),
+                exercises: self.exercises.clone(),
+                clock: self.deps.clock.clone(),
+                ids: self.deps.ids.clone(),
             },
         }
     }
@@ -236,6 +340,7 @@ pub fn fakes() -> Fakes {
         users,
         sessions,
         exercises: Arc::new(MemoryExercises::default()),
+        records: Arc::new(MemorySessionRecords::default()),
         deps,
     }
 }

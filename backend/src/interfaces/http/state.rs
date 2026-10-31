@@ -2,9 +2,11 @@
 
 use crate::application::auth::AuthDeps;
 use crate::application::exercises::ExerciseDeps;
+use crate::application::sessions::SessionDeps;
 
 #[derive(Clone)]
 pub struct AppState {
     pub auth: AuthDeps,
     pub exercises: ExerciseDeps,
+    pub sessions: SessionDeps,
 }

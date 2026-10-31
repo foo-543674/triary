@@ -128,6 +128,7 @@ pub fn violation_code(code: ViolationCode) -> &'static str {
         ViolationCode::ExceedsMaxDepth => "exceeds_max_depth",
         ViolationCode::ExceedsMaxChildren => "exceeds_max_children",
         ViolationCode::ExceedsMaxBlocks => "exceeds_max_blocks",
+        ViolationCode::ExceedsMaxSets => "exceeds_max_sets",
         ViolationCode::MissingRequiredMeasurement => "missing_required_measurement",
     }
 }
@@ -154,6 +155,7 @@ fn violation_message(code: ViolationCode) -> &'static str {
         ViolationCode::ExceedsMaxDepth => "Exceeds the maximum depth",
         ViolationCode::ExceedsMaxChildren => "Exceeds the maximum number of children",
         ViolationCode::ExceedsMaxBlocks => "Exceeds the maximum number of blocks",
+        ViolationCode::ExceedsMaxSets => "Exceeds the maximum number of sets",
         ViolationCode::MissingRequiredMeasurement => "A required measurement is missing",
     }
 }

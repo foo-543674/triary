@@ -5,7 +5,7 @@ use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
 use crate::application::exercises::{ExerciseView, ListFilter, get_exercise, list_exercises};
-use crate::domain::exercise::{ExerciseId, MeasurementKind, Owner};
+use crate::domain::exercise::{ExerciseId, Measurement, MeasurementKind, Owner};
 use crate::interfaces::http::dto::timestamp;
 use crate::interfaces::http::error::{AppError, QueryParams};
 use crate::interfaces::http::id::{self, prefix};
@@ -55,6 +55,15 @@ fn kind_name(kind: MeasurementKind) -> &'static str {
     }
 }
 
+impl From<&Measurement> for MeasurementDto {
+    fn from(m: &Measurement) -> Self {
+        Self {
+            kind: kind_name(m.kind),
+            required: m.required,
+        }
+    }
+}
+
 impl From<&ExerciseView> for ExerciseDto {
     fn from(view: &ExerciseView) -> Self {
         let exercise = &view.exercise;
@@ -68,10 +77,7 @@ impl From<&ExerciseView> for ExerciseDto {
             measurement_kinds: exercise
                 .measurements()
                 .iter()
-                .map(|m| MeasurementDto {
-                    kind: kind_name(m.kind),
-                    required: m.required,
-                })
+                .map(MeasurementDto::from)
                 .collect(),
             parent_id: exercise
                 .parent()

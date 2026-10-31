@@ -1475,6 +1475,708 @@
           }
         }
       ]
+    },
+    {
+      "name": "POST /api/v1/sessions, blocks, sets (US-7)",
+      "item": [
+        {
+          "name": "record: sign up",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('recordHandle', ('rc' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('recordCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{recordHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: find the bench press preset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const bench = pm.response.json().items.find((i) => i.name === 'ベンチプレス');",
+                  "pm.test('bench press is there', function () { pm.expect(bench).to.not.eql(undefined); });",
+                  "pm.collectionVariables.set('benchId', bench.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: start a session today",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('an empty, running session', function () {",
+                  "  pm.expect(body.id).to.match(/^ses_[0-9A-HJKMNP-TV-Z]{26}$/);",
+                  "  pm.expect(body.workout_date).to.eql(pm.collectionVariables.get('today'));",
+                  "  pm.expect(body.started_at).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/);",
+                  "  pm.expect(body.ended_at).to.eql(null);",
+                  "  pm.expect(body.blocks).to.eql([]);",
+                  "});",
+                  "pm.collectionVariables.set('sessionId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"{{today}}\", \"note\": \"integration\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: a date three days ahead is in the future",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('future', new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"workout_date\", \"in_future\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"{{future}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: the date is required",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"workout_date\", \"required\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: add a bench press block",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('first block of the bench press', function () {",
+                  "  pm.expect(body.order).to.eql(0);",
+                  "  pm.expect(body.exercise_id).to.eql(pm.collectionVariables.get('benchId'));",
+                  "  pm.expect(body.exercise_name).to.eql('ベンチプレス');",
+                  "  pm.expect(body.sets).to.eql([]);",
+                  "});",
+                  "pm.collectionVariables.set('blockId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/blocks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "blocks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"{{benchId}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: an unknown exercise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"exercise_id\", \"not_found\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/blocks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "blocks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: add a set (weight on the 0.1 grid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('stored as sent', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect([body.order, body.reps, body.weight_kg, body.interval_seconds]).to.eql([0, 8, 80.5, 120]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 8, \"weight_kg\": 80.5, \"interval_seconds\": 120}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: assisted weight (negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201, order 1', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect([pm.response.json().order, pm.response.json().weight_kg]).to.eql([1, -10]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 5, \"weight_kg\": -10.0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: a required measurement is missing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"weight_kg\", \"missing_required_measurement\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 8}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: an empty set",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"set\", \"empty\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"interval_seconds\": 60}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: values out of range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([[\"reps\", \"out_of_range\"], [\"weight_kg\", \"out_of_range\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 10000, \"weight_kg\": 1000.0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: read the whole session back",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('one block with two sets in order', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.note).to.eql('integration');",
+                  "  pm.expect(body.blocks.length).to.eql(1);",
+                  "  pm.expect(body.blocks[0].exercise_measurement_kinds).to.eql([{ kind: 'reps', required: true }, { kind: 'weight', required: true }]);",
+                  "  pm.expect(body.blocks[0].sets.map((s) => [s.order, s.reps, s.weight_kg])).to.eql([[0, 8, 80.5], [1, 5, -10]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: another user cannot read it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
     }
   ]
 }

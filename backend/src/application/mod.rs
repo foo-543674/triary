@@ -14,3 +14,4 @@
 pub mod auth;
 pub mod exercises;
 pub mod ports;
+pub mod sessions;

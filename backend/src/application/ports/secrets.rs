@@ -49,8 +49,13 @@ pub trait SecretSource: Send + Sync {
     fn session_token(&self) -> anyhow::Result<SessionToken>;
 }
 
+/// New, time-ordered 16-byte IDs (data-model §3).
 pub trait IdSource: Send + Sync {
-    fn user_id(&self) -> UserId;
+    fn next_id(&self) -> [u8; 16];
+
+    fn user_id(&self) -> UserId {
+        UserId::from_bytes(self.next_id())
+    }
 }
 
 #[cfg(test)]

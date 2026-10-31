@@ -1,7 +1,6 @@
 //! Randomness-backed IDs and secrets.
 
 use crate::application::ports::secrets::{IdSource, SecretSource, SessionToken};
-use crate::domain::user::UserId;
 
 /// Session tokens from the operating system's CSPRNG (`getrandom`).
 pub struct OsSecrets;
@@ -21,7 +20,7 @@ impl SecretSource for OsSecrets {
 pub struct TimeOrderedIds;
 
 impl IdSource for TimeOrderedIds {
-    fn user_id(&self) -> UserId {
-        UserId::from_bytes(*uuid::Uuid::now_v7().as_bytes())
+    fn next_id(&self) -> [u8; 16] {
+        *uuid::Uuid::now_v7().as_bytes()
     }
 }

@@ -32,3 +32,7 @@ export type Exercise = components['schemas']['Exercise'];
 export type ExerciseDetail = components['schemas']['ExerciseDetail'];
 export type Measurement = components['schemas']['Measurement'];
 export type MeasurementKind = components['schemas']['MeasurementKind'];
+export type Session = components['schemas']['Session'];
+export type ExerciseBlock = components['schemas']['ExerciseBlock'];
+export type WorkoutSet = components['schemas']['WorkoutSet'];
+export type SetValues = components['schemas']['SetValues'];

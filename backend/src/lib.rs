@@ -30,10 +30,12 @@ use tower_http::trace::TraceLayer;
 
 use crate::application::auth::AuthDeps;
 use crate::application::exercises::ExerciseDeps;
+use crate::application::sessions::SessionDeps;
 use crate::config::CorsConfig;
 use crate::infrastructure::clock::SystemClock;
 use crate::infrastructure::password_hasher::Argon2idHasher;
 use crate::infrastructure::repositories::mysql_exercise_repository::MysqlExerciseRepository;
+use crate::infrastructure::repositories::mysql_session_repository::MysqlSessionRepository;
 use crate::infrastructure::repositories::mysql_session_store::MysqlSessionStore;
 use crate::infrastructure::repositories::mysql_user_repository::MysqlUserRepository;
 use crate::infrastructure::secrets::{OsSecrets, TimeOrderedIds};
@@ -109,17 +111,26 @@ pub async fn run() -> anyhow::Result<()> {
 
     let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL is not set")?;
     let pool = infrastructure::db::connect(&database_url).await?;
+    let clock = Arc::new(SystemClock);
+    let ids = Arc::new(TimeOrderedIds);
+    let exercises = Arc::new(MysqlExerciseRepository::new(pool.clone()));
     let state = AppState {
         auth: AuthDeps {
             users: Arc::new(MysqlUserRepository::new(pool.clone())),
             sessions: Arc::new(MysqlSessionStore::new(pool.clone())),
             hasher: Arc::new(Argon2idHasher::new()),
-            clock: Arc::new(SystemClock),
-            ids: Arc::new(TimeOrderedIds),
+            clock: clock.clone(),
+            ids: ids.clone(),
             secrets: Arc::new(OsSecrets),
         },
         exercises: ExerciseDeps {
-            exercises: Arc::new(MysqlExerciseRepository::new(pool)),
+            exercises: exercises.clone(),
+        },
+        sessions: SessionDeps {
+            sessions: Arc::new(MysqlSessionRepository::new(pool)),
+            exercises,
+            clock,
+            ids,
         },
     };
 

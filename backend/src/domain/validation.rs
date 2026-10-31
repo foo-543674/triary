@@ -30,6 +30,7 @@ pub enum ViolationCode {
     ExceedsMaxDepth,
     ExceedsMaxChildren,
     ExceedsMaxBlocks,
+    ExceedsMaxSets,
     MissingRequiredMeasurement,
 }
 
