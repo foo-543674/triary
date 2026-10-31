@@ -1,0 +1,6 @@
+{
+  "name": "triary-dev-image",
+  "private": true,
+  "type": "module",
+  "description": "Tests for the ./dev entrypoint. Zero dependencies; runs on Node 22 type stripping."
+}

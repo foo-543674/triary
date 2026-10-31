@@ -64,3 +64,7 @@
 {"expect":2,"command":"timeout 60 git push origin HEAD"}
 {"expect":2,"command":"eval 'git commit -m x'"}
 {"expect":2,"command":"bash -c \"true; git commit -n -m x\""}
+{"expect":2,"command":"./dev git commit -m x"}
+{"expect":2,"command":"./dev bash -c 'git push origin HEAD'"}
+{"expect":0,"command":"./dev cargo nextest run"}
+{"expect":0,"command":"cd frontend && ../dev pnpm run lint:ci"}

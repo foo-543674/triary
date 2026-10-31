@@ -39,3 +39,9 @@ run_review_gate_selftest() {
   "$FRONTEND_BIN/tsc" -p "$REPO_ROOT/tools/review-gate/tsconfig.json"
   node --test "$REPO_ROOT"/tools/review-gate/test/*.test.ts
 }
+
+run_dev_selftest() {
+  require_frontend_deps
+  "$FRONTEND_BIN/tsc" -p "$REPO_ROOT/tools/dev-image/tsconfig.json"
+  node --test "$REPO_ROOT"/tools/dev-image/test/*.test.ts
+}

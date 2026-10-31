@@ -29,6 +29,7 @@ if touches '^frontend/' "${CHANGED[@]}"; then
     fail "frontend architecture tests or unit tests failed"
 fi
 if touches '^tools/review-gate/' "${CHANGED[@]}"; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
+if touches '^(dev|tools/dev-image/.*)$' "${CHANGED[@]}"; then run_dev_selftest || fail "./dev self-test failed"; fi
 
 # DO NOT REMOVE OR WEAKEN: blocks a push whose branch diff was never reviewed
 # as a whole. "No review record" must stay a failure, never a pass.

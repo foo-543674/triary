@@ -88,3 +88,8 @@ hooks-install: ## Enable the git hooks in .githooks/ (review gate, see AGENTS.md
 gate-test: ## Type-check and test the review gate tool (tools/review-gate/)
 	frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json
 	node --test tools/review-gate/test/*.test.ts
+
+.PHONY: dev-test
+dev-test: ## Type-check and test the ./dev entrypoint (tools/dev-image/)
+	frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json
+	node --test tools/dev-image/test/*.test.ts

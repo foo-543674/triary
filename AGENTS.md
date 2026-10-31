@@ -128,6 +128,7 @@ for that category.
 | backend change | `cargo fmt --all -- --check` + `cargo clippy --all-targets --all-features` + `cargo nextest run` (includes the architecture tests) |
 | frontend change | `pnpm run lint:ci` + `pnpm run typecheck` + `pnpm run test:run` + `pnpm run arch:test` (+ `pnpm run build-storybook` when stories or Storybook config change) |
 | review gate tool (`tools/review-gate/`) | `make gate-test` |
+| dev entrypoint (`dev`, `tools/dev-image/`) | `make dev-test` (the image itself is built and checked by `.github/workflows/dev-image.yml` on the PR) |
 | docs / design docs (`.contexts/`, `docs/`) | grep the related documents for the same terms (HTTP status, field names, error codes) and make them agree |
 | OpenAPI (`openapi/`) | `npx -y @stoplight/spectral-cli lint openapi/openapi.yaml` + `make api-generate` + check the referencing docs and handlers |
 | DB migration | `make db-migrate-test` + `make db-prepare` + re-run the backend tests |
@@ -398,6 +399,8 @@ or the issue is in Japanese.
 | `make arch-test` | Architecture tests for both backend and frontend |
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Type-check and test the review gate tool |
+| `make dev-test` | Type-check and test the `./dev` entrypoint |
+| `./dev <command>` | Run a command inside the dev image (`tools/dev-image/Dockerfile`). Being introduced: the commands in this table still run directly until the image is published and the hooks / Makefile / CI switch to it (`.contexts/bootstrap-decisions.md` "2026-10-31 再実行 (3.0.1)") |
 | `node tools/review-gate/src/cli.ts check --scope commit` | Ask the review gate whether the staged diff may be committed |
 | `cd frontend && pnpm run dev` | Frontend dev server |
 
