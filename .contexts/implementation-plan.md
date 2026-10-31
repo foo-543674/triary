@@ -13,7 +13,7 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
 (整合維持の手間と乖離リスクを避けるため)。
 
 開発プロセス・PR フロー・レビュー対応プロトコル・CI とレビューの責務
-分担などのプロジェクト規約は本書には書かない。それらは `CLAUDE.md` と
+分担などのプロジェクト規約は本書には書かない。それらは `AGENTS.md` と
 ブートストラップ元の `foo-skills` プラグインに置く。
 
 ---
@@ -467,7 +467,7 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
 - スコープ: `tests/integration/triary.postman_collection.json` を
   GitHub Actions で実行、fail で CI red。
 - 関連設計書: 既存の `.github/workflows/ci.yml`、Newman 実行系の整備、
-  `CLAUDE.md §Common commands`。
+  `AGENTS.md §Common commands`。
 - 前提: 全機能スライス完了。
 - タスク分割案:
   - T24-1 GHA workflow に Newman ステップ追加 (DB セットアップ含む)

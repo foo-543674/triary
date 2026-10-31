@@ -1,7 +1,7 @@
 # 設計フェーズ引き継ぎ資料
 
 次の設計タスクを担当する AI が最初に読む。プロジェクト全体の前提は
-`CLAUDE.md` と `.contexts/concept.md` を参照。
+`AGENTS.md` と `.contexts/concept.md` を参照。
 
 ## プロジェクト概要（ごく簡潔に）
 
@@ -34,7 +34,7 @@ triary — 筋トレ記録・スコアリング PWA。個人プロジェクト�
 §5 にある。
 
 実装途中で曖昧さが出たら勝手に判断せず、実装計画 §5「残課題」と
-`CLAUDE.md` §AI delegation scope の "Stop and confirm first" に従って
+`AGENTS.md` §AI delegation scope の "Stop and confirm first" に従って
 ユーザーに確認すること。
 
 > **過去の経緯**: 本文書の以前のバージョンには「データモデル設計フェーズの

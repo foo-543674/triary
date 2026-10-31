@@ -1,7 +1,11 @@
 # Copilot instructions for triary
 
+<!-- Derived from AGENTS.md (the single source of project instructions).
+     Update AGENTS.md first, then bring this file in line without dropping
+     Copilot-specific additions. -->
+
 A workout-logging and scoring PWA. Personal project, doubles as a programming
-learning playground. **Read `CLAUDE.md` first** for the full project guide;
+learning playground. **Read `AGENTS.md` first** for the full project guide;
 this file is the short version Copilot needs in every prompt.
 
 ## Stack
@@ -55,11 +59,33 @@ Before committing, the following must pass:
 - `cargo fmt --check`, `cargo clippy --all-targets`, `cargo nextest run`
 - `pnpm run lint:ci`, `pnpm run typecheck`, `pnpm run test:run`,
   `pnpm run arch:test`
+- Full per-task-type table: `AGENTS.md` "Quality gates"
+
+## Review gate and acceptance
+
+- `git commit` / `git push` are stopped by the git hooks in `.githooks/`
+  (`make hooks-install` once per clone) until the diff has been reviewed.
+  When they stop you, have a reviewer in a separate context review the diff
+  following `.agents/skills/code-review/SKILL.md` and record the round, then
+  retry. If no separate context is available, treat the review as not done.
+- Never bypass: no `--no-verify` / `-n`, no `core.hooksPath` changes, no
+  hand-edited review ledger, no weakening of steps marked
+  `# DO NOT REMOVE OR WEAKEN:`.
+- Rules: `docs/review-contract.md`. Remote acceptance (ledger snapshot on the
+  PR, `acceptance / verdict` status): `docs/remote-acceptance.md`.
+- Decisions you cannot make go to GitHub Issues labelled `needs-decision`;
+  keep working on what does not depend on them.
+
+## Natural language
+
+Code, comments, identifiers and commit messages are English only, even when
+the issue or conversation is Japanese. Design docs in `.contexts/` and
+`docs/` are Japanese.
 
 ## Commit message prefixes
 
 `[feat]` `[fix]` `[update]` `[improve]` `[refactor]` `[chore]` `[docs]`
-`[test]` `[style]`. One commit, one purpose.
+`[test]` `[style]`. One commit, one purpose. English only.
 
 ## Where to look
 
@@ -68,3 +94,5 @@ Before committing, the following must pass:
 - `.contexts/data-model.md` — DB schema and ID strategy
 - `.contexts/specification.md` — user stories with acceptance criteria
 - `.contexts/bootstrap-decisions.md` — selected quality lenses and rationale
+- `docs/review-contract.md`, `docs/remote-acceptance.md` — review and
+  acceptance rules
