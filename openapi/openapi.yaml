@@ -223,6 +223,7 @@ paths:
     get:
       tags: [api-v1]
       summary: One exercise (US-4)
+      description: The list item plus `created_at`. Missing, malformed and other users' IDs are all 404.
       operationId: getExercise
       parameters:
         - name: exercise_id
@@ -280,6 +281,7 @@ paths:
     get:
       tags: [api-v1]
       summary: A whole session with its blocks and sets (US-7 / US-8)
+      description: Blocks carry the exercise's name and measurements so the session reads on its own.
       operationId: getSession
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -296,10 +298,208 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/UnexpectedError"
+    patch:
+      tags: [api-v1]
+      summary: Edit a session's date, note or end time (US-8)
+      description: |
+        Partial update: a missing field is kept, `null` clears `note` or
+        `ended_at`. Changing `workout_date` also moves its blocks in the
+        by-exercise history.
+      operationId: updateSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionPatch"
+      responses:
+        "200":
+          description: The updated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: |
+            `workout_date`: `invalid_format`, `in_future`. `note`: `too_long`.
+            `ended_at`: `invalid_format`, `before_start`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a session with its blocks and sets (US-8)
+      description: Removes the session and everything recorded in it.
+      operationId: deleteSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "204":
+          description: Deleted; there is no way to restore it.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}/end:
+    post:
+      tags: [api-v1]
+      summary: End the session now (US-7)
+      description: Sets `ended_at` to the server's time. Ending an ended session changes nothing and answers the same.
+      operationId: endSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The ended session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/blocks/{block_id}:
+    patch:
+      tags: [api-v1]
+      summary: Change a block's exercise or position (US-8)
+      description: |
+        `order` moves the block; the others are renumbered. A new exercise
+        must fit every recorded set (required measurements present, nothing
+        it does not record).
+      operationId: updateBlock
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exercise_id:
+                  $ref: "#/components/schemas/IdString"
+                order:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: The updated block.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseBlock"
+        "400":
+          description: "`exercise_id`: `not_found`, `incompatible_with_existing_sets`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a block with its sets (US-8)
+      description: The blocks after it move up one position.
+      operationId: deleteBlock
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      responses:
+        "204":
+          description: Deleted; the later blocks move up.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sets/{set_id}:
+    patch:
+      tags: [api-v1]
+      summary: Change a set's values or position (US-7 / US-8)
+      description: |
+        Partial update: a missing field is kept, `null` clears it. The
+        resulting set is checked like a new one. `order` moves the set.
+      operationId: updateSet
+      parameters:
+        - name: set_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IdString"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SetValues"
+                - type: object
+                  properties:
+                    order:
+                      type: integer
+                      minimum: 0
+      responses:
+        "200":
+          description: The updated set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutSet"
+        "400":
+          description: The same codes as adding a set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a set
+      description: The sets after it move up one position.
+      operationId: deleteSet
+      parameters:
+        - name: set_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IdString"
+      responses:
+        "204":
+          description: Deleted; the later sets move up.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
   /api/v1/sessions/{session_id}/blocks:
     post:
       tags: [api-v1]
       summary: Add an exercise block at the end of the session (US-7)
+      description: The block gets the next position and starts without sets. The same exercise may appear in several blocks.
       operationId: appendBlock
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -694,3 +894,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExerciseBlock"
+    SessionPatch:
+      type: object
+      properties:
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        note:
+          type: [string, "null"]
+          maxLength: 2000
+        ended_at:
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"

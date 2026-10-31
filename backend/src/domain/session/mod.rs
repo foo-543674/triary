@@ -2,6 +2,7 @@
 //! and their sets. Blocks and sets live inside the session aggregate
 //! (architecture.md "境界定義").
 
+pub mod edit;
 pub mod record;
 pub mod values;
 

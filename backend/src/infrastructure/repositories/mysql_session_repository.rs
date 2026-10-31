@@ -248,4 +248,178 @@ impl SessionRepository for MysqlSessionRepository {
             Ok(())
         })
     }
+
+    fn find_session_of_block<'a>(
+        &'a self,
+        owner: UserId,
+        block: BlockId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>> {
+        Box::pin(async move {
+            let session = sqlx::query_scalar!(
+                "SELECT b.session_id FROM exercise_blocks b JOIN sessions s ON s.session_id = b.session_id
+                  WHERE b.block_id = ? AND s.user_id = ?",
+                block.as_bytes().as_slice(),
+                owner.as_bytes().as_slice()
+            )
+            .fetch_optional(&self.pool)
+            .await?;
+            match session {
+                Some(id) => {
+                    self.find_session(owner, SessionId::from_bytes(id_bytes(id)?))
+                        .await
+                }
+                None => Ok(None),
+            }
+        })
+    }
+
+    fn find_session_of_set<'a>(
+        &'a self,
+        owner: UserId,
+        set: SetId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>> {
+        Box::pin(async move {
+            let session = sqlx::query_scalar!(
+                "SELECT b.session_id FROM workout_sets ws
+                   JOIN exercise_blocks b ON b.block_id = ws.block_id
+                   JOIN sessions s ON s.session_id = b.session_id
+                  WHERE ws.set_id = ? AND s.user_id = ?",
+                set.as_bytes().as_slice(),
+                owner.as_bytes().as_slice()
+            )
+            .fetch_optional(&self.pool)
+            .await?;
+            match session {
+                Some(id) => {
+                    self.find_session(owner, SessionId::from_bytes(id_bytes(id)?))
+                        .await
+                }
+                None => Ok(None),
+            }
+        })
+    }
+
+    fn update_session<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async move {
+            let mut tx = self.pool.begin().await?;
+            sqlx::query!(
+                "UPDATE sessions SET workout_date = ?, note = ?, ended_at = ?, updated_at = UTC_TIMESTAMP(3)
+                  WHERE session_id = ?",
+                session.workout_date.date(),
+                session.note.as_ref().map(|n| n.as_str()),
+                session.ended_at.map(to_db_time),
+                session.id.as_bytes().as_slice(),
+            )
+            .execute(&mut *tx)
+            .await?;
+            // Keep the copy of the date on the blocks in step (data-model §4.6).
+            sqlx::query!(
+                "UPDATE exercise_blocks SET workout_date = ? WHERE session_id = ?",
+                session.workout_date.date(),
+                session.id.as_bytes().as_slice(),
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok(())
+        })
+    }
+
+    fn delete_session<'a>(&'a self, id: SessionId) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async move {
+            // Blocks and sets go with it (ON DELETE CASCADE, data-model §7).
+            sqlx::query!(
+                "DELETE FROM sessions WHERE session_id = ?",
+                id.as_bytes().as_slice()
+            )
+            .execute(&self.pool)
+            .await?;
+            Ok(())
+        })
+    }
+
+    fn save_blocks<'a>(
+        &'a self,
+        session: SessionId,
+        blocks: &'a [ExerciseBlock],
+        removed: Option<BlockId>,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async move {
+            let mut tx = self.pool.begin().await?;
+            if let Some(removed) = removed {
+                sqlx::query!(
+                    "DELETE FROM exercise_blocks WHERE block_id = ?",
+                    removed.as_bytes().as_slice()
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            // Move every block out of the way first: uk_blocks_session_order
+            // would refuse swapping two orders one row at a time.
+            sqlx::query!(
+                "UPDATE exercise_blocks SET block_order = block_order + 1000 WHERE session_id = ?",
+                session.as_bytes().as_slice()
+            )
+            .execute(&mut *tx)
+            .await?;
+            for block in blocks {
+                sqlx::query!(
+                    "UPDATE exercise_blocks SET exercise_id = ?, block_order = ?, updated_at = UTC_TIMESTAMP(3)
+                      WHERE block_id = ?",
+                    block.exercise_id.as_bytes().as_slice(),
+                    i16::try_from(block.order)?,
+                    block.id.as_bytes().as_slice(),
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            tx.commit().await?;
+            Ok(())
+        })
+    }
+
+    fn save_sets<'a>(
+        &'a self,
+        block: BlockId,
+        sets: &'a [WorkoutSet],
+        removed: Option<SetId>,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        Box::pin(async move {
+            let mut tx = self.pool.begin().await?;
+            if let Some(removed) = removed {
+                sqlx::query!(
+                    "DELETE FROM workout_sets WHERE set_id = ?",
+                    removed.as_bytes().as_slice()
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            // Same as for blocks: free the orders before assigning them.
+            sqlx::query!(
+                "UPDATE workout_sets SET set_order = set_order + 1000 WHERE block_id = ?",
+                block.as_bytes().as_slice()
+            )
+            .execute(&mut *tx)
+            .await?;
+            for set in sets {
+                let v = set.values;
+                sqlx::query!(
+                    "UPDATE workout_sets
+                        SET set_order = ?, reps = ?, weight_kg = ? / 10, duration_seconds = ?, interval_seconds = ?,
+                            updated_at = UTC_TIMESTAMP(3)
+                      WHERE set_id = ?",
+                    i16::try_from(set.order)?,
+                    v.reps,
+                    v.weight_tenths,
+                    v.duration_seconds,
+                    v.interval_seconds,
+                    set.id.as_bytes().as_slice(),
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            tx.commit().await?;
+            Ok(())
+        })
+    }
 }

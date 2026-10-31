@@ -91,6 +91,16 @@ const meta: Meta<typeof SessionEditor> = {
     onEditDraft: () => {},
     onAssisted: () => {},
     onSaveSet: () => {},
+    editingSet: () => undefined,
+    confirming: undefined,
+    onEditSet: () => {},
+    onCancelEdit: () => {},
+    onMoveSet: () => {},
+    onMoveBlock: () => {},
+    onAskConfirm: () => {},
+    onDeleteSet: () => {},
+    onDeleteBlock: () => {},
+    header: <h1 class="text-2xl font-bold">2026-10-31 のトレーニング</h1>,
   },
 };
 
@@ -106,6 +116,11 @@ export const SetErrors: Story = {
       blockId === recorded.blocks[0]?.id ? { weight_kg: '必須の項目です' } : {},
   },
 };
-export const Ended: Story = {
-  args: { session: { ...recorded, ended_at: '2026-10-31T10:00:00Z' } },
+export const ConfirmingBlockDelete: Story = { args: { confirming: recorded.blocks[0]?.id } };
+export const EditingASet: Story = {
+  args: {
+    editingSet: (blockId: string) =>
+      blockId === recorded.blocks[0]?.id ? recorded.blocks[0]?.sets[0]?.id : undefined,
+    draft: () => ({ ...emptyDraft, reps: '8', weight: '80.5', interval: '120' }),
+  },
 };

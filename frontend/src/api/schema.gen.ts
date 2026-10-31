@@ -135,7 +135,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** One exercise (US-4) */
+    /**
+     * One exercise (US-4)
+     * @description The list item plus `created_at`. Missing, malformed and other users' IDs are all 404.
+     */
     get: operations['getExercise'];
     put?: never;
     post?: never;
@@ -175,14 +178,98 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A whole session with its blocks and sets (US-7 / US-8) */
+    /**
+     * A whole session with its blocks and sets (US-7 / US-8)
+     * @description Blocks carry the exercise's name and measurements so the session reads on its own.
+     */
     get: operations['getSession'];
     put?: never;
     post?: never;
+    /**
+     * Delete a session with its blocks and sets (US-8)
+     * @description Removes the session and everything recorded in it.
+     */
+    delete: operations['deleteSession'];
+    options?: never;
+    head?: never;
+    /**
+     * Edit a session's date, note or end time (US-8)
+     * @description Partial update: a missing field is kept, `null` clears `note` or
+     *     `ended_at`. Changing `workout_date` also moves its blocks in the
+     *     by-exercise history.
+     */
+    patch: operations['updateSession'];
+    trace?: never;
+  };
+  '/api/v1/sessions/{session_id}/end': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * End the session now (US-7)
+     * @description Sets `ended_at` to the server's time. Ending an ended session changes nothing and answers the same.
+     */
+    post: operations['endSession'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/blocks/{block_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete a block with its sets (US-8)
+     * @description The blocks after it move up one position.
+     */
+    delete: operations['deleteBlock'];
+    options?: never;
+    head?: never;
+    /**
+     * Change a block's exercise or position (US-8)
+     * @description `order` moves the block; the others are renumbered. A new exercise
+     *     must fit every recorded set (required measurements present, nothing
+     *     it does not record).
+     */
+    patch: operations['updateBlock'];
+    trace?: never;
+  };
+  '/api/v1/sets/{set_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete a set
+     * @description The sets after it move up one position.
+     */
+    delete: operations['deleteSet'];
+    options?: never;
+    head?: never;
+    /**
+     * Change a set's values or position (US-7 / US-8)
+     * @description Partial update: a missing field is kept, `null` clears it. The
+     *     resulting set is checked like a new one. `order` moves the set.
+     */
+    patch: operations['updateSet'];
     trace?: never;
   };
   '/api/v1/sessions/{session_id}/blocks': {
@@ -194,7 +281,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Add an exercise block at the end of the session (US-7) */
+    /**
+     * Add an exercise block at the end of the session (US-7)
+     * @description The block gets the next position and starts without sets. The same exercise may appear in several blocks.
+     */
     post: operations['appendBlock'];
     delete?: never;
     options?: never;
@@ -394,6 +484,11 @@ export interface components {
       ended_at: components['schemas']['Timestamp'] | null;
       note: string | null;
       blocks: components['schemas']['ExerciseBlock'][];
+    };
+    SessionPatch: {
+      workout_date?: components['schemas']['WorkoutDate'];
+      note?: string | null;
+      ended_at?: components['schemas']['Timestamp'] | null;
     };
   };
   responses: {
@@ -761,6 +856,222 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Session'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  deleteSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: components['parameters']['SessionId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted; there is no way to restore it. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  updateSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: components['parameters']['SessionId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SessionPatch'];
+      };
+    };
+    responses: {
+      /** @description The updated session. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Session'];
+        };
+      };
+      /**
+       * @description `workout_date`: `invalid_format`, `in_future`. `note`: `too_long`.
+       *     `ended_at`: `invalid_format`, `before_start`.
+       */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  endSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: components['parameters']['SessionId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The ended session. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Session'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  deleteBlock: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        block_id: components['parameters']['BlockId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted; the later blocks move up. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  updateBlock: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        block_id: components['parameters']['BlockId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': {
+          exercise_id?: components['schemas']['IdString'];
+          order?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description The updated block. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExerciseBlock'];
+        };
+      };
+      /** @description `exercise_id`: `not_found`, `incompatible_with_existing_sets`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  deleteSet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        set_id: components['schemas']['IdString'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted; the later sets move up. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  updateSet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        set_id: components['schemas']['IdString'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetValues'] & {
+          order?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description The updated set. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkoutSet'];
+        };
+      };
+      /** @description The same codes as adding a set. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
         };
       };
       401: components['responses']['Unauthenticated'];

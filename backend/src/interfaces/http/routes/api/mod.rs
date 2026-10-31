@@ -1,5 +1,6 @@
 //! REST API (`/api/v1`, api-design §2.2-§2.6). Every route needs a session.
 
+mod edit;
 mod exercises;
 mod sessions;
 
@@ -13,7 +14,21 @@ pub fn router() -> Router<AppState> {
         .route("/api/v1/exercises", get(exercises::list))
         .route("/api/v1/exercises/{exercise_id}", get(exercises::detail))
         .route("/api/v1/sessions", post(sessions::start))
-        .route("/api/v1/sessions/{session_id}", get(sessions::show))
+        .route(
+            "/api/v1/sessions/{session_id}",
+            get(sessions::show)
+                .patch(edit::update_session)
+                .delete(edit::remove_session),
+        )
+        .route("/api/v1/sessions/{session_id}/end", post(edit::end))
+        .route(
+            "/api/v1/blocks/{block_id}",
+            axum::routing::patch(edit::update_block).delete(edit::remove_block),
+        )
+        .route(
+            "/api/v1/sets/{set_id}",
+            axum::routing::patch(edit::update_set).delete(edit::remove_set),
+        )
         .route(
             "/api/v1/sessions/{session_id}/blocks",
             post(sessions::add_block),

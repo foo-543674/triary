@@ -26,4 +26,27 @@ describe('createSessionEditorState', () => {
       expect(state.draft('a')).toEqual({ ...emptyDraft, interval: '90', assisted: true });
       dispose();
     }));
+
+  it('loads a stored set into the form for editing', () =>
+    createRoot((dispose) => {
+      const state = createSessionEditorState();
+      state.startEditingSet('a', 'set-1', {
+        reps: 5,
+        weight_kg: -10,
+        duration_seconds: null,
+        interval_seconds: 90,
+      });
+      expect(state.editingSet('a')).toBe('set-1');
+      expect(state.draft('a')).toEqual({
+        reps: '5',
+        weight: '10',
+        assisted: true,
+        duration: '',
+        interval: '90',
+      });
+      state.stopEditingSet('a');
+      expect(state.editingSet('a')).toBeUndefined();
+      expect(state.draft('a')).toEqual(emptyDraft);
+      dispose();
+    }));
 });

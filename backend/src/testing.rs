@@ -20,7 +20,7 @@ use crate::application::sessions::SessionDeps;
 use crate::domain::clock::Clock;
 use crate::domain::exercise::{Exercise, ExerciseId};
 use crate::domain::password_hasher::{PasswordHasher, PasswordHashingFailed};
-use crate::domain::session::{BlockId, ExerciseBlock, Session, SessionId, WorkoutSet};
+use crate::domain::session::{BlockId, ExerciseBlock, Session, SessionId, SetId, WorkoutSet};
 use crate::domain::user::{Password, PasswordHash, User, UserHandle, UserId};
 use crate::interfaces::http::state::AppState;
 
@@ -293,6 +293,89 @@ impl SessionRepository for MemorySessionRecords {
             .find(|b| b.id == block)
         {
             stored.sets.push(set.clone());
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn find_session_of_block<'a>(
+        &'a self,
+        owner: UserId,
+        block: BlockId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| s.owner == owner && s.blocks.iter().any(|b| b.id == block))
+            .cloned();
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn find_session_of_set<'a>(
+        &'a self,
+        owner: UserId,
+        set: SetId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| {
+                s.owner == owner && s.blocks.iter().any(|b| b.sets.iter().any(|x| x.id == set))
+            })
+            .cloned();
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn update_session<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, anyhow::Result<()>> {
+        if let Some(stored) = self
+            .0
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .find(|s| s.id == session.id)
+        {
+            stored.workout_date = session.workout_date;
+            stored.note = session.note.clone();
+            stored.ended_at = session.ended_at;
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn delete_session<'a>(&'a self, id: SessionId) -> BoxFuture<'a, anyhow::Result<()>> {
+        self.0.lock().unwrap().retain(|s| s.id != id);
+        Box::pin(async { Ok(()) })
+    }
+
+    fn save_blocks<'a>(
+        &'a self,
+        session: SessionId,
+        blocks: &'a [ExerciseBlock],
+        _removed: Option<BlockId>,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        if let Some(stored) = self.0.lock().unwrap().iter_mut().find(|s| s.id == session) {
+            stored.blocks = blocks.to_vec();
+        }
+        Box::pin(async { Ok(()) })
+    }
+
+    fn save_sets<'a>(
+        &'a self,
+        block: BlockId,
+        sets: &'a [WorkoutSet],
+        _removed: Option<SetId>,
+    ) -> BoxFuture<'a, anyhow::Result<()>> {
+        if let Some(stored) = self
+            .0
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .flat_map(|s| s.blocks.iter_mut())
+            .find(|b| b.id == block)
+        {
+            stored.sets = sets.to_vec();
         }
         Box::pin(async { Ok(()) })
     }

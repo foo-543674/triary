@@ -8,6 +8,9 @@ type Props = {
   readonly draft: SetDraft;
   readonly errors: DraftErrors;
   readonly saving: boolean;
+  /** Editing a stored set instead of adding one. */
+  readonly editing: boolean;
+  readonly onCancel: () => void;
   readonly onEdit: (field: DraftField, value: string) => void;
   readonly onAssisted: (assisted: boolean) => void;
   readonly onSave: () => void;
@@ -118,8 +121,17 @@ export const SetForm = (props: Props): JSX.Element => {
         class="rounded bg-green-700 px-3 py-1 text-sm font-semibold text-white hover:bg-green-800 disabled:bg-gray-400"
         disabled={props.saving}
       >
-        セットを追加
+        {props.editing ? 'セットを更新' : 'セットを追加'}
       </button>
+      <Show when={props.editing}>
+        <button
+          type="button"
+          class="text-sm text-gray-600 underline"
+          onClick={() => props.onCancel()}
+        >
+          やめる
+        </button>
+      </Show>
       <Show when={props.errors.set}>
         {(message) => <p class="w-full text-sm text-red-600">{message()}</p>}
       </Show>

@@ -2,7 +2,7 @@
 
 use super::BoxFuture;
 use crate::domain::exercise::Measurement;
-use crate::domain::session::{BlockId, ExerciseBlock, Session, SessionId, WorkoutSet};
+use crate::domain::session::{BlockId, ExerciseBlock, Session, SessionId, SetId, WorkoutSet};
 use crate::domain::user::UserId;
 
 /// What adding a set to a block needs to know about the block.
@@ -43,5 +43,44 @@ pub trait SessionRepository: Send + Sync {
         &'a self,
         block: BlockId,
         set: &'a WorkoutSet,
+    ) -> BoxFuture<'a, anyhow::Result<()>>;
+
+    /// The whole session that contains the block, if it is `owner`'s.
+    fn find_session_of_block<'a>(
+        &'a self,
+        owner: UserId,
+        block: BlockId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>>;
+
+    /// The whole session that contains the set, if it is `owner`'s.
+    fn find_session_of_set<'a>(
+        &'a self,
+        owner: UserId,
+        set: SetId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Session>>>;
+
+    /// Writes the session's own attributes (date, note, end) and copies the
+    /// date to its blocks (data-model §4.6), in one transaction.
+    fn update_session<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, anyhow::Result<()>>;
+
+    /// Deletes the session with its blocks and sets.
+    fn delete_session<'a>(&'a self, id: SessionId) -> BoxFuture<'a, anyhow::Result<()>>;
+
+    /// Writes each block's exercise and order (`blocks` in their new order)
+    /// in one transaction, after deleting `removed` if given.
+    fn save_blocks<'a>(
+        &'a self,
+        session: SessionId,
+        blocks: &'a [ExerciseBlock],
+        removed: Option<BlockId>,
+    ) -> BoxFuture<'a, anyhow::Result<()>>;
+
+    /// Writes each set's values and order (`sets` in their new order) in one
+    /// transaction, after deleting `removed` if given.
+    fn save_sets<'a>(
+        &'a self,
+        block: BlockId,
+        sets: &'a [WorkoutSet],
+        removed: Option<SetId>,
     ) -> BoxFuture<'a, anyhow::Result<()>>;
 }

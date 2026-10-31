@@ -1,5 +1,7 @@
 //! Recording workouts (US-7): start a session, read it, add blocks and sets.
 
+pub mod edit;
+
 use std::sync::Arc;
 
 use crate::application::ports::exercise_repository::ExerciseRepository;

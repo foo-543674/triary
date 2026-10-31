@@ -14,6 +14,8 @@ const meta: Meta<typeof SetForm> = {
     draft: emptyDraft,
     errors: {},
     saving: false,
+    editing: false,
+    onCancel: () => {},
     onEdit: () => {},
     onAssisted: () => {},
     onSave: () => {},
@@ -26,6 +28,9 @@ type Story = StoryObj<typeof SetForm>;
 export const RepsAndOptionalWeight: Story = {};
 export const Assisted: Story = {
   args: { draft: { ...emptyDraft, reps: '5', weight: '10', assisted: true } },
+};
+export const EditingStoredSet: Story = {
+  args: { editing: true, draft: { ...emptyDraft, reps: '8', weight: '80' } },
 };
 export const TimeOnly: Story = { args: { measurements: [{ kind: 'time', required: true }] } };
 export const Errors: Story = {
