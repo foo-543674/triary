@@ -401,7 +401,6 @@ because those must work wherever git and `./dev` run. Why:
 | `make infra-reset` | Reset data volumes and restart |
 | `make db-migrate` | Apply migrations to the development DB |
 | `make db-migrate-test` | Apply migrations to the test DB |
-| `make db-seed` | Seed the development DB |
 | `make db-prepare` | Regenerate sqlx offline metadata |
 | `make api-generate` | Regenerate frontend types from OpenAPI |
 | `cd backend && ../dev cargo nextest run` | Rust unit + architecture tests |

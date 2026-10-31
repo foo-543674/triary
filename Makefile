@@ -54,10 +54,6 @@ db-migrate: ## Apply migrations to the development DB (backend/migrations/)
 db-migrate-test: ## Apply migrations to the test DB
 	cd backend && DATABASE_URL=$(TEST_DATABASE_URL) "$(DEV)" sqlx migrate run
 
-.PHONY: db-seed
-db-seed: ## Seed the development DB
-	cd backend && bash scripts/seed.sh
-
 .PHONY: db-prepare
 db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx/)
 	cd backend && "$(DEV)" cargo sqlx prepare -- --tests

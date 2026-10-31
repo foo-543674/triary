@@ -18,7 +18,7 @@
     "arch:test": "node scripts/check-arch.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "api:generate": "openapi-typescript ../openapi/openapi.yaml -o ./src/api/schema.gen.ts"
+    "api:generate": "openapi-typescript ../openapi/openapi.yaml -o ./src/api/schema.gen.ts && biome format --write ./src/api/schema.gen.ts"
   },
   "license": "MIT",
   "devDependencies": {

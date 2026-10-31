@@ -84,7 +84,6 @@ make infra-up        # Start local infra
 make infra-down      # Stop local infra
 make infra-reset     # Reset data and restart
 make db-migrate      # Apply DB migrations
-make db-seed         # Seed the development DB
 ```
 
 For backend / frontend specific commands, see the "Common commands" section
