@@ -7,6 +7,7 @@ import { type Infra, InfraProvider } from './lib/infra/context';
 
 const Home = lazy(() => import('./routes/index'));
 const NotFound = lazy(() => import('./routes/not-found'));
+const Signup = lazy(() => import('./routes/signup'));
 
 const queryClient = createAppQueryClient();
 
@@ -32,6 +33,7 @@ const App: Component = () => {
       <QueryClientProvider client={queryClient}>
         <Router root={Layout}>
           <Route path="/" component={Home} />
+          <Route path="/signup" component={Signup} />
           <Route path="*" component={NotFound} />
         </Router>
       </QueryClientProvider>
