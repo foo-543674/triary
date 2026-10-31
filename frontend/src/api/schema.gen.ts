@@ -29,6 +29,65 @@ export interface components {
       /** @enum {string} */
       status: 'ok';
     };
+    /**
+     * @description Body of every error response (`.contexts/api-design.md` §1.6). Never
+     *     a single-error object; validation errors are all collected.
+     */
+    ErrorEnvelope: {
+      /** @description Order has no meaning. */
+      errors: components['schemas']['ErrorItem'][];
+    };
+    ErrorItem: {
+      code: components['schemas']['ErrorCode'];
+      /**
+       * @description Path of the offending input (`name`, `sets[1].reps`). Present for
+       *     field-dependent codes. Absent for `unauthenticated`,
+       *     `invalid_credentials`, `preset_not_modifiable`, `not_found` on the
+       *     path target, `rate_limited`, `internal_error`, and for
+       *     `invalid_format` when the request could not be read at all: a body
+       *     that is not the expected JSON (400), or a protocol refusal that
+       *     keeps its own status (405 wrong method, 413 body too large, 415
+       *     not JSON). Such structural errors stop at the first one.
+       * @example name
+       * @example sets[1].reps
+       */
+      field?: string;
+      /**
+       * @description Short English text for debugging. Clients show their own wording
+       *     based on `(code, field)`.
+       */
+      message: string;
+    };
+    /**
+     * @description Kind of error, never including the field name. Adding a code is not a
+     *     breaking change; clients must tolerate codes they do not know.
+     * @enum {string}
+     */
+    ErrorCode:
+      | 'required'
+      | 'too_short'
+      | 'too_long'
+      | 'invalid_charset'
+      | 'invalid_format'
+      | 'empty'
+      | 'out_of_range'
+      | 'in_future'
+      | 'before_start'
+      | 'reserved'
+      | 'already_taken'
+      | 'not_found'
+      | 'locked_by_existing_records'
+      | 'incompatible_with_existing_sets'
+      | 'creates_cycle'
+      | 'exceeds_max_depth'
+      | 'exceeds_max_children'
+      | 'exceeds_max_blocks'
+      | 'missing_required_measurement'
+      | 'unauthenticated'
+      | 'invalid_credentials'
+      | 'preset_not_modifiable'
+      | 'rate_limited'
+      | 'internal_error';
   };
   responses: never;
   parameters: never;
@@ -54,6 +113,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Health'];
+        };
+      };
+      /** @description Unexpected error, in the common error envelope. */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
         };
       };
     };
