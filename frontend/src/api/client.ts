@@ -36,3 +36,4 @@ export type Session = components['schemas']['Session'];
 export type ExerciseBlock = components['schemas']['ExerciseBlock'];
 export type WorkoutSet = components['schemas']['WorkoutSet'];
 export type SetValues = components['schemas']['SetValues'];
+export type SessionSummary = components['schemas']['SessionSummary'];

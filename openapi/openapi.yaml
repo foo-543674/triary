@@ -244,6 +244,59 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/UnexpectedError"
+  /api/v1/history/sessions:
+    get:
+      tags: [api-v1]
+      summary: Sessions by date, newest first (US-9)
+      description: |
+        Summaries only (no sets); open a session with GET /api/v1/sessions/{id}.
+        Ordered by `workout_date`, then session, both descending. Page with
+        `cursor` = the previous page's `page_info.next_cursor`.
+      operationId: listSessionsByDate
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Only sessions on or after this date.
+          schema:
+            $ref: "#/components/schemas/WorkoutDate"
+        - name: to
+          in: query
+          required: false
+          description: Only sessions on or before this date.
+          schema:
+            $ref: "#/components/schemas/WorkoutDate"
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque; from `page_info.next_cursor`.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionHistoryPage"
+        "400":
+          description: "`from` / `to` / `cursor`: `invalid_format`. `limit`: `out_of_range`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
   /api/v1/sessions:
     post:
       tags: [api-v1]
@@ -906,3 +959,44 @@ components:
           oneOf:
             - $ref: "#/components/schemas/Timestamp"
             - type: "null"
+    SessionSummary:
+      type: object
+      required: [id, workout_date, started_at, ended_at, block_count, set_count, exercise_summary]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        ended_at:
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        block_count:
+          type: integer
+          minimum: 0
+        set_count:
+          type: integer
+          minimum: 0
+        exercise_summary:
+          type: array
+          description: Exercises in block order, each once.
+          items:
+            type: object
+            required: [exercise_id, exercise_name]
+            properties:
+              exercise_id:
+                $ref: "#/components/schemas/IdString"
+              exercise_name:
+                type: string
+    SessionHistoryPage:
+      type: object
+      required: [items, page_info]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionSummary"
+        page_info:
+          $ref: "#/components/schemas/PageInfo"

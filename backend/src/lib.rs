@@ -30,11 +30,13 @@ use tower_http::trace::TraceLayer;
 
 use crate::application::auth::AuthDeps;
 use crate::application::exercises::ExerciseDeps;
+use crate::application::history::HistoryDeps;
 use crate::application::sessions::SessionDeps;
 use crate::config::CorsConfig;
 use crate::infrastructure::clock::SystemClock;
 use crate::infrastructure::password_hasher::Argon2idHasher;
 use crate::infrastructure::repositories::mysql_exercise_repository::MysqlExerciseRepository;
+use crate::infrastructure::repositories::mysql_history_queries::MysqlHistoryQueries;
 use crate::infrastructure::repositories::mysql_session_repository::MysqlSessionRepository;
 use crate::infrastructure::repositories::mysql_session_store::MysqlSessionStore;
 use crate::infrastructure::repositories::mysql_user_repository::MysqlUserRepository;
@@ -125,6 +127,9 @@ pub async fn run() -> anyhow::Result<()> {
         },
         exercises: ExerciseDeps {
             exercises: exercises.clone(),
+        },
+        history: HistoryDeps {
+            queries: Arc::new(MysqlHistoryQueries::new(pool.clone())),
         },
         sessions: SessionDeps {
             sessions: Arc::new(MysqlSessionRepository::new(pool)),

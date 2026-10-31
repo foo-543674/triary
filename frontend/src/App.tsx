@@ -14,6 +14,7 @@ const Login = lazy(() => import('./routes/login'));
 const Exercises = lazy(() => import('./routes/exercises/index'));
 const ExerciseDetail = lazy(() => import('./routes/exercises/detail'));
 const SessionDetail = lazy(() => import('./routes/sessions/detail'));
+const History = lazy(() => import('./routes/history/index'));
 
 const queryClient = createAppQueryClient();
 
@@ -31,6 +32,9 @@ const Layout: Component<{ children?: JSX.Element }> = (props) => {
           </A>
           <A class="text-sm text-gray-700 hover:text-green-700" href="/exercises">
             種目
+          </A>
+          <A class="text-sm text-gray-700 hover:text-green-700" href="/history">
+            履歴
           </A>
         </nav>
         <AccountMenuContainer onSignedOut={() => navigate('/login', { replace: true })} />
@@ -61,6 +65,7 @@ const App: Component = () => {
           <Route path="/exercises" component={() => <Protected page={Exercises} />} />
           <Route path="/exercises/:id" component={() => <Protected page={ExerciseDetail} />} />
           <Route path="/sessions/:id" component={() => <Protected page={SessionDetail} />} />
+          <Route path="/history" component={() => <Protected page={History} />} />
           <Route path="/signup" component={Signup} />
           <Route path="/login" component={Login} />
           <Route path="*" component={NotFound} />

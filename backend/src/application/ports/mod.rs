@@ -6,6 +6,7 @@
 //! (`Arc<dyn UserRepository>`) without an extra crate.
 
 pub mod exercise_repository;
+pub mod history;
 pub mod secrets;
 pub mod session_repository;
 pub mod session_store;

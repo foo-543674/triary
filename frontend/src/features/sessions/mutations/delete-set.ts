@@ -15,6 +15,7 @@ export const createDeleteSetMutation = (sessionId: () => string) => {
       if (!result.ok) throw result.error;
       return undefined;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.detail(sessionId()) }),
+    // All session queries, including the history list built from them.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   }));
 };

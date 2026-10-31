@@ -2877,6 +2877,399 @@
           }
         }
       ]
+    },
+    {
+      "name": "GET /api/v1/history/sessions (US-9)",
+      "item": [
+        {
+          "name": "history: sign up",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('historyHandle', ('hs' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('historyCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{historyHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-01",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-01\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-03",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-03\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-02",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-02\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: newest first, two per page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('first page', function () {",
+                  "  pm.expect(body.items.map((i) => i.workout_date)).to.eql(['2025-03-03', '2025-03-02']);",
+                  "  pm.expect(body.items[0]).to.include.keys('block_count', 'set_count', 'exercise_summary');",
+                  "  pm.expect(body.page_info.has_next).to.eql(true);",
+                  "  pm.expect(body.page_info.next_cursor).to.match(/^[A-Za-z0-9_-]+$/);",
+                  "});",
+                  "pm.collectionVariables.set('historyCursor', body.page_info.next_cursor);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?limit=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: the next page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('last page', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.items.map((i) => i.workout_date)).to.eql(['2025-03-01']);",
+                  "  pm.expect(body.page_info).to.eql({ next_cursor: null, has_next: false });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?limit=2&cursor={{historyCursor}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{historyCursor}}"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: date range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('only 2025-03-02', function () { pm.expect(pm.response.json().items.map((i) => i.workout_date)).to.eql(['2025-03-02']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?from=2025-03-02&to=2025-03-02",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2025-03-02"
+                },
+                {
+                  "key": "to",
+                  "value": "2025-03-02"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a broken cursor and limit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 with both problems', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.map((e) => [e.field, e.code])).to.eql([['cursor', 'invalid_format'], ['limit', 'out_of_range']]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?cursor=!!&limit=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "!!"
+                },
+                {
+                  "key": "limit",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
     }
   ]
 }

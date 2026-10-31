@@ -2,6 +2,7 @@
 
 mod edit;
 mod exercises;
+mod history;
 mod sessions;
 
 use axum::Router;
@@ -13,6 +14,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/v1/exercises", get(exercises::list))
         .route("/api/v1/exercises/{exercise_id}", get(exercises::detail))
+        .route("/api/v1/history/sessions", get(history::sessions))
         .route("/api/v1/sessions", post(sessions::start))
         .route(
             "/api/v1/sessions/{session_id}",

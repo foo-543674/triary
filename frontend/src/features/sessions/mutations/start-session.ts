@@ -15,6 +15,8 @@ export const createStartSessionMutation = (options: { onSuccess: (session: Sessi
     },
     onSuccess: (session) => {
       queryClient.setQueryData(sessionKeys.detail(session.id), session);
+      // The history list now has one more session.
+      void queryClient.invalidateQueries({ queryKey: [...sessionKeys.all, 'history'] });
       options.onSuccess(session);
     },
   }));

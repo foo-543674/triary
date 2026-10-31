@@ -148,6 +148,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/history/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Sessions by date, newest first (US-9)
+     * @description Summaries only (no sets); open a session with GET /api/v1/sessions/{id}.
+     *     Ordered by `workout_date`, then session, both descending. Page with
+     *     `cursor` = the previous page's `page_info.next_cursor`.
+     */
+    get: operations['listSessionsByDate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/sessions': {
     parameters: {
       query?: never;
@@ -490,6 +512,23 @@ export interface components {
       note?: string | null;
       ended_at?: components['schemas']['Timestamp'] | null;
     };
+    SessionSummary: {
+      id: components['schemas']['IdString'];
+      workout_date: components['schemas']['WorkoutDate'];
+      started_at: components['schemas']['Timestamp'];
+      ended_at: components['schemas']['Timestamp'] | null;
+      block_count: number;
+      set_count: number;
+      /** @description Exercises in block order, each once. */
+      exercise_summary: {
+        exercise_id: components['schemas']['IdString'];
+        exercise_name: string;
+      }[];
+    };
+    SessionHistoryPage: {
+      items: components['schemas']['SessionSummary'][];
+      page_info: components['schemas']['PageInfo'];
+    };
   };
   responses: {
     /** @description `unauthenticated`: no cookie, or an unknown or expired session. */
@@ -800,6 +839,45 @@ export interface operations {
       };
       401: components['responses']['Unauthenticated'];
       404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  listSessionsByDate: {
+    parameters: {
+      query?: {
+        /** @description Only sessions on or after this date. */
+        from?: components['schemas']['WorkoutDate'];
+        /** @description Only sessions on or before this date. */
+        to?: components['schemas']['WorkoutDate'];
+        /** @description Opaque; from `page_info.next_cursor`. */
+        cursor?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description One page. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionHistoryPage'];
+        };
+      };
+      /** @description `from` / `to` / `cursor`: `invalid_format`. `limit`: `out_of_range`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
       default: components['responses']['UnexpectedError'];
     };
   };

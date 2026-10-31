@@ -10,8 +10,10 @@ use chrono::{DateTime, Utc};
 
 use crate::application::auth::AuthDeps;
 use crate::application::exercises::ExerciseDeps;
+use crate::application::history::HistoryDeps;
 use crate::application::ports::BoxFuture;
 use crate::application::ports::exercise_repository::ExerciseRepository;
+use crate::application::ports::history::{DateKey, DateRange, HistoryQueries, SessionSummary};
 use crate::application::ports::secrets::{IdSource, SecretSource, SessionToken};
 use crate::application::ports::session_repository::{BlockForSets, SessionRepository};
 use crate::application::ports::session_store::SessionStore;
@@ -381,6 +383,48 @@ impl SessionRepository for MemorySessionRecords {
     }
 }
 
+impl HistoryQueries for MemorySessionRecords {
+    fn sessions_by_date<'a>(
+        &'a self,
+        owner: UserId,
+        range: DateRange,
+        after: Option<DateKey>,
+        limit: usize,
+    ) -> BoxFuture<'a, anyhow::Result<Vec<SessionSummary>>> {
+        let mut found: Vec<SessionSummary> = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|s| s.owner == owner)
+            .filter(|s| range.from.is_none_or(|from| s.workout_date.date() >= from))
+            .filter(|s| range.to.is_none_or(|to| s.workout_date.date() <= to))
+            .filter(|s| {
+                after.is_none_or(|key| {
+                    (s.workout_date.date(), s.id) < (key.workout_date, key.session)
+                })
+            })
+            .map(|s| SessionSummary {
+                id: s.id,
+                workout_date: s.workout_date.date(),
+                started_at: s.started_at,
+                ended_at: s.ended_at,
+                block_count: s.blocks.len(),
+                set_count: s.blocks.iter().map(|b| b.sets.len()).sum(),
+                exercises: s.blocks.iter().fold(Vec::new(), |mut acc, b| {
+                    if !acc.iter().any(|(id, _)| *id == b.exercise_id) {
+                        acc.push((b.exercise_id, b.exercise_name.clone()));
+                    }
+                    acc
+                }),
+            })
+            .collect();
+        found.sort_by_key(|s| std::cmp::Reverse((s.workout_date, s.id)));
+        found.truncate(limit);
+        Box::pin(async move { Ok(found) })
+    }
+}
+
 /// Fakes with handles kept so tests can look inside.
 pub struct Fakes {
     pub users: Arc<MemoryUsers>,
@@ -396,6 +440,9 @@ impl Fakes {
             auth: self.deps.clone(),
             exercises: ExerciseDeps {
                 exercises: self.exercises.clone(),
+            },
+            history: HistoryDeps {
+                queries: self.records.clone(),
             },
             sessions: SessionDeps {
                 sessions: self.records.clone(),
