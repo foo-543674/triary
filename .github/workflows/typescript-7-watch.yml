@@ -1,0 +1,89 @@
+name: typescript-7-watch
+
+# Detects when the frontend works on TypeScript 7 (owner request in #44).
+# .github/dependabot.yml ignores typescript >=7 because, on 2026-10-31,
+# TypeScript 7 broke `storybook build` and made dependency-cruiser analyse
+# nothing. Package metadata does not say whether Storybook works, so this
+# job tries it: install the latest TypeScript 7 into the main branch's
+# frontend and run the checks that broke. When they all pass, it opens an
+# issue asking to drop the ignore entry. Commands run in the dev image
+# through ./dev (AGENTS.md "Common commands").
+
+on:
+  schedule:
+    - cron: "0 1 * * 1" # Monday 10:00 JST, after Dependabot's run
+  workflow_dispatch:
+
+concurrency:
+  group: typescript-7-watch
+  cancel-in-progress: true
+
+# Reads the repository and opens an issue; nothing else. The schedule runs
+# the default branch; a manual dispatch can pick any branch that contains
+# this file, which only people with write access can do.
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TRIARY_DEV_ENGINE: docker
+
+jobs:
+  try:
+    name: typescript-7-watch / try the latest TypeScript 7
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dev-image
+
+      # Setup failures (registry, resolution) must turn the run red, so they
+      # are not covered by continue-on-error below: otherwise a broken setup
+      # would read as "TypeScript 7 still fails" forever.
+      - name: install dependencies with the latest TypeScript 7
+        working-directory: frontend
+        run: |
+          ../dev bash -c '
+            set -euo pipefail
+            pnpm install --frozen-lockfile
+            pnpm add --save-dev "typescript@^7"
+            node_modules/.bin/tsc --version'
+
+      - name: run the checks that broke on TypeScript 7
+        id: try
+        working-directory: frontend
+        # Only these checks may fail; the result is reported by the steps
+        # below, not by failing the run.
+        continue-on-error: true
+        run: |
+          ../dev bash -c '
+            set -euo pipefail
+            pnpm run typecheck
+            pnpm run arch:test
+            pnpm run build-storybook'
+
+      - name: open an issue when everything passed
+        if: steps.try.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="TypeScript 7 now passes typecheck, arch:test and build-storybook"
+          # Any state: once the owner has seen (and maybe closed) the issue,
+          # do not open it again every week. A failed query fails the step.
+          count="$(gh issue list -R "$REPO" --state all --search "\"$title\" in:title" --json number --jq 'length')"
+          if [ "$count" = 0 ]; then
+            gh issue create -R "$REPO" --title "$title" --body "$(printf '%s\n' \
+              "The weekly check installed the latest TypeScript 7 into main's frontend and \`pnpm run typecheck\`, \`pnpm run arch:test\` and \`pnpm run build-storybook\` all passed: $RUN_URL" \
+              "" \
+              "Next step: remove the \`typescript\` \`>=7.0.0\` ignore entry from \`.github/dependabot.yml\` (added for #44) so Dependabot proposes the upgrade, and check that dependency-cruiser analyses a non-zero number of modules.")"
+          else
+            echo "an issue with this title already exists ($count); not opening another"
+          fi
+
+      - name: report that TypeScript 7 still fails
+        if: steps.try.outcome != 'success'
+        run: echo "TypeScript 7 still breaks at least one check; see the step above. Nothing to do."
