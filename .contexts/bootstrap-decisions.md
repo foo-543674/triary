@@ -16,7 +16,8 @@
 | 日付 | プラグイン | 生成結果 | 状態 |
 |---|---|---|---|
 | 2026-04-25 | foo-skills — 版・commit SHA は **不明** (記録なし。`AGENTS.md` を生成していないことから 2.x より前と推定) | commit `a5575a1`、PR #19 (2026-04-26 マージ) | 採用済み |
-| 2026-10-31 | foo-skills 3.0.0 (`gitCommitSha` ce07f3463ad10f4ce4c2333af6c3fbbe4a4af738、https://github.com/foo-543674/foo-skills) | ブランチ `chore/bootstrap-v3` の PR (下記「2026-10-31 再実行」) | **提案中** (PR のマージで採用。ruleset の適用は別途) |
+| 2026-10-31 | foo-skills 3.0.0 (`gitCommitSha` ce07f3463ad10f4ce4c2333af6c3fbbe4a4af738、https://github.com/foo-543674/foo-skills) | PR #46 (下記「2026-10-31 再実行」) | 採用済み (PR #46 のマージ。ruleset の適用は別途) |
+| 2026-10-31 | foo-skills 3.0.1 (`gitCommitSha` 9bb1b4c3280d4977f2a7e67b73f578abaf8fa083) | ブランチ `chore/dev-entrypoint` の PR (下記「2026-10-31 再実行 (3.0.1)」) | **提案中** (2 段階。第 1 段の PR のマージで入口とイメージを採用、第 2 段で切り替え) |
 
 以降の節のうち「Phase 1」〜「次の更新タイミング」は 2026-04-25 時点の記録
 で、2026-10-31 の再実行で変わったものはその節に注記した。
@@ -418,3 +419,67 @@ ruleset が有効になる前だった。
 | #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。GitHub Actions の更新を含めるかと台帳の要否を確認中。実装は後続の PR |
 | #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。後続の PR |
 | #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。後続の PR |
+
+## 2026-10-31 再実行 (foo-skills 3.0.1)
+
+3.0.0 と 3.0.1 の原料を直接比べた (どちらもプラグインのキャッシュに残って
+いた)。`philosophy/` と `skills/bootstrap/` の変更は下表の 1 つだけ。ほかに
+`skills/ai-box/` が変わっており (`containers/`、`seccomp.json`、entrypoint、
+`setup.md`、`SKILL.md`「プロジェクトのコマンドを動かす仕組み」)、箱に
+rootless Podman が入った。下記の「ai-box を podman 入りの版に更新する」と
+入口の podman の扱いはこの変更に依存する。チーム側の変更: 3.0.0 の再実行
+(PR #46) 以降に入ったのは PR #47 (依存の更新、アーキテクチャテストの 0 件
+検出、Dependabot の TypeScript 7 除外) だけで、開発コマンドの実行方法には
+触れていない (`git log afc204a..` ではなく PR #47 の diff で確認)。
+
+| 原料の変更 | 状況 | 扱い |
+|---|---|---|
+| `philosophy/technology-choices.md`「実行環境 — 言語のツールチェーンは作業環境に入れない」、`skills/bootstrap/SKILL.md` Phase 5「開発コマンドの入口」と settings の deny、`resources/checklist.md` 2 項目、`resources/context-template.md` の開発コマンド、`resources/known-pitfalls.md`「言語のコマンドを作業環境で直接叩く」(出典 foo-skills PR #86) | プラグイン側だけが変わった | 採用 (提案中)。下記の 2 段階で入れる |
+
+このプロジェクトでは known-pitfalls の症状がそのまま起きていた: ai-box に
+Rust がなく `backend/` を含むコミットが pre-commit で止まり、#45 の cargo
+audit を直す手段として「ai-box に Rust を入れる」を判断依頼に載せていた。
+新しい原則ではこの選択肢は取らない (作業環境に入れない)。
+
+### 2 段階にした理由
+
+入口を hook・Makefile・CI に通すと、次の 2 つが揃うまでどこでも動かない。
+(1) 開発イメージが GHCR に公開されていること (公開は `main` からだけ)、
+(2) ai-box が podman を持つ版に更新されていること (この ai-box には podman
+がない。2026-10-31 に `command -v podman` で確認)。そのため:
+
+- **第 1 段** (PR `chore/dev-entrypoint`): 入口 `dev`、開発イメージ
+  `tools/dev-image/Dockerfile`、入口のテスト (`make dev-test`)、イメージを
+  ビルドしてプロジェクトの検査を中で通し `main` から公開する workflow
+  (`.github/workflows/dev-image.yml`)、devcontainer の `TRIARY_DEV_DIRECT`。
+  既存のコマンドの動きは変えない
+- **第 2 段** (第 1 段のマージ・イメージの公開・ai-box の更新の後): hook・
+  `Makefile`・`AGENTS.md` の開発コマンド・CI を入口に通し、settings.json で
+  `cargo` / `pnpm` 等の直接実行を deny する。devcontainer のツールチェーンをイメージに揃える
+
+### 入口の実装判断
+
+- イメージのタグは Dockerfile の内容のハッシュ (`./dev --image-ref`)。どの
+  checkout も自分の Dockerfile から作られたイメージを取る。版は Dockerfile
+  で固定する (浮動タグだとタグを変えずに中身が変わる)
+- podman があれば podman (ai-box の単一 UID モード。コンテナ内の root =
+  呼び出し元)、なければ docker (`--user` で呼び出し元の UID)。どちらもなけ
+  れば失敗し、作業環境のツールにフォールバックしない
+- 作業ツリーを同じ絶対パスにマウントする。docker-outside-of-docker のように
+  エンジンのホストからそのパスが見えない場合に空のディレクトリで走らないよう、
+  コンテナ内で作業ツリーの存在を確かめてから実行する。devcontainer では
+  `TRIARY_DEV_DIRECT=1` で直接実行する。理由はすでにツールチェーンが入って
+  いること。docker-outside-of-docker 経由ではエンジンのホストから作業ツリー
+  のパスが見えないと考えたことも理由だが、NOTE: 未確認 (devcontainer で
+  エンジン経由の `./dev` を実行していない)。ただし devcontainer のツールチェーンはまだイメージと同じではない
+  (rust `latest`、nextest / sqlx-cli の版が固定されておらず、cargo-audit が
+  ない)。揃えるのは第 2 段の作業とする (devcontainer をイメージの上に作る案
+  が有力。オーナーの作業環境の作り直しを伴うので、その時に確認する)
+- 渡す環境変数は列挙したものだけ (トークン類を渡さない)
+- レビューゲート (`tools/review-gate/`) と入口のテストは、作業環境の Node 22
+  (ai-box と devcontainer が既に持つ) で動かす例外とした。git と入口が走る
+  場所で動く必要があるため。型チェックは第 2 段で入口に通す
+- 入口とイメージは決定的ゲートが何の上で走るかを決めるので基準ファイルにした
+  (`.github/CODEOWNERS`、`docs/remote-acceptance.md`)
+- NOTE: 未確認 — 新しい GHCR パッケージを匿名で pull できるか。最初の公開後
+  に確かめ、private ならパッケージの設定で public にする (オーナー作業)
