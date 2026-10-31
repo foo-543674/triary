@@ -53,10 +53,13 @@ guide. This file is the always-on context Cursor should respect.
 
 ## Quality gates before committing
 
-- Backend: `cargo fmt --all -- --check`, `cargo clippy --all-targets`,
-  `cargo nextest run`
-- Frontend: `pnpm run lint:ci`, `pnpm run typecheck`, `pnpm run test:run`,
-  `pnpm run arch:test`
+- Run language commands through `./dev` (`../dev` from `backend/` or
+  `frontend/`); toolchains live only in the dev image. Do not run `cargo` /
+  `pnpm` directly or install them (`AGENTS.md` "Common commands")
+- Backend: `../dev cargo fmt --all -- --check`,
+  `../dev cargo clippy --all-targets`, `../dev cargo nextest run`
+- Frontend: `../dev pnpm run lint:ci`, `../dev pnpm run typecheck`,
+  `../dev pnpm run test:run`, `../dev pnpm run arch:test`
 - Full per-task-type table: `AGENTS.md` "Quality gates"
 
 ## Review gate and acceptance

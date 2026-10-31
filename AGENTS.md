@@ -82,8 +82,9 @@ Hard rules:
   `Manager`, `Helper`, `Util`, `Utils`, `Processor`, `Worker`, `Engine`.
   `Handler` is allowed only inside `interfaces::http`.
 
-These rules are checked by `cargo nextest run` against
-`backend/tests/architecture.rs` and `pnpm run arch:test` for the frontend.
+These rules are checked by `backend/tests/architecture.rs` (run by
+`cargo nextest run` in `backend/`) and by `pnpm run arch:test` in
+`frontend/`; `make arch-test` runs both through `./dev`.
 
 ## Quality lenses applied
 
@@ -125,12 +126,12 @@ for that category.
 
 | Task type | Minimum checks |
 |---|---|
-| backend change | `cargo fmt --all -- --check` + `cargo clippy --all-targets --all-features` + `cargo nextest run` (includes the architecture tests) |
-| frontend change | `pnpm run lint:ci` + `pnpm run typecheck` + `pnpm run test:run` + `pnpm run arch:test` (+ `pnpm run build-storybook` when stories or Storybook config change) |
+| backend change | in `backend/`: `../dev cargo fmt --all -- --check` + `../dev cargo clippy --all-targets --all-features` + `../dev cargo nextest run` (includes the architecture tests) |
+| frontend change | in `frontend/`: `../dev pnpm run lint:ci` + `../dev pnpm run typecheck` + `../dev pnpm run test:run` + `../dev pnpm run arch:test` (+ `../dev pnpm run build-storybook` when stories or Storybook config change) |
 | review gate tool (`tools/review-gate/`) | `make gate-test` |
 | dev entrypoint (`dev`, `tools/dev-image/`) | `make dev-test` (the image itself is built and checked by `.github/workflows/dev-image.yml` on the PR) |
 | docs / design docs (`.contexts/`, `docs/`) | grep the related documents for the same terms (HTTP status, field names, error codes) and make them agree |
-| OpenAPI (`openapi/`) | `npx -y @stoplight/spectral-cli lint openapi/openapi.yaml` + `make api-generate` + check the referencing docs and handlers |
+| OpenAPI (`openapi/`) | `./dev npx -y @stoplight/spectral-cli lint openapi/openapi.yaml` + `make api-generate` + check the referencing docs and handlers |
 | DB migration | `make db-migrate-test` + `make db-prepare` + re-run the backend tests |
 
 ### Review gate (commit / push are stopped by hooks)
@@ -378,6 +379,20 @@ or the issue is in Japanese.
 
 ## Common commands
 
+Language toolchains (cargo, sqlx, node packages, pnpm, ...) live only in the
+dev image (`tools/dev-image/Dockerfile`). Run every language command through
+the `./dev` entrypoint at the repository root (`../dev` from `backend/` or
+`frontend/`); the hooks, the `Makefile` and CI do the same. Do not install a
+toolchain on your machine or the AI's box to work around a failing `./dev`;
+fix the entrypoint or the image instead. Do not run the toolchains directly
+either, even where they happen to be installed (NOTE: `.claude/settings.json`
+does not deny them yet; that change awaits the owner, see
+`.contexts/bootstrap-decisions.md`). The one exception is the caller's
+Node 22, which runs the review gate (`node tools/review-gate/src/cli.ts`) and
+the tests of the gate and of `./dev` (`make gate-test` / `make dev-test`),
+because those must work wherever git and `./dev` run. Why:
+`.contexts/bootstrap-decisions.md` "2026-10-31 再実行 (3.0.1)".
+
 | Command | Purpose |
 |---|---|
 | `make help` | List available make targets |
@@ -389,20 +404,22 @@ or the issue is in Japanese.
 | `make db-seed` | Seed the development DB |
 | `make db-prepare` | Regenerate sqlx offline metadata |
 | `make api-generate` | Regenerate frontend types from OpenAPI |
-| `cd backend && cargo nextest run` | Rust unit + architecture tests |
-| `cd backend && cargo clippy --all-targets` | Rust lint |
-| `cd backend && cargo fmt --all` | Rust format |
-| `cd frontend && pnpm run lint:ci` | Biome lint + format check |
-| `cd frontend && pnpm run typecheck` | TypeScript type check |
-| `cd frontend && pnpm run test:run` | Frontend unit tests |
-| `cd frontend && pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
+| `cd backend && ../dev cargo nextest run` | Rust unit + architecture tests |
+| `cd backend && ../dev cargo clippy --all-targets` | Rust lint |
+| `cd backend && ../dev cargo fmt --all` | Rust format |
+| `cd frontend && ../dev pnpm install` | Install frontend dependencies (needed before the frontend checks and the hooks) |
+| `cd frontend && ../dev pnpm run lint:ci` | Biome lint + format check |
+| `cd frontend && ../dev pnpm run typecheck` | TypeScript type check |
+| `cd frontend && ../dev pnpm run test:run` | Frontend unit tests |
+| `cd frontend && ../dev pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
 | `make arch-test` | Architecture tests for both backend and frontend |
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Type-check and test the review gate tool |
 | `make dev-test` | Type-check and test the `./dev` entrypoint |
-| `./dev <command>` | Run a command inside the dev image (`tools/dev-image/Dockerfile`). Being introduced: the commands in this table still run directly until the image is published and the hooks / Makefile / CI switch to it (`.contexts/bootstrap-decisions.md` "2026-10-31 再実行 (3.0.1)") |
+| `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer; NOTE: the devcontainer's toolchain is not aligned with the image yet, so results there can differ from CI). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
+| `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `node tools/review-gate/src/cli.ts check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `cd frontend && pnpm run dev` | Frontend dev server |
+| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
 
 ## devcontainer and local infra
 

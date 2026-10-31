@@ -43,7 +43,8 @@ cd triary
 cp .env.example .env
 
 # 3. Open in VS Code and choose "Reopen in Container".
-#    The devcontainer sets up Rust, Node, and the rest of the toolchain.
+#    Inside the devcontainer ./dev runs commands directly on the
+#    devcontainer's own toolchain (see the note below).
 
 # 4. Start the local infra (MySQL dev + test)
 make infra-up
@@ -52,9 +53,28 @@ make infra-up
 make db-migrate
 
 # 6. Then start the dev servers individually
-cd backend  && cargo run
-cd frontend && npx vite dev
+cd backend  && ../dev cargo run
+cd frontend && ../dev pnpm install && ../dev pnpm run dev
 ```
+
+Language commands (cargo, pnpm, npx, ...) go through `./dev`, which runs them
+in the dev image (`tools/dev-image/Dockerfile`). Inside the devcontainer it
+runs them directly; elsewhere it uses podman or docker. Do not install the
+toolchains on your machine; see "Common commands" in `AGENTS.md`.
+
+NOTE: two things are not settled yet (`.contexts/bootstrap-decisions.md`
+"2026-10-31 再実行 (3.0.1)"):
+
+- The devcontainer's toolchain is not aligned with the dev image yet (Rust
+  `latest`, unpinned nextest / sqlx-cli, no cargo-audit), so results there
+  can differ from CI.
+- Step 6 outside the devcontainer is unverified. `./dev` publishes no ports,
+  so under docker the dev servers are probably not reachable from the host
+  browser. The backend's `DATABASE_URL` in `.env.example` uses the container
+  name `triary-mysql`: under docker `./dev` joins `triary-network`, which
+  resolves it; under podman in the ai-box the container shares the box's
+  network and that name probably does not resolve. Check by running step 6
+  there.
 
 ## Common commands
 
@@ -76,8 +96,9 @@ The API is schema-first. The source of truth lives at
 [`openapi/openapi.yaml`](./openapi/openapi.yaml). To preview it locally:
 
 ```sh
-# Redocly
-npx @redocly/cli preview-docs openapi/openapi.yaml
+# Redocly (NOTE: the preview port is not published by ./dev; see the note
+# on step 6 above)
+./dev npx @redocly/cli preview-docs openapi/openapi.yaml
 
 # Swagger UI (via docker)
 docker run --rm -p 8081:8080 \

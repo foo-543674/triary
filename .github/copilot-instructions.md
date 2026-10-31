@@ -56,9 +56,13 @@ Naming, anywhere in the codebase:
 ## Quality gates
 
 Before committing, the following must pass:
-- `cargo fmt --check`, `cargo clippy --all-targets`, `cargo nextest run`
-- `pnpm run lint:ci`, `pnpm run typecheck`, `pnpm run test:run`,
-  `pnpm run arch:test`
+- Run language commands through `./dev` (`../dev` from `backend/` or
+  `frontend/`); toolchains live only in the dev image. Do not run `cargo` /
+  `pnpm` directly or install them (`AGENTS.md` "Common commands")
+- `../dev cargo fmt --check`, `../dev cargo clippy --all-targets`,
+  `../dev cargo nextest run`
+- `../dev pnpm run lint:ci`, `../dev pnpm run typecheck`,
+  `../dev pnpm run test:run`, `../dev pnpm run arch:test`
 - Full per-task-type table: `AGENTS.md` "Quality gates"
 
 ## Review gate and acceptance
