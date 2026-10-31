@@ -13,7 +13,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 | 項目 | 状態 |
 |---|---|
 | 目標とする構成 | **GitHub の保護ルールでマージを止める** (2026-10-31 にオーナーが選択) |
-| 現在の状態 | **PR に警告を出すだけ** (2026-10-31 06:16 にオーナーが ruleset `main` を無効にしたことを読み戻して確認)。05:41〜06:16 の間は有効で、PR 必須・承認 1 件、AI の App は迂回できなかった。`docs/rulesets/main.json` は生成済み・未適用で、適用コマンドは #42 にある。適用して読み戻すまで、受け入れ検証の結果は PR への警告にとどまり、AI は規律としてマージ条件を守る |
+| 現在の状態 | **ruleset `main` は有効 (`docs/rulesets/main.json` を適用済み)。ただし、マージを止められるかは未確認** (下の「動作確認」が済むまで)。2026-10-31 14:37 UTC にオーナーが適用し (#42)、AI が読み戻して `enforcement: active`、規則と対象が `main.json` と一致、`current_user_can_bypass: never` を確認した。`bypass_actors` は App の権限では読めず (`null` が返る)、未確認。動作確認が済むまで、AI は規律としてマージ条件を守る。それ以前の履歴: 05:41〜06:16 に一部の規則 (PR 必須・承認 1 件) が有効、06:16 に無効化 |
 | AI の主体 | GitHub App `foo-543674-ai-agent[bot]`。オーナー (`foo-543674`) とは別の主体 |
 | AI の資格情報で確かめたこと | ブランチ保護の読み取りが 403 (`Resource not accessible by integration`)、`viewerPermission` が空 (admin 権限なしと推定)。ruleset は読める。ruleset `main` の `current_user_can_bypass` が `never` (App は迂回できない)。**未確認**: App が ruleset を変更できないこと、App のレビューが承認として数えられないこと。ruleset が「承認 1 件」だけを求める構成 (05:41〜06:16 の状態) では、書き込み権限を持つ App が他者の PR (Dependabot 等) を承認すると数えられる可能性がある。`main.json` で code owner (オーナー) の承認を必須にすると塞がる |
 | リポジトリ | public (GitHub Free でも ruleset が使える) |
@@ -88,10 +88,10 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 | 状態 | |
 |---|---|
 | 生成済み | `docs/rulesets/main.json` |
-| 適用予定 | オーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行。今は無効なので、規則を足したうえで有効にする操作になる (`main.json` は `enforcement: active`)。**この PR のマージ後に** 行う。先に適用すると、required check `acceptance / verdict` を発行する workflow が base にまだないので、この PR 自身が status を得られず止まる |
-| 有効化済み | 未 (05:41〜06:16 に一部が有効だったが、現在は無効)。`main.json` の適用後に AI が読み戻し、下記の動作確認をしてからこの表を更新する |
+| 適用 | 2026-10-31 14:37 UTC にオーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行 (#42) |
+| 有効化済み | 有効 (読み戻しで確認。詳細は「マージを止められるか」)。下記の動作確認は未 |
 
-主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)、ブランチを最新にする。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない (適用後に確かめる)。
+主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)、ブランチを最新にする。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない設計。適用後の読み戻しで App の `current_user_can_bypass: never` を確認した (2026-10-31)。`bypass_actors` は App の権限では読めず未確認。
 
 ### 動作確認 (適用後)
 
@@ -114,17 +114,17 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 
 ## 人間の承認なしでマージしてよい変更
 
-条件の版: 2026-10-31 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。この PR のマージで有効になる。
+条件の版: 2026-10-31 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」(のち、code owner 保護との兼ね合いを説明したうえで承認ありに確定。下記)「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。#63 のマージ (2026-10-31) で有効。最初の適用は #50 (rstest): 14:42 UTC に automerge ジョブが GitHub Actions として承認し、そのままマージされた (run 41211333898、ruleset 有効の状態で観測)。
 
 | 区分 | 変更 | 検証器が確かめる証拠 (`tools/review-gate/acceptance.sh` の手順 0) |
 |---|---|---|
 | 承認なし | Dependabot による Rust / npm の依存更新 (patch / minor / major を問わない) | 判定は `tools/review-gate/src/dependency.ts` (単体テスト `dependency.test.ts`)。PR 作成者が `dependabot[bot]`。merge-base から判定した HEAD までの変更ファイル (リネーム元を含む) が `backend/Cargo.toml` / `backend/Cargo.lock` / `frontend/package.json` / `frontend/pnpm-lock.yaml` だけ。その範囲の全コミットについて、作成者が `dependabot[bot]`、コミッターが `web-flow` (GitHub)、署名検証が通っている (作成者は push する人が自由に書けるので、それだけでは足りない)。必須の CI ジョブがその SHA ですべて成功。台帳のスナップショットは求めない |
-| 人間の承認が要る | 上記以外のすべて。GitHub Actions の更新も今は含む (下記) | — |
+| 人間の承認が要る | 上記以外のすべて。GitHub Actions の更新も含む (下記) | — |
 
 - 合格すると、`acceptance.yml` の `acceptance / automerge dependency update` ジョブが GitHub Actions として承認し、判定した HEAD に限って auto-merge を有効にする。前提となるリポジトリ設定: 「Allow GitHub Actions to create and approve pull requests」(承認に必要。オーナーの操作) と「Allow auto-merge」(`gh pr merge --auto` に必要。2026-10-31 に API の `allow_auto_merge: true` で有効を確認)。この設定で PR のコードから書き込みトークンに届くと自分の PR を承認できてしまうので、PR のコードを動かす workflow はトークンを読み取り専用にした (`permissions: contents: read`)
-- 承認の後に Dependabot のブランチへ別のコミットが push された場合、その承認を使わせない仕組みは ruleset の `dismiss_stale_reviews_on_push` と `require_last_push_approval` (`docs/rulesets/main.json`) である。ruleset が無効の間はこれが効かない。そのため、ruleset を有効にするまでの防御は `--match-head-commit` (判定した HEAD 以外をマージしない) だけになる
+- 承認の後に Dependabot のブランチへ別のコミットが push された場合、その承認を使わせない仕組みは ruleset の `dismiss_stale_reviews_on_push` と `require_last_push_approval` (`docs/rulesets/main.json`) である。ruleset は 2026-10-31 から有効だが、これらが実際に効くことは動作確認 #7 が済むまで未確認。それまでの確かな防御は `--match-head-commit` (判定した HEAD 以外をマージしない) である
 - NOTE: 未確認 — Dependabot のブランチで、作成者を偽った上で `web-flow` の署名付きコミットを作れるか (GitHub の Web UI や contents API で作ったコミットを `web-flow` が署名するかどうか、`author` を指定できるかどうかも確かめていない)。書き込み権限が要る操作で、今の書き込み権限者はオーナーと AI の App だけ。確かめ方: テスト用のブランチで contents API に `author` を指定してコミットし、`author.login` と `committer.login` を見る。より強い対策は、`dependabot/**` への push を Dependabot に限る ruleset (オーナーの操作)
-- **GitHub Actions の更新はまだ承認ありのまま。** オーナーは含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。どちらを取るかを #43 でオーナーに確認している。それまでの暫定: Actions の更新 PR はオーナーが承認してマージする
+- **GitHub Actions の更新は承認あり (2026-10-31 にオーナーが確定、#43)。** オーナーは当初含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。この穴を説明したうえで、オーナーは承認ありを選んだ。運用: Actions の更新 PR は AI がレビューしてスナップショットを投稿し、オーナーが承認してマージする
 - NOTE: 未確認 — GITHUB_TOKEN で行ったマージは `main` への push の workflow を起動しない (GitHub のドキュメント「Triggering a workflow from a workflow」による)。そのため、この区分のマージでは `main` の CI が走らない。根拠は、ruleset の「ブランチを最新にする」で最新の HEAD に対して走った PR の CI とする
 - 変更されたパスは判定の材料の 1 つで、パスだけで安全と決めない。検証器が機械的に確かめられない部分は承認ありとする
 - 戻し方: `git revert` でロックファイルとマニフェストを戻す。データ変更・外部への作用は起きない (デプロイの仕組みがまだないため)。デプロイが入ったら見直す
