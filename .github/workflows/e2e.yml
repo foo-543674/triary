@@ -6,6 +6,13 @@ on:
   push:
     branches: [main]
 
+# The token is read-only. Once GitHub Actions may approve pull requests
+# (needed to auto-merge Dependabot updates, #43), a writable token reachable
+# from PR code could approve its own PR;
+# this workflow runs repository code on main only, read is all it needs.
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -21,7 +28,7 @@ jobs:
     outputs:
       ready: ${{ steps.check.outputs.ready }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - id: check
         run: |
           if compgen -G "frontend/playwright.config.*" > /dev/null; then
@@ -38,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: create shared docker network
         run: docker network create triary-network || true
@@ -46,16 +53,18 @@ jobs:
       - name: start local infra
         run: docker compose up -d --wait
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      # Pinned to the `stable` branch head of 2026-10-31. A branch is not a
+      # release, so Dependabot cannot update this pin; refresh it by hand.
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: backend
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2
         with:
           tool: sqlx-cli
 
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22"
           cache: pnpm
@@ -92,7 +101,7 @@ jobs:
 
       - name: upload playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: frontend/playwright-report
