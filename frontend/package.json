@@ -46,10 +46,10 @@
     "workbox-window": "^7.4.0"
   },
   "dependencies": {
-    "@solidjs/router": "^0.16.1",
-    "@tanstack/solid-query": "^5.99.0",
+    "@solidjs/router": "^0.16.2",
+    "@tanstack/solid-query": "^5.101.2",
     "openapi-fetch": "^0.17.0",
-    "solid-js": "^1.9.12"
+    "solid-js": "^1.9.14"
   },
   "pnpm": {
     "overrides": {
