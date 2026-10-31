@@ -5,7 +5,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# The review gate and the self-tests of the gate and of ./dev run on the
+# caller's Node 22: they have to work wherever git and ./dev run. Everything
+# else (cargo, biome, tsc, vitest, ...) runs in the dev image through ./dev
+# (.contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)").
 REVIEW_GATE=(node "$REPO_ROOT/tools/review-gate/src/cli.ts")
+DEV="$REPO_ROOT/dev"
 FRONTEND_BIN="$REPO_ROOT/frontend/node_modules/.bin"
 
 fail() {
@@ -13,10 +18,12 @@ fail() {
   exit 1
 }
 
-# A deterministic gate that cannot run is a failure, never a pass.
+# A deterministic gate that cannot run is a failure, never a pass. This also
+# holds for ./dev: it fails when it cannot run the dev image and never falls
+# back to tools installed on this machine.
 require_frontend_deps() {
   [[ -x "$FRONTEND_BIN/biome" && -x "$FRONTEND_BIN/tsc" ]] ||
-    fail "frontend dependencies are missing; run 'pnpm install' in frontend/ before committing."
+    fail "frontend dependencies are missing; run '../dev pnpm install' in frontend/ before committing."
 }
 
 touches() {
@@ -25,23 +32,26 @@ touches() {
   printf '%s\n' "$@" | grep -Eq "$pattern"
 }
 
+# Each ./dev call starts a container (about 3.5 s in the ai-box's vfs
+# storage, observed 2026-10-31), so the commands of one gate share one call.
 run_rust_lint() {
-  (cd "$REPO_ROOT/backend" && cargo fmt --all -- --check && cargo clippy --all-targets --all-features --quiet -- -D warnings)
+  (cd "$REPO_ROOT/backend" &&
+    "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --all-targets --all-features --quiet -- -D warnings')
 }
 
 run_frontend_lint() {
   require_frontend_deps
-  (cd "$REPO_ROOT/frontend" && "$FRONTEND_BIN/biome" ci . && "$FRONTEND_BIN/tsc" --noEmit)
+  (cd "$REPO_ROOT/frontend" && "$DEV" bash -c 'node_modules/.bin/biome ci . && node_modules/.bin/tsc --noEmit')
 }
 
 run_review_gate_selftest() {
   require_frontend_deps
-  "$FRONTEND_BIN/tsc" -p "$REPO_ROOT/tools/review-gate/tsconfig.json"
+  (cd "$REPO_ROOT" && "$DEV" frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json)
   node --test "$REPO_ROOT"/tools/review-gate/test/*.test.ts
 }
 
 run_dev_selftest() {
   require_frontend_deps
-  "$FRONTEND_BIN/tsc" -p "$REPO_ROOT/tools/dev-image/tsconfig.json"
+  (cd "$REPO_ROOT" && "$DEV" frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json)
   node --test "$REPO_ROOT"/tools/dev-image/test/*.test.ts
 }

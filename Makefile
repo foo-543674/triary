@@ -13,6 +13,12 @@ endif
 
 COMPOSE := docker compose
 
+# Language commands run in the dev image through ./dev (tools/dev-image/);
+# they are not installed on the calling machine. The review gate's and
+# ./dev's own tests are the exception and run on the caller's Node 22
+# (.contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)").
+DEV := $(CURDIR)/dev
+
 .PHONY: help
 help: ## List available commands
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -42,11 +48,11 @@ infra-logs: ## Tail local infra logs
 
 .PHONY: db-migrate
 db-migrate: ## Apply migrations to the development DB (backend/migrations/)
-	cd backend && sqlx migrate run
+	cd backend && "$(DEV)" sqlx migrate run
 
 .PHONY: db-migrate-test
 db-migrate-test: ## Apply migrations to the test DB
-	cd backend && DATABASE_URL=$(TEST_DATABASE_URL) sqlx migrate run
+	cd backend && DATABASE_URL=$(TEST_DATABASE_URL) "$(DEV)" sqlx migrate run
 
 .PHONY: db-seed
 db-seed: ## Seed the development DB
@@ -54,13 +60,13 @@ db-seed: ## Seed the development DB
 
 .PHONY: db-prepare
 db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx/)
-	cd backend && cargo sqlx prepare -- --tests
+	cd backend && "$(DEV)" cargo sqlx prepare -- --tests
 
 # ---------- Frontend ----------
 
 .PHONY: api-generate
 api-generate: ## Regenerate TypeScript types from the OpenAPI schema (frontend/src/api/schema.gen.ts)
-	cd frontend && pnpm run api:generate
+	cd frontend && "$(DEV)" pnpm run api:generate
 
 # ---------- Architecture tests ----------
 
@@ -75,8 +81,8 @@ arch-test: ## Run architecture tests for both backend and frontend
 	# every other test in the workspace. Both invocations pass
 	# `--no-tests=pass` so that a binary which currently has no tests
 	# (e.g. before any `domain/` files are added) is treated as success.
-	cd backend && cargo nextest run --test architecture --all-features --no-tests=pass
-	cd frontend && pnpm run arch:test
+	cd backend && "$(DEV)" cargo nextest run --test architecture --all-features --no-tests=pass
+	cd frontend && "$(DEV)" pnpm run arch:test
 
 # ---------- Review gate ----------
 
@@ -86,10 +92,10 @@ hooks-install: ## Enable the git hooks in .githooks/ (review gate, see AGENTS.md
 
 .PHONY: gate-test
 gate-test: ## Type-check and test the review gate tool (tools/review-gate/)
-	frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json
+	"$(DEV)" frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json
 	node --test tools/review-gate/test/*.test.ts
 
 .PHONY: dev-test
 dev-test: ## Type-check and test the ./dev entrypoint (tools/dev-image/)
-	frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json
+	"$(DEV)" frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json
 	node --test tools/dev-image/test/*.test.ts
