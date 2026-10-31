@@ -7,10 +7,9 @@ name: dev-image
 # built from its own Dockerfile.
 #
 # Pull requests only build and test: an image built from unreviewed code is
-# never published. NOTE (unverified): whether a new GHCR package of this
-# public repository is publicly pullable without login; check with an
-# anonymous `docker pull` after the first publish and, if it is private,
-# make the package public in its settings.
+# never published. The package is pullable without login: observed
+# 2026-10-31 with an anonymous `podman pull` of the first published tag
+# (df-d98c305832a9) from the ai-box, which has no GHCR credentials.
 
 on:
   pull_request:
