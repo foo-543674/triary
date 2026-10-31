@@ -27,4 +27,7 @@ npm install -g @biomejs/biome
 echo "==> Installing typescript-language-server (for Claude Code typescript-lsp plugin)"
 npm install -g typescript typescript-language-server
 
+echo "==> Enabling the review-gate git hooks (.githooks/, see AGENTS.md)"
+git config core.hooksPath .githooks
+
 echo "==> post-create setup complete"

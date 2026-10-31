@@ -77,3 +77,14 @@ arch-test: ## Run architecture tests for both backend and frontend
 	# (e.g. before any `domain/` files are added) is treated as success.
 	cd backend && cargo nextest run --test architecture --all-features --no-tests=pass
 	cd frontend && pnpm run arch:test
+
+# ---------- Review gate ----------
+
+.PHONY: hooks-install
+hooks-install: ## Enable the git hooks in .githooks/ (review gate, see AGENTS.md)
+	git config core.hooksPath .githooks
+
+.PHONY: gate-test
+gate-test: ## Type-check and test the review gate tool (tools/review-gate/)
+	frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json
+	node --test tools/review-gate/test/*.test.ts

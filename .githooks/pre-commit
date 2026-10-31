@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# pre-commit: deterministic gates on the staged change, then the review gate.
+# Design: docs/review-contract.md / AGENTS.md "Review gate".
+source "$(git rev-parse --show-toplevel)/.githooks/lib.sh"
+
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMRD)
+[[ ${#STAGED[@]} -eq 0 ]] && exit 0
+
+if touches '^backend/' "${STAGED[@]}"; then run_rust_lint || fail "backend fmt/clippy failed"; fi
+if touches '^frontend/' "${STAGED[@]}"; then run_frontend_lint || fail "frontend biome/tsc failed"; fi
+if touches '^tools/review-gate/' "${STAGED[@]}"; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
+
+# DO NOT REMOVE OR WEAKEN: this step is the only thing that stops a commit
+# whose staged diff was never reviewed. "No review record" must stay a
+# failure; treating it as success turns the whole review gate into a no-op.
+"${REVIEW_GATE[@]}" check --scope commit

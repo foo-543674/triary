@@ -1,0 +1,30 @@
+{"expect":0,"command":"git status"}
+{"expect":0,"command":"cat <<EOF\nmention the review gate in text\nEOF"}
+{"expect":0,"command":"git log --grep commit"}
+{"expect":0,"command":"echo \"git commit\""}
+{"expect":0,"command":"git log --oneline -n 3"}
+{"expect":0,"command":"git --no-pager log -P"}
+{"expect":0,"command":"node tools/review-gate/src/cli.ts show"}
+{"expect":2,"command":"git config core.hooksPath /dev/null"}
+{"expect":2,"command":"git config --global CORE.HOOKSPATH /dev/null"}
+{"expect":2,"command":"git -c core.hooksPath=/dev/null commit -m x"}
+{"expect":2,"command":"git -c core.hooksPath=/dev/null push"}
+{"expect":2,"command":"git --config-env=core.hooksPath=X commit -m x"}
+{"expect":2,"command":"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.x GIT_CONFIG_VALUE_0=/dev/null git commit -m x"}
+{"expect":2,"command":"export GIT_CONFIG_PARAMETERS=x; git push"}
+{"expect":2,"command":"sed -i 's/x/y/' .git/config"}
+{"expect":2,"command":"echo '{}' > .git/review-ledger/ledger.json"}
+{"expect":2,"command":"git commit --no-verify -m x"}
+{"expect":2,"command":"git -C . commit -n -m x"}
+{"expect":2,"command":"git commit -nm x"}
+{"expect":2,"command":"git commit --no-verif -m x"}
+{"expect":2,"command":"git push --no-v origin HEAD"}
+{"expect":2,"command":"bash -c \"git commit --no-verify -m x\""}
+{"expect":2,"command":"bash -c 'git commit -m x'"}
+{"expect":2,"command":"echo x; git config --unset core.hooksPath"}
+{"expect":2,"command":"git commit -am x"}
+{"expect":2,"command":"cargo test && git commit -m x"}
+{"expect":2,"command":"/usr/bin/git commit -m x"}
+{"expect":2,"command":"FOO=1 git commit -m x"}
+{"expect":2,"command":"command git push origin HEAD"}
+{"expect":2,"command":"git --no-pager -P commit -m x"}
