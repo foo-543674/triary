@@ -71,7 +71,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 - `AGENTS.md`、`CLAUDE.md`、`GEMINI.md`、`.cursorrules`、`.github/copilot-instructions.md`
 - `docs/review-contract.md`、`docs/remote-acceptance.md` (承認なしでマージしてよい変更の条件を含む)、`docs/rulesets/`
 - `.agents/skills/`、`.claude/` (`settings.json`、hook、エージェント定義)
-- アーキテクチャテスト (`backend/tests/architecture.rs`、`frontend/.dependency-cruiser.cjs`)
+- アーキテクチャテスト (`backend/tests/architecture.rs`、`frontend/.dependency-cruiser.cjs`、`frontend/scripts/check-arch.mjs`)
 - git hook (`.githooks/`)、判定ツール (`tools/review-gate/`)
 - CI の workflow と設定 (`.github/`)、`Makefile`、`.devcontainer/`
 - `.github/CODEOWNERS` 自身
