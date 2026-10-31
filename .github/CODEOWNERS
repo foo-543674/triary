@@ -19,4 +19,5 @@
 /tools/review-gate/               @foo-543674
 /backend/tests/architecture.rs    @foo-543674
 /frontend/.dependency-cruiser.cjs @foo-543674
+/frontend/scripts/check-arch.mjs  @foo-543674
 /.github/                         @foo-543674

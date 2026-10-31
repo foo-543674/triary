@@ -6,7 +6,7 @@ import { server } from '../mocks/server';
 // NOTE: Wire up the standard MSW lifecycle hooks so handlers cannot leak
 //       between tests.
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' });
+  server.listen({ onUnhandledFrame: 'error' });
 });
 
 afterEach(() => {
