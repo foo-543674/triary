@@ -13,7 +13,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 | 項目 | 状態 |
 |---|---|
 | 目標とする構成 | **GitHub の保護ルールでマージを止める** (2026-10-31 にオーナーが選択) |
-| 現在の状態 | **一部だけ保護ルールで止まる** (2026-10-31 に読み戻して確認)。ruleset `main` は有効で、PR 必須・承認 1 件・削除と force push の禁止まで。AI の App は迂回できない。code owner の承認、承認の失効、`acceptance / verdict` の required check はまだない (`docs/rulesets/main.json` は生成済み・未適用)。適用して読み戻すまで、受け入れ検証の結果は PR への警告にとどまる |
+| 現在の状態 | **PR に警告を出すだけ** (2026-10-31 06:16 にオーナーが ruleset `main` を無効にしたことを読み戻して確認)。05:41〜06:16 の間は有効で、PR 必須・承認 1 件、AI の App は迂回できなかった。`docs/rulesets/main.json` は生成済み・未適用で、適用コマンドは #42 にある。適用して読み戻すまで、受け入れ検証の結果は PR への警告にとどまり、AI は規律としてマージ条件を守る |
 | AI の主体 | GitHub App `foo-543674-ai-agent[bot]`。オーナー (`foo-543674`) とは別の主体 |
 | AI の資格情報で確かめたこと | ブランチ保護の読み取りが 403 (`Resource not accessible by integration`)、`viewerPermission` が空 (admin 権限なしと推定)。ruleset は読める。ruleset `main` の `current_user_can_bypass` が `never` (App は迂回できない)。**未確認**: App が ruleset を変更できないこと、App のレビューが承認として数えられないこと。code owner の承認が必須でない今は、書き込み権限を持つ App が他者の PR (Dependabot 等) を承認すると数えられる可能性がある。`main.json` の適用で code owner (オーナー) の承認が必須になれば塞がる |
 | リポジトリ | public (GitHub Free でも ruleset が使える) |
@@ -88,7 +88,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 |---|---|
 | 生成済み | `docs/rulesets/main.json` |
 | 適用予定 | オーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行。既存の有効な ruleset を強化する操作になる。**この PR のマージ後に** 行う。先に適用すると、required check `acceptance / verdict` を発行する workflow が base にまだないので、この PR 自身が status を得られず止まる |
-| 有効化済み | 一部 (PR 必須・承認 1 件・削除と force push の禁止)。`main.json` の適用後に AI が読み戻し、下記の動作確認をしてからこの表を更新する |
+| 有効化済み | 未 (05:41〜06:16 に一部が有効だったが、現在は無効)。`main.json` の適用後に AI が読み戻し、下記の動作確認をしてからこの表を更新する |
 
 主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)、ブランチを最新にする。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない (適用後に確かめる)。
 
@@ -113,7 +113,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 
 ## 人間の承認なしでマージしてよい変更
 
-**現在、承認なしでマージしてよい変更はない。** 下の条件は AI が起草した **案** で、合意も有効化もされていない。合意するまで、すべての変更を承認ありとして扱い、案は判断依頼 (Issue、ラベル `needs-decision`) に積む。
+**現在、承認なしでマージしてよい変更はない。** 2026-10-31 にオーナーが #43 で「依存パッケージの更新は、CI などで壊れなければ自動でマージしてよい」と回答した。下の案より広い (major を含む)。具体化と未確認の 2 点 (GitHub Actions の更新を含めるか、台帳のスナップショットを求めるか) は #43 で確認中で、検証器と ruleset の実装もまだない。実装した PR が承認されてマージされるまでは、すべての変更を承認ありとして扱う。
 
 ### 案 (未合意・無効)
 
