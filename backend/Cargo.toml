@@ -43,5 +43,5 @@ fake = { version = "5", features = ["chrono", "derive", "uuid"] }
 http-body-util = "0.1"
 pretty_assertions = "1"
 proptest = "1"
-rstest = "0.26"
+rstest = "0.28"
 tower = { version = "0.5", features = ["util"] }
