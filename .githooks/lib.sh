@@ -36,7 +36,7 @@ touches() {
 # storage, observed 2026-10-31), so the commands of one gate share one call.
 run_rust_lint() {
   (cd "$REPO_ROOT/backend" &&
-    "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --all-targets --all-features --quiet -- -D warnings')
+    "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings')
 }
 
 run_frontend_lint() {

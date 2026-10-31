@@ -81,8 +81,8 @@ jobs:
           TRIARY_DEV_IMAGE_REF: ${{ steps.ref.outputs.ref }}
         run: |
           ../dev cargo fmt --all -- --check
-          ../dev cargo clippy --all-targets --all-features
-          ../dev cargo nextest run --all-features --no-tests=pass
+          ../dev cargo clippy --locked --all-targets --all-features
+          ../dev cargo nextest run --locked --all-features --no-tests=pass
 
       - name: Frontend checks
         working-directory: frontend

@@ -19,6 +19,7 @@ REQUIRED_JOBS='[
   "frontend / build (vite)",
   "openapi / spectral lint",
   "security / cargo audit",
+  "security / cargo deny",
   "security / pnpm audit"
 ]'
 CLI=(node tools/review-gate/src/cli.ts)

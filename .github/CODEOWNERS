@@ -20,6 +20,10 @@
 /dev                              @foo-543674
 /tools/dev-image/                 @foo-543674
 /backend/tests/architecture.rs    @foo-543674
+/backend/tests/dependency_ledger.rs @foo-543674
+/backend/deny.toml                @foo-543674
+/backend/.cargo/                  @foo-543674
+/docs/dependency-policy.md        @foo-543674
 /frontend/.dependency-cruiser.cjs @foo-543674
 /frontend/scripts/check-arch.mjs  @foo-543674
 /.github/                         @foo-543674

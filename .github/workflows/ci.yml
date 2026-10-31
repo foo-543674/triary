@@ -52,7 +52,7 @@ jobs:
       - name: cargo fmt --check
         run: ../dev cargo fmt --all -- --check
       - name: cargo clippy
-        run: ../dev cargo clippy --all-targets --all-features
+        run: ../dev cargo clippy --locked --all-targets --all-features
 
   backend-test:
     name: backend / test (nextest)
@@ -74,7 +74,7 @@ jobs:
           key: target-test-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: target-test-${{ steps.dev.outputs.ref }}-
       - name: cargo nextest run
-        run: ../dev cargo nextest run --all-features --no-tests=pass
+        run: ../dev cargo nextest run --locked --all-features --no-tests=pass
 
   backend-build:
     name: backend / build (release)
@@ -97,7 +97,7 @@ jobs:
           key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: target-release-${{ steps.dev.outputs.ref }}-
       - name: cargo build --release
-        run: ../dev cargo build --release
+        run: ../dev cargo build --locked --release
 
   # ---------- Frontend ----------
   frontend-lint:
@@ -207,7 +207,7 @@ jobs:
         run: ../dev sqlx migrate run
       - name: build backend
         working-directory: backend
-        run: ../dev cargo build --release
+        run: ../dev cargo build --locked --release
       - name: start backend and run newman
         run: |
           ./dev bash -c '
@@ -246,6 +246,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: ../dev cargo audit
+
+  # Supply-chain policy (backend/deny.toml, docs/dependency-policy.md):
+  # advisories, licenses, wildcard versions and sources other than crates.io.
+  # cargo-deny is built here with the image's cargo at a pinned version,
+  # using cargo-deny's own Cargo.lock (--locked), instead of coming from a
+  # third-party installer. It downloads the RustSec advisory DB at run time.
+  # NOTE: unverified on CI until this job's first run; locally the same
+  #       commands passed through ./dev on 2026-10-31.
+  # TODO: move it into tools/dev-image/Dockerfile; until then, run it locally
+  #       the same way.
+  security-deny-backend:
+    name: security / cargo deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/dev-image
+      - run: |
+          ../dev bash -c '
+            set -euo pipefail
+            cargo install --locked --quiet cargo-deny@0.20.2 --root ../.tmp/cargo-tools
+            ../.tmp/cargo-tools/bin/cargo-deny --locked check'
 
   security-scan-frontend:
     name: security / pnpm audit

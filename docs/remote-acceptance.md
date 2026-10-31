@@ -35,10 +35,11 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 ### 必須ジョブ (CI)
 
-`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`openapi / spectral lint`、`security / cargo audit`、`security / pnpm audit`。
+`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`openapi / spectral lint`、`security / cargo audit`、`security / cargo deny`、`security / pnpm audit`。
 
 - `integration / newman` は `integration / detect` が成功していれば `skipped` を許す (検出対象がない PR では走らない設計のため)
 - `security / cargo audit` と `security / pnpm audit` は 2026-10-31 に必須に加えた (#45 のオーナー判断「1」)。それまでは base (`main`) 自体が既知の脆弱性で失敗していて、必須にすると PR の内容と無関係に全 PR が止まるため外していた。依存の更新で緑に戻した (pnpm は PR #47、cargo は `Cargo.lock` の更新)。今後、新しい advisory が出ると PR の内容と無関係に止まる。そのときは依存を更新するか、`.contexts/security-overrides.md` の台帳に載せる対処で緑に戻す
+- `security / cargo deny` は 2026-10-31 に必須に加えた (オーナーの指示「サプライチェーンなどのセキュリティリスクを考慮したガードレールを設けて」)。方針は `docs/dependency-policy.md`、設定は `backend/deny.toml`。Dependabot の自動マージもこの job の成功を必要とするので、許可外のライセンスや crates.io 以外の取得元を持ち込む更新は自動ではマージされない
 
 ## 信頼できる検証経路
 
@@ -73,6 +74,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 - `.agents/skills/`、`.claude/` (`settings.json`、hook、エージェント定義)
 - アーキテクチャテスト (`backend/tests/architecture.rs`、`frontend/.dependency-cruiser.cjs`、`frontend/scripts/check-arch.mjs`)
 - git hook (`.githooks/`)、判定ツール (`tools/review-gate/`)
+- 依存のサプライチェーン対策 (`docs/dependency-policy.md`、`backend/deny.toml`、`backend/.cargo/audit.toml`、`backend/tests/dependency_ledger.rs`)。`backend/Cargo.toml` 自体は含めない (含めると Dependabot の自動マージが code owner の承認で止まる。直接依存の追加は台帳の検査で `docs/dependency-policy.md` の変更を伴うので、承認を経る)
 - 開発コマンドの入口 (`dev`) と開発イメージ (`tools/dev-image/`)。決定的ゲートが何の上で走るかを決めるため
 - CI の workflow と設定 (`.github/`)、`Makefile`、`.devcontainer/`
 - `.github/CODEOWNERS` 自身
