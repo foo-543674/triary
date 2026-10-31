@@ -1,0 +1,85 @@
+# NOTE: Remote acceptance verifier. Contract: docs/remote-acceptance.md.
+#       This is NOT a review: no LLM runs here. It checks, from the protected
+#       base branch's definition, that the PR head passed the deterministic
+#       gates and carries a review-ledger snapshot that meets
+#       docs/review-contract.md, then publishes the commit status
+#       `acceptance / verdict` (required by the ruleset, GitHub Actions only).
+#
+#       Every trigger below runs the workflow file from the default branch,
+#       so a PR cannot change how it is judged. The job checks out the base
+#       branch only and never executes code from the PR.
+name: Acceptance
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to (re)judge
+        required: true
+
+permissions: {}
+
+jobs:
+  verdict:
+    name: acceptance / judge
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests[0].number) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '<!-- triary-review-snapshot -->'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # NOTE: Runs for the same PR are serialized and nothing is ever
+    #       cancelled: a cancelled verdict would leave the status pending.
+    #       Every PR comment fires issue_comment, so with the default
+    #       `queue: single` an unrelated comment could replace a queued
+    #       verdict. `queue: max` keeps up to 100 pending runs instead
+    #       (GitHub docs, workflow syntax, "concurrency"; checked 2026-10-31).
+    #       Whether a job skipped by `if` joins the group is not documented,
+    #       so this setting does not rely on it.
+    concurrency:
+      group: acceptance-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+      checks: read
+      statuses: write
+    steps:
+      # DO NOT REMOVE OR WEAKEN: check out the protected base branch, never the
+      # PR head. Running PR code here would let a PR judge itself.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SNAPSHOT_FILE: ${{ runner.temp }}/review-snapshot.md
+        # DO NOT REMOVE OR WEAKEN: a missing snapshot, a skipped gate or a
+        # failed check must end as a failing `acceptance / verdict` status.
+        run: bash tools/review-gate/acceptance.sh
+      - name: keep the snapshot that was judged
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-snapshot-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/review-snapshot.md
+          if-no-files-found: warn
