@@ -7,6 +7,20 @@
 `.contexts/setup-plan.md` が「環境構築の方針」を扱うのに対し、本ドキュ
 メントは「AI が自律的に開発を継続するための基盤の方針」を扱う。
 
+判断の理由と来歴の原典はこのファイル 1 か所。規則の本文は `AGENTS.md`、
+`docs/review-contract.md`、`docs/remote-acceptance.md` が原典で、ここには
+転記しない。
+
+## 実行履歴
+
+| 日付 | プラグイン | 生成結果 | 状態 |
+|---|---|---|---|
+| 2026-04-25 | foo-skills — 版・commit SHA は **不明** (記録なし。`AGENTS.md` を生成していないことから 2.x より前と推定) | commit `a5575a1`、PR #19 (2026-04-26 マージ) | 採用済み |
+| 2026-10-31 | foo-skills 3.0.0 (`gitCommitSha` ce07f3463ad10f4ce4c2333af6c3fbbe4a4af738、https://github.com/foo-543674/foo-skills) | ブランチ `chore/bootstrap-v3` の PR (下記「2026-10-31 再実行」) | **提案中** (PR のマージで採用。ruleset の適用は別途) |
+
+以降の節のうち「Phase 1」〜「次の更新タイミング」は 2026-04-25 時点の記録
+で、2026-10-31 の再実行で変わったものはその節に注記した。
+
 ## Phase 1: プロジェクトの本質（既存ドキュメントから確定）
 
 | 項目 | 内容 |
@@ -38,6 +52,10 @@
 | フロントエンド寄り | component, state-design |
 
 **重み付けの調整**: なし（A: 全部フル適用、ユーザー確認済み）。
+
+> 2026-10-31 注記: 上の表は 20 件で、当時の原料にない `debugging` が 3.0.0
+> では加わっている。プラグイン側だけの変更として `debugging` を追加した
+> (`AGENTS.md` Quality lenses、レビュースキル観点 10)。
 
 ### プロジェクト固有の補足
 
@@ -95,6 +113,8 @@
 - **TS 禁止語**: `dependency-cruiser` は依存関係を見るツールで型名・クラ
   ス名のスキャンには向かないため、TS 側の禁止語チェックは `arch:test`
   には組み込まず、`code-reviewer` エージェント（Layer 3）に委ねる
+  (2026-10-31 注記: レビューの観点は `.agents/skills/code-review/SKILL.md`
+  に移った)
 
 ### CI 組み込み
 
@@ -135,6 +155,9 @@
   ようになったとき（その場合は `dependencies` へ昇格させて除外不要）。
 
 ### upstream 依存の workaround とその撤去条件
+
+> 2026-10-31: **撤去済み**。`ai-review.yml` ごと廃止した (下記「2026-10-31
+> 再実行」の「変更ごとの扱い」)。以下は経緯として残す。
 
 - **`.github/workflows/ai-review.yml` の `github.actor != 'Copilot'` 条件
   と `trigger-copilot-review` ジョブ**:
@@ -195,6 +218,14 @@ bootstrap で許可コマンド (`permissions.allow` / `permissions.deny`) を�
   triary` まで巻き込むので置かない。代わりに `find /` 単独実行は allow
   に無く、permission prompt 経由で都度確認するに留める
 
+> 2026-10-31 注記: allow の `Bash(git:*)` / `Bash(docker:*)` /
+> `Bash(docker compose:*)` / `Bash(make:*)` を非破壊の個別コマンドに置き換え
+> た (下記「2026-10-31 再実行」)。上の find / grep の方針はそのまま残す。
+> ただし観測した事実として、AI は現在 devcontainer ではなく
+> `/home/node/work/foo-543674/triary` (ai-box) で動いており、
+> `/workspaces/triary` を前提にした絶対パスのパターンはこの環境では効かない
+> (相対パスのパターンは効く)。直すかどうかは判断していない。
+
 ## Phase 5: 技術インフラの状態
 
 bootstrap 着手時点で技術インフラは概ね整備済み:
@@ -216,22 +247,11 @@ bootstrap で追加したもの:
 - `backend/tests/architecture.rs`（Rust 側カスタムテスト）
 - `frontend/.dependency-cruiser.cjs`（TS 側設定）
 
-## 判断委任の境界（CLAUDE.md より転記）
+## 判断委任の境界
 
-AI が自律判断してよい:
-- 実装の詳細（関数・変数名、アルゴリズム選択、ライブラリ内部）
-- テストの追加・修正
-- 既存テストが全パスする範囲のリファクタリング
-- lint / format の修正
-- ドキュメントの更新
-
-確認が必要:
-- 新しい外部依存の追加（Cargo crate / npm パッケージ）
-- レイヤー構成・アーキテクチャルールの変更
-- OpenAPI スキーマ・`/api/v1/*` の破壊的変更
-- 認証・認可・暗号化に関わる判断
-- `.contexts/*.md` の書き換え（設計判断そのものの変更）
-- 要件解釈に曖昧さがある場合
+原典は `AGENTS.md`「AI delegation scope」。2026-04-25 の記録ではここに
+当時の CLAUDE.md の一覧を転記していたが、規則を転記しない方針に合わせて
+2026-10-31 に参照だけにした (転記は AGENTS.md の改訂と食い違っていた)。
 
 ## 次の更新タイミング
 
@@ -239,7 +259,162 @@ AI が自律判断してよい:
 記する:
 - philosophy / perspectives の適用範囲を変更したとき
 - アーキテクチャテストのルールを追加・変更したとき
-- code-reviewer の観点を増減したとき
+- レビューの観点 (`.agents/skills/code-review/SKILL.md`) を増減したとき
 - AI 委任範囲の境界を動かしたとき
 
 設計判断そのものは `.contexts/architecture.md` 等の本体側に記録する。
+
+---
+
+## 2026-10-31 再実行 (foo-skills 3.0.0)
+
+前回の原料の版が不明なため、前回生成した結果 (PR #19 時点) と現在のプロジェ
+クトと 3.0.0 の原料を直接比べた。前回以降に AI コンテキスト関連ファイルへ
+入ったチームの変更は PR #19 のレビュー対応と `implementation-plan.md` の
+整理 (2026-04-28) で、いずれも残した。
+
+参照した原料 (すべて 3.0.0): `skills/bootstrap/SKILL.md`、
+`skills/bootstrap/resources/` の `context-template.md` / `checklist.md` /
+`known-pitfalls.md` / `local-review-gate.md` / `review-contract.md` /
+`remote-acceptance.md`、`philosophy/*.md` (特に development-values「判断待ち
+を仕事の停止条件にしない」、core-principles「記述の検証状態」)、
+`perspectives/debugging.md`。
+
+### Phase 2 で人間に確認した判断
+
+| 問い | 回答 (2026-10-31、オーナー) | 反映先 |
+|---|---|---|
+| リモート AI レビュー (`ai-review.yml`、2026-04-07 にチームが追加) をどうするか | **廃止して置き換える** | `ai-review.yml` を削除。手元のレビューゲート + リモート受け入れ確認に置き換え |
+| AI のマージを GitHub の保護ルールで止める構成にするか | **保護ルールで止める** | `docs/remote-acceptance.md`、`docs/rulesets/main.json`、`.github/CODEOWNERS` |
+
+- AI の主体: GitHub App `foo-543674-ai-agent[bot]` (オーナーと別主体)。確認済み
+- リポジトリは public。GitHub Free でも ruleset が使える
+- 原料の他の原則・perspectives の除外や重み付けの変更は、前回の判断 (すべて
+  フル適用) を引き継いだ。改めて問わなかった
+
+### 変更ごとの扱い
+
+| 項目 | 状況 | 扱い | 反映先 |
+|---|---|---|---|
+| `AGENTS.md` を単一の原典にする | プラグイン側だけが変わった | 採用 (提案中)。`CLAUDE.md` の本文をそのまま移し、`CLAUDE.md` / `GEMINI.md` は `@AGENTS.md` で読み込む。`.cursorrules` / `copilot-instructions.md` は派生元を `AGENTS.md` に替え、既存の記述は残した | `AGENTS.md` ほか |
+| 自然言語の使用範囲 | プラグイン側だけ | 採用。設計文書と契約は日本語、`AGENTS.md` と派生ファイルは英語 (前回の「既存スタイルを維持」を引き継ぐ) | `AGENTS.md` Natural language |
+| 設計成果物の役割分担・計画の 3 階層 | プラグイン側だけ | 採用。API 契約は `openapi.yaml`、永続化は `backend/migrations/` に具体化 | `AGENTS.md` Design artifacts |
+| 判断待ちで止めない進め方 | プラグイン側だけ | 採用。判断待ちの置き場は **GitHub Issues (ラベル `needs-decision`)** を AI が選んだ。理由: 保護ルールを有効にすると、リポジトリ内のファイルは更新のたびにオーナーの承認が要り、判断待ちを積むこと自体が止まるため。Issue なら承認なしで積め、受け入れ検証が state (open / closed) を機械的に読める。暫定案に積んでよい差し替え費用の目安は「約 1 作業日」とした | `AGENTS.md` Asking for decisions |
+| 記述の検証状態・逃げの一覧の拡張 | プラグイン側だけ | 採用 | `AGENTS.md` Development workflow |
+| 規約・受け入れ条件・検証器の改訂は通常の作業権限に含めない | プラグイン側だけ | 採用。改訂権限の委任範囲は「なし」とした | `AGENTS.md` AI delegation scope |
+| レビュー手順をスキルに移す | プラグイン側だけ | 採用。旧 `code-reviewer.md` の観点 1〜10 を移し (旧 10 のコミット品質は観点 12 に移動)、`debugging` (観点 10) と基準ファイル・ゲートの変更 (観点 11) を新たに追加。エージェント定義は薄くし、`model: sonnet` は意図の記録がないチームの設定として残した | `.agents/skills/code-review/SKILL.md`、`.claude/agents/code-reviewer.md` |
+| 旧 `code-reviewer.md` の可読性基準 (ネスト 4 以上 / 関数 200 行以上) | チームの成果物の中で食い違い (CLAUDE.md は ネスト 3 以下 / 関数 50 行以下) | CLAUDE.md (現 `AGENTS.md`) の値に揃えた。どちらが意図かの記録はない。200 行で運用したい意図があったなら戻す | レビュースキル観点 9 |
+| レビュー契約・台帳 | プラグイン側だけ | 採用。台帳は `.git/review-ledger/ledger.json`、判定は `tools/review-gate/` | `docs/review-contract.md` |
+| ローカルレビューゲート | プラグイン側だけ | 採用。下記「ゲートの実装判断」 | `.githooks/`、`.claude/hooks/review-gate.sh` |
+| リモート受け入れ保証 | プラグイン側だけ | 採用。ruleset は生成済み・未適用 | `docs/remote-acceptance.md`、`.github/workflows/acceptance.yml` |
+| リモート AI レビュー (`ai-review.yml`) | **両方が変わった** (チームが追加し Copilot 向けの回避策を作り込んだ。3.0.0 は生成しない方針。さらに読み込み先の `foo-skills:code-reviewer` は 3.0.0 で廃止され、2026-04-28 以降成功していなかった) | オーナーの判断で廃止。リポジトリの secret `CLAUDE_CODE_OAUTH_TOKEN` が不要になったかはオーナーが確認する | — |
+| `.claude/settings.json` の広い allow (`git:*` / `docker:*` / `docker compose:*` / `make:*`) | プラグイン側が変わった (allow は非破壊のみ)。チーム側は設定時の意図の記録なし (変わった ≠ 意図して選んだ) | 改訂案として非破壊の個別コマンドに置き換え、環境を壊す操作は ask、迂回と履歴の破壊は deny にした。`gh:*`・`npm:*`・`npx:*` などは残し、削除系の `gh` だけ deny を足した。基準ファイルの改訂なので PR の承認を経て有効になる | `.claude/settings.json` |
+| known-pitfalls「claude-code-action + Copilot Coding Agent」 | 原料の該当エントリは本プロジェクトの事例 | `ai-review.yml` の廃止で該当しなくなった | — |
+
+### ゲートの実装判断
+
+- **判定ツール**: `tools/review-gate/` に TypeScript で書き、Node 22 の型
+  ストリッピングで直接実行する。追加の依存はない (`frontend/` の `tsc` と
+  `@types/node` を型チェックにだけ借りる)。判定ロジック (`ledger.ts`、
+  `snapshot.ts`) は純粋関数、git と台帳ファイルを触るのは `cli.ts` だけ
+- **git hook の管理方法**: `.githooks/` を hooksPath に設定する方式。
+  lefthook / husky / pre-commit は追加の install が要るため選ばなかった。
+  git の仕様上、clone 直後に hook を自動で有効にする方法はないので、
+  devcontainer の `post-create.sh` で有効にし、それ以外の環境では
+  `make hooks-install` を 1 回実行する。Claude Code hook は hooks が有効で
+  ないと commit / push を止めるので、AI は有効化を飛ばせない
+- **pre-commit**: 変更された領域だけ fmt + clippy / biome + tsc / ゲート
+  ツールの自己テスト、その後 staged diff のレビュー記録を確認
+- **pre-push**: 変更された領域だけ nextest / depcruise + vitest / ゲート
+  ツールの自己テスト、その後 `origin/main` との差分のレビュー記録を確認。
+  統合テスト (Newman) と Storybook のビルドは DB や時間の都合で CI に任せた
+- **commit 時に全変更を自動で stage するオプション (`-a`) の禁止**: staged
+  以外が混ざると、レビューした diff とコミットされる diff がずれるため
+- **Claude Code hook の判定 (現行)**: hooksPath・`GIT_CONFIG_*`・エイリアス
+  定義・`.git/config`・台帳ファイルへの言及はコマンド全体で止める。git の
+  呼び出しの判定は `tools/review-gate/src/command.ts` (規則は同ファイル冒頭)
+  に委ねる。シェルのように字句解析し (テキストは捨てず、heredoc と here-string
+  はコマンドの入力として扱う)、すべての簡易コマンドで basename が `git` の語を
+  すべて調べ、設定済みのエイリアスを展開し、`shell -c` / `eval` / シェルの
+  heredoc 入力 / コマンド置換へ再帰し、他のランチャーに渡されたコマンド文字列
+  は迂回フラグだけを見て、解析できないテキストは原文を保守的に走査する。
+  単一引用符と backtick の中は意図して過剰に報告する。残る穴 (変数に入れた
+  フラグ、ファイルに書いて後で実行するスクリプト、API 経由のコミット、hook
+  ファイル自体の編集) は hook 冒頭に列挙し、リモート受け入れが受け持つ
+- **経緯**: 最初は正規表現で判定したが、レビューで同じカテゴリの迂回が繰り
+  返し見つかり (引用符内の区切り、行継続、キーワードや未知のランチャーの後ろ、
+  エイリアス、heredoc の誤除去、引用符内のコマンド置換など)、作業中に正当な
+  コマンドの誤ブロックも実際に踏んだ (`git log ...; grep -n`、`review-gate.sh`
+  というファイル名)。個別の修正をやめ、構文の列挙に依存しない現行の方式に
+  置き換えた
+- **permission 規則**: 公式ドキュメント (code.claude.com/docs/en/permissions)
+  で確認した仕様に合わせた。評価順は deny → ask → allow で最初に一致したもの、
+  `:*` は語の区切りのあとの末尾ワイルドカード、規則の途中の `*` は前後に空白
+  がある位置だけに一致し、deny / ask はセキュリティ境界ではない。そのため
+  - allow は非破壊の形だけにし、破壊的な形は ask / deny に個別に置く。途中
+    にワイルドカードを持つ規則には、フラグが先頭に来る形の規則も並べる
+  - 広い ask (例: `git switch:*`) は具体的な allow を覆い隠すので置かない。
+    allow にないコマンドは既定で確認が出る
+  - 迂回の検出の本体は PreToolUse hook と git hook 側に置いた
+  - 残る穴: `git push <remote> :<branch>` (空の送り元でリモートブランチを
+    削除する refspec) はこの書式では安全に表せない
+
+### リモート受け入れの実装判断
+
+- 検証は `pull_request_target` / `workflow_run` / `issue_comment` /
+  `workflow_dispatch` で base の定義を使い、PR のコードを実行しない。結果は
+  commit status `acceptance / verdict` (GitHub Actions 発行に限って required)
+- 必須にする CI ジョブから `security / *` を外した。`main` 自体が既知の
+  脆弱性で赤い間は全 PR が止まるため (判断依頼に積む)
+- `integration / newman` は `integration / detect` 成功時の `skipped` を許す
+- PR 内で追加した workflow が同名の status を出せる穴は、`.github/` を
+  CODEOWNERS の対象にして承認で塞いでいる。機械的な遮断ではない
+- ruleset の bypass はリポジトリの admin ロールの PR 経由のマージだけにした。
+  個人リポジトリでオーナーが自分の PR を自己承認できないため
+- 承認なしでマージしてよい変更の条件は案 (Dependabot の patch / minor の
+  ロックファイル更新) を起草したが、**未合意・無効**。合意まですべての PR
+  が承認必須。判断依頼に積む
+- ファイル単位の保護の手間: `AGENTS.md` の現状説明の更新、アーキテクチャ
+  テストの強化、`Makefile` の変更にもオーナーの承認が要る
+
+### マージを止められるか
+
+現在の状態、読み戻した履歴、AI の資格情報で確かめたことは
+`docs/remote-acceptance.md`「マージを止められるか」と「ruleset」に一元化
+した (ruleset はこの作業中にも 2 回変わり、複数か所に書くとずれるため)。
+この再実行での判断は、目標を「保護ルールでマージを止める」とし、適用は
+オーナーが行うこと (#42) だけである。
+
+なお、Phase 1 の作業 (Dependabot の PR 8 件のマージ) は 05:30 頃で、
+ruleset が有効になる前だった。
+
+### 動作確認の結果
+
+- `make gate-test` のテスト 151 件が通る。内訳は台帳と判定 (review-contract
+  の 5 ケース、remote-acceptance の 1・2・4・9・10 の判定部分)、JSON 境界の
+  検証、コマンド分類 (字句解析)、Claude Code hook の回帰ケース (一時リポジ
+  トリで実行)、`.git/` 書き込み保護
+- CLI を一時リポジトリで実行し、レビューなし → 止まる、未処置の Critical →
+  止まる、証拠付きの却下 → 通る、diff が変わる → 止まる、古いラウンドの記録
+  → 拒否、を確かめた
+- このブランチ自体のコミットをすべて新しいゲートに通した (各コミットで別
+  コンテキストのレビュアーが台帳に記録)。途中で pre-commit がゲートツールの
+  自己テストの失敗で実際にコミットを止めたことと、Claude Code hook が正当な
+  コマンドを誤って止めたこと (後に修正) も観測した
+- この環境 (ai-box) には Rust のツールチェーンがなく、`backend/` を含む
+  コミットは pre-commit の fmt / clippy を実行できず止まる。そのため
+  `backend/` 内のコメントの `CLAUDE.md` 参照の更新は見送った
+- 受け入れ検証スクリプトを `DRY_RUN=1` で実在の PR に対して実行し、#41 で
+  CI の失敗 (frontend / test) とスナップショットなしを検出することを確かめた。
+  #39 の実 diff に対し、一致するスナップショット → 合格、HEAD が違う → 不合格、
+  改ざん → 不合格を確かめた
+- 実 PR 上での 12 ケースの確認は ruleset の適用後に行う (未)
+
+### 判断待ち (GitHub Issues、ラベル `needs-decision`)
+
+| Issue | 問い | 状態 (2026-10-31) |
+|---|---|---|
+| #42 | 現在無効の ruleset `main` を `docs/rulesets/main.json` の内容で有効にするか | 適用コマンドを Issue に準備済み。この PR のマージ後にオーナーが適用 |
+| #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。GitHub Actions の更新を含めるかと台帳の要否を確認中。実装は後続の PR |
+| #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。後続の PR |
+| #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。後続の PR |

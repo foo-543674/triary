@@ -1,0 +1,6 @@
+{
+  "name": "triary-review-gate",
+  "private": true,
+  "type": "module",
+  "description": "Local review gate and remote acceptance verifier. Zero runtime dependencies; runs on Node 22 type stripping."
+}

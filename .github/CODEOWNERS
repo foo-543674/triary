@@ -1,0 +1,22 @@
+# Base files: changes need the code owner's approval (enforced by the ruleset
+# in docs/rulesets/main.json). Rationale and the full list:
+# docs/remote-acceptance.md "保護する基準ファイル".
+# GitHub uses the base branch's copy of this file, so editing it in a PR does
+# not change how that PR is judged.
+
+/AGENTS.md                        @foo-543674
+/CLAUDE.md                        @foo-543674
+/GEMINI.md                        @foo-543674
+/.cursorrules                     @foo-543674
+/Makefile                         @foo-543674
+/docs/review-contract.md          @foo-543674
+/docs/remote-acceptance.md        @foo-543674
+/docs/rulesets/                   @foo-543674
+/.agents/                         @foo-543674
+/.claude/                         @foo-543674
+/.githooks/                       @foo-543674
+/.devcontainer/                   @foo-543674
+/tools/review-gate/               @foo-543674
+/backend/tests/architecture.rs    @foo-543674
+/frontend/.dependency-cruiser.cjs @foo-543674
+/.github/                         @foo-543674

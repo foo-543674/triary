@@ -1,7 +1,7 @@
 // Architecture rules for the frontend.
 //
 // Run via `pnpm run arch:test`. The rules mirror what is documented in
-// `CLAUDE.md` and `.contexts/bootstrap-decisions.md`. Tighten them when a
+// `AGENTS.md` and `.contexts/bootstrap-decisions.md`. Tighten them when a
 // new violation pattern is observed; loosen them only with a note in
 // `bootstrap-decisions.md`.
 

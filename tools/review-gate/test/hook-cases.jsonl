@@ -1,0 +1,66 @@
+{"expect":0,"command":"git status"}
+{"expect":0,"command":"cat <<EOF\nmention the review gate in text\nEOF"}
+{"expect":0,"command":"git log --grep commit"}
+{"expect":0,"command":"echo \"git commit\""}
+{"expect":0,"command":"git log --oneline -n 3"}
+{"expect":0,"command":"git --no-pager log -P"}
+{"expect":0,"command":"node tools/review-gate/src/cli.ts show"}
+{"expect":2,"command":"git config core.hooksPath /dev/null"}
+{"expect":2,"command":"git config --global CORE.HOOKSPATH /dev/null"}
+{"expect":2,"command":"git -c core.hooksPath=/dev/null commit -m x"}
+{"expect":2,"command":"git -c core.hooksPath=/dev/null push"}
+{"expect":2,"command":"git --config-env=core.hooksPath=X commit -m x"}
+{"expect":2,"command":"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.x GIT_CONFIG_VALUE_0=/dev/null git commit -m x"}
+{"expect":2,"command":"export GIT_CONFIG_PARAMETERS=x; git push"}
+{"expect":2,"command":"sed -i 's/x/y/' .git/config"}
+{"expect":2,"command":"echo '{}' > .git/review-ledger/ledger.json"}
+{"expect":2,"command":"git commit --no-verify -m x"}
+{"expect":2,"command":"git -C . commit -n -m x"}
+{"expect":2,"command":"git commit -nm x"}
+{"expect":2,"command":"git commit --no-verif -m x"}
+{"expect":2,"command":"git push --no-v origin HEAD"}
+{"expect":2,"command":"bash -c \"git commit --no-verify -m x\""}
+{"expect":2,"command":"bash -c 'git commit -m x'"}
+{"expect":2,"command":"echo x; git config --unset core.hooksPath"}
+{"expect":2,"command":"git commit -am x"}
+{"expect":2,"command":"cargo test && git commit -m x"}
+{"expect":2,"command":"/usr/bin/git commit -m x"}
+{"expect":2,"command":"FOO=1 git commit -m x"}
+{"expect":2,"command":"command git push origin HEAD"}
+{"expect":2,"command":"git --no-pager -P commit -m x"}
+{"expect":2,"command":"git commit -m \"a; b\" --no-verify"}
+{"expect":2,"command":"git commit -m 'a & b' -n"}
+{"expect":2,"command":"git commit -m \"x|y\" -n"}
+{"expect":2,"command":"git commit -m x \\\n  --no-verify"}
+{"expect":2,"command":"git commit -m \"unbalanced"}
+{"expect":2,"command":"{ git commit -n -m x; }"}
+{"expect":2,"command":"if true; then git commit -n -m x; fi"}
+{"expect":2,"command":"! git commit -n -m x"}
+{"expect":2,"command":"for i in 1; do git commit -n -m x; done"}
+{"expect":2,"command":"find . -maxdepth 0 -exec git commit -n -m x \\;"}
+{"expect":2,"command":"git -c alias.c=commit c -n -m x"}
+{"expect":2,"command":"echo 'git commit -n -m x' | sh"}
+{"expect":0,"command":"cat <<'EOF'\ndon't run git push -n here\nEOF"}
+{"expect":2,"command":"cat <<<hi\ngit commit -n -m x"}
+{"expect":2,"command":"echo '<<X'\ngit commit -n -m x"}
+{"expect":2,"command":"echo \"a <<EOF b\"\ngit commit -n -m x"}
+{"expect":2,"command":"echo 'git commit -n' | sh"}
+{"expect":2,"command":"bash <<'EOF'\ngit commit -n -m x\nEOF"}
+{"expect":2,"command":"diff <(git commit -n -m x) /dev/null"}
+{"expect":2,"command":"echo \"$(git commit -n -m x)\""}
+{"expect":2,"command":"x=\"`git commit -n -m x`\""}
+{"expect":2,"command":"echo \"$(git commit -m x --no-verify)\""}
+{"expect":2,"command":"su -c 'git commit -n -m x'"}
+{"expect":2,"command":"watch 'git commit -n -m x'"}
+{"expect":2,"command":"script -qc 'git commit -n -m x' /dev/null"}
+{"expect":0,"command":"watch 'git status'"}
+{"expect":0,"command":"git log --grep \"it's"}
+{"expect":0,"command":"git log --grep commit; grep -n x README.md"}
+{"expect":0,"command":"git log --oneline -4 && grep -n push Makefile"}
+{"expect":2,"command":"true; git commit -nm x"}
+{"expect":0,"command":"git add .claude/hooks/review-gate.sh tools/x.jsonl && git diff --cached --stat && node tools/review-gate/src/cli.ts hash --scope commit"}
+{"expect":2,"command":"xargs -I{} git commit -m {}"}
+{"expect":2,"command":"sudo -u node git push"}
+{"expect":2,"command":"timeout 60 git push origin HEAD"}
+{"expect":2,"command":"eval 'git commit -m x'"}
+{"expect":2,"command":"bash -c \"true; git commit -n -m x\""}

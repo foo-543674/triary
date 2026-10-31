@@ -68,7 +68,7 @@ make db-seed         # Seed the development DB
 ```
 
 For backend / frontend specific commands, see the "Common commands" section
-in `CLAUDE.md`.
+in `AGENTS.md`.
 
 ## API spec
 
@@ -100,7 +100,10 @@ docker run --rm -p 8081:8080 \
 ├── tests/integration/  # Postman collection (language-agnostic integration tests)
 ├── docker-compose.yml  # Local infra (MySQL dev/test)
 ├── Makefile            # Developer task hub
-└── CLAUDE.md           # Project guide for Claude Code / AI assistants
+├── docs/               # Review contract, remote acceptance contract, ruleset
+├── tools/review-gate/  # Review ledger gate and remote acceptance verifier
+├── AGENTS.md           # Project guide for AI assistants (single source)
+└── CLAUDE.md           # Imports AGENTS.md for Claude Code
 ```
 
 ## Development principles
