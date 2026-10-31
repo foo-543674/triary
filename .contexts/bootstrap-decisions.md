@@ -307,7 +307,7 @@ bootstrap で追加したもの:
 | 旧 `code-reviewer.md` の可読性基準 (ネスト 4 以上 / 関数 200 行以上) | チームの成果物の中で食い違い (CLAUDE.md は ネスト 3 以下 / 関数 50 行以下) | CLAUDE.md (現 `AGENTS.md`) の値に揃えた。どちらが意図かの記録はない。200 行で運用したい意図があったなら戻す | レビュースキル観点 9 |
 | レビュー契約・台帳 | プラグイン側だけ | 採用。台帳は `.git/review-ledger/ledger.json`、判定は `tools/review-gate/` | `docs/review-contract.md` |
 | ローカルレビューゲート | プラグイン側だけ | 採用。下記「ゲートの実装判断」 | `.githooks/`、`.claude/hooks/review-gate.sh` |
-| リモート受け入れ保証 | プラグイン側だけ | 採用。ruleset は生成済み・未適用 | `docs/remote-acceptance.md`、`.github/workflows/acceptance.yml` |
+| リモート受け入れ保証 | プラグイン側だけ | 採用。ruleset はこの時点で生成済み・未適用 (2026-10-31 14:37 UTC にオーナーが適用、#42) | `docs/remote-acceptance.md`、`.github/workflows/acceptance.yml` |
 | リモート AI レビュー (`ai-review.yml`) | **両方が変わった** (チームが追加し Copilot 向けの回避策を作り込んだ。3.0.0 は生成しない方針。さらに読み込み先の `foo-skills:code-reviewer` は 3.0.0 で廃止され、2026-04-28 以降成功していなかった) | オーナーの判断で廃止。リポジトリの secret `CLAUDE_CODE_OAUTH_TOKEN` が不要になったかはオーナーが確認する | — |
 | `.claude/settings.json` の広い allow (`git:*` / `docker:*` / `docker compose:*` / `make:*`) | プラグイン側が変わった (allow は非破壊のみ)。チーム側は設定時の意図の記録なし (変わった ≠ 意図して選んだ) | 改訂案として非破壊の個別コマンドに置き換え、環境を壊す操作は ask、迂回と履歴の破壊は deny にした。`gh:*`・`npm:*`・`npx:*` などは残し、削除系の `gh` だけ deny を足した。基準ファイルの改訂なので PR の承認を経て有効になる | `.claude/settings.json` |
 | known-pitfalls「claude-code-action + Copilot Coding Agent」 | 原料の該当エントリは本プロジェクトの事例 | `ai-review.yml` の廃止で該当しなくなった | — |
@@ -416,9 +416,9 @@ ruleset が有効になる前だった。
 
 | Issue | 問い | 状態 (2026-10-31) |
 |---|---|---|
-| #42 | 現在無効の ruleset `main` を `docs/rulesets/main.json` の内容で有効にするか | 適用コマンドを Issue に準備済み。この PR のマージ後にオーナーが適用 |
-| #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。GitHub Actions の更新を含めるかと台帳の要否を確認中。実装は後続の PR |
-| #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。後続の PR |
+| #42 | 現在無効の ruleset `main` を `docs/rulesets/main.json` の内容で有効にするか | 2026-10-31 14:37 UTC にオーナーが適用し、AI が読み戻して有効を確認。マージを止められるかの動作確認は未 (`docs/remote-acceptance.md`) |
+| #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。台帳は不要、GitHub Actions の更新も含める (07:07)、action は SHA で固定 (07:30)。Rust / npm は #63 で実装し、#50 で自動マージを観測。Actions の更新は code owner 保護との兼ね合いで承認ありのまま (`docs/remote-acceptance.md`) |
+| #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。週次の検知 workflow を #61 で追加 |
 | #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。PR #47 (pnpm)・#58 (cargo と必須化) で完了 |
 
 ## 2026-10-31 再実行 (foo-skills 3.0.1)
