@@ -366,7 +366,8 @@ bootstrap で追加したもの:
   `workflow_dispatch` で base の定義を使い、PR のコードを実行しない。結果は
   commit status `acceptance / verdict` (GitHub Actions 発行に限って required)
 - 必須にする CI ジョブから `security / *` を外した。`main` 自体が既知の
-  脆弱性で赤い間は全 PR が止まるため (判断依頼に積む)
+  脆弱性で赤い間は全 PR が止まるため (判断依頼に積む)。追記 2026-10-31:
+  #45 で audit を緑に戻し、PR #58 で必須に加えた
 - `integration / newman` は `integration / detect` 成功時の `skipped` を許す
 - PR 内で追加した workflow が同名の status を出せる穴は、`.github/` を
   CODEOWNERS の対象にして承認で塞いでいる。機械的な遮断ではない
@@ -418,7 +419,7 @@ ruleset が有効になる前だった。
 | #42 | 現在無効の ruleset `main` を `docs/rulesets/main.json` の内容で有効にするか | 適用コマンドを Issue に準備済み。この PR のマージ後にオーナーが適用 |
 | #43 | 承認なしでマージしてよい変更 | オーナー回答「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」。案より広い (major を含む)。GitHub Actions の更新を含めるかと台帳の要否を確認中。実装は後続の PR |
 | #44 | PR #41 の TypeScript 7 | オーナー承認 (TS7 を Dependabot の対象から外し、残りを取り込む)。条件が満たされたら検知したい、との要望。後続の PR |
-| #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。後続の PR |
+| #45 | `main` の security audit が赤い | オーナー回答「1」(依存の更新と overrides で緑に戻し、`security / *` を必須にする)。PR #47 (pnpm)・#58 (cargo と必須化) で完了 |
 
 ## 2026-10-31 再実行 (foo-skills 3.0.1)
 
@@ -518,7 +519,10 @@ audit を直す手段として「ai-box に Rust を入れる」を判断依頼�
 この段でやっていないこと:
 
 - `.claude/settings.json` の deny: 編集が Claude Code の auto mode に
-  自己改変として止められた。変更案は PR の説明に載せ、オーナーが当てる
+  自己改変として止められた。変更案は PR の説明に載せ、オーナーが当てる。
+  2026-10-31 にオーナーが #55 で承認し、案のファイルを自分で配置した
+  (言語コマンドを deny、`./dev` / `../dev` / `make dev-test` を allow、
+  `make db-seed` を削除)
 - `e2e.yml` (Playwright。ブラウザと `--with-deps` の apt がイメージにない。
   `main` への push だけで動き、設定ファイルがないので skip 中) と
   `chromatic.yml` は作業環境のツールのまま。e2e を有効にするときに入口へ

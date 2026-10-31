@@ -385,9 +385,8 @@ the `./dev` entrypoint at the repository root (`../dev` from `backend/` or
 `frontend/`); the hooks, the `Makefile` and CI do the same. Do not install a
 toolchain on your machine or the AI's box to work around a failing `./dev`;
 fix the entrypoint or the image instead. Do not run the toolchains directly
-either, even where they happen to be installed (NOTE: `.claude/settings.json`
-does not deny them yet; that change awaits the owner, see
-`.contexts/bootstrap-decisions.md`). The one exception is the caller's
+either, even where they happen to be installed; `.claude/settings.json`
+denies them and allows `./dev` / `../dev` instead. The one exception is the caller's
 Node 22, which runs the review gate (`node tools/review-gate/src/cli.ts`) and
 the tests of the gate and of `./dev` (`make gate-test` / `make dev-test`),
 because those must work wherever git and `./dev` run. Why:
