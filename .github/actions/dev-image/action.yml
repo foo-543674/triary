@@ -1,0 +1,25 @@
+name: dev image
+description: >-
+  Make the dev image of this checkout (`./dev --image-ref`) available to
+  ./dev: pull it from GHCR, or build it from tools/dev-image/Dockerfile when
+  it is not published yet (the Dockerfile changed on this branch; images are
+  published only from main by .github/workflows/dev-image.yml).
+
+runs:
+  using: composite
+  steps:
+    - name: Pull or build the dev image
+      shell: bash
+      # ./dev and tools/dev-image are relative to the repository root; do not
+      # depend on whether the caller job's defaults.run.working-directory
+      # reaches composite steps.
+      working-directory: ${{ github.workspace }}
+      run: |
+        ref="$(./dev --image-ref)"
+        if docker pull --quiet "$ref"; then
+          exit 0
+        fi
+        # Also reached on transient registry / network failures, not only when
+        # the tag is unpublished; building is slower but gives the same image.
+        echo "::notice::could not pull $ref (unpublished, or a registry error); building it from tools/dev-image/Dockerfile"
+        docker build --pull --tag "$ref" tools/dev-image

@@ -17,6 +17,10 @@ env:
   #       so they can compile without a live database. Run
   #       `cargo sqlx prepare` locally whenever queries change.
   SQLX_OFFLINE: "true"
+  # Every language command runs in the dev image through ./dev (AGENTS.md
+  # "Common commands"); the runner's own toolchains are not used. Runners
+  # also ship podman, which ./dev would prefer; docker is the engine here.
+  TRIARY_DEV_ENGINE: docker
 
 jobs:
   # ---------- Backend ----------
@@ -29,16 +33,20 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/dev-image
+      - name: Resolve dev image
+        id: dev
+        working-directory: .
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
         with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: backend
+          path: backend/target
+          key: target-lint-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: target-lint-${{ steps.dev.outputs.ref }}-
       - name: cargo fmt --check
-        run: cargo fmt --all -- --check
+        run: ../dev cargo fmt --all -- --check
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features
+        run: ../dev cargo clippy --all-targets --all-features
 
   backend-test:
     name: backend / test (nextest)
@@ -49,15 +57,18 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/dev-image
+      - name: Resolve dev image
+        id: dev
+        working-directory: .
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
         with:
-          workspaces: backend
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
+          path: backend/target
+          key: target-test-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: target-test-${{ steps.dev.outputs.ref }}-
       - name: cargo nextest run
-        run: cargo nextest run --all-features --no-tests=pass
+        run: ../dev cargo nextest run --all-features --no-tests=pass
 
   backend-build:
     name: backend / build (release)
@@ -69,12 +80,18 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/dev-image
+      - name: Resolve dev image
+        id: dev
+        working-directory: .
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
         with:
-          workspaces: backend
+          path: backend/target
+          key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: target-release-${{ steps.dev.outputs.ref }}-
       - name: cargo build --release
-        run: cargo build --release
+        run: ../dev cargo build --release
 
   # ---------- Frontend ----------
   frontend-lint:
@@ -86,19 +103,12 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/dev-image
+      - run: ../dev pnpm install --frozen-lockfile
       - name: biome ci
-        run: pnpm exec biome ci .
+        run: ../dev pnpm exec biome ci .
       - name: typecheck (tsc --noEmit)
-        run: pnpm exec tsc --noEmit
+        run: ../dev pnpm exec tsc --noEmit
 
   frontend-test:
     name: frontend / test (vitest + storybook smoke)
@@ -109,25 +119,18 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/dev-image
+      - run: ../dev pnpm install --frozen-lockfile
       - name: dependency-cruiser (architecture rules)
-        run: pnpm run arch:test
+        run: ../dev pnpm run arch:test
       - name: vitest run
-        run: pnpm exec vitest run
+        run: ../dev pnpm exec vitest run
       - name: build storybook
         # NOTE: Real story rendering is covered by the vitest stories smoke
         #       test. This step exists to catch breakage in the bundler /
         #       preset / config layer by running the production storybook
         #       build.
-        run: pnpm run build-storybook
+        run: ../dev pnpm run build-storybook
 
   frontend-build:
     name: frontend / build (vite)
@@ -139,16 +142,9 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vite build
+      - uses: ./.github/actions/dev-image
+      - run: ../dev pnpm install --frozen-lockfile
+      - run: ../dev pnpm exec vite build
 
   # ---------- Integration tests (language agnostic via Postman / Newman) ----------
   # NOTE: Detect whether `backend/migrations/` and the Postman collection are
@@ -178,53 +174,48 @@ jobs:
     if: needs.integration-detect.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: triary_test
-          MYSQL_USER: triary
-          MYSQL_PASSWORD: triary
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -uroot -prootpassword"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-          --tmpfs /var/lib/mysql
+    # MySQL comes from docker-compose.yml (service mysql-test) on
+    # triary-network, which ./dev joins under docker, so the dev image
+    # reaches it by name. The backend and newman run in ONE ./dev call: the
+    # collection targets http://127.0.0.1:8080, which is only the backend
+    # when both share the container.
     env:
-      DATABASE_URL: mysql://triary:triary@127.0.0.1:3306/triary_test
+      DATABASE_URL: mysql://triary:triary@triary-mysql-test:3306/triary_test
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/dev-image
+      - name: start the test database
+        run: |
+          docker network create triary-network
+          docker compose up -d --wait mysql-test
+      - name: Resolve dev image
+        id: dev
+        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
         with:
-          workspaces: backend
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: sqlx-cli
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-      - name: install newman
-        run: npm install -g newman
+          path: backend/target
+          key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: target-release-${{ steps.dev.outputs.ref }}-
       - name: run migrations
         working-directory: backend
-        run: sqlx migrate run
-      - name: start backend
+        run: ../dev sqlx migrate run
+      - name: build backend
         working-directory: backend
+        run: ../dev cargo build --release
+      - name: start backend and run newman
         run: |
-          cargo build --release
-          nohup ./target/release/triary-backend > backend.log 2>&1 &
-          for i in {1..30}; do
-            if curl -sf http://127.0.0.1:8080/health; then exit 0; fi
-            sleep 1
-          done
-          echo "backend failed to start"; cat backend.log; exit 1
-      - name: newman run
-        run: newman run tests/integration/triary.postman_collection.json
+          ./dev bash -c '
+            backend/target/release/triary-backend > backend/backend.log 2>&1 &
+            for _ in $(seq 1 30); do
+              curl -sf http://127.0.0.1:8080/health >/dev/null && break
+              sleep 1
+            done
+            curl -sf http://127.0.0.1:8080/health >/dev/null ||
+              { echo "backend failed to start"; cat backend/backend.log; exit 1; }
+            npx -y newman run tests/integration/triary.postman_collection.json'
+      - name: stop the test database
+        if: always()
+        run: docker compose down -v
 
   # ---------- OpenAPI schema validation ----------
   openapi-validate:
@@ -233,11 +224,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
+      - uses: ./.github/actions/dev-image
       - name: spectral lint
-        run: npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
+        run: ./dev npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
 
   # ---------- Dependency vulnerability scans ----------
   security-scan-backend:
@@ -249,11 +238,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-audit
-      - run: cargo audit
+      - uses: ./.github/actions/dev-image
+      - run: ../dev cargo audit
 
   security-scan-frontend:
     name: security / pnpm audit
@@ -264,10 +250,5 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-      - run: pnpm audit --audit-level high
+      - uses: ./.github/actions/dev-image
+      - run: ../dev pnpm audit --audit-level high
