@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
-# NOTE: Initial setup script invoked by the devcontainer postCreateCommand.
-#       Installs the Rust and frontend toolchains inside the devcontainer.
+# NOTE: Setup run once by the devcontainer postCreateCommand.
+#       The toolchain itself comes from the dev image (tools/dev-image/
+#       Dockerfile); this only adds per-user editor tooling and enables the
+#       review-gate hooks.
 
 set -euo pipefail
 
-echo "==> Installing cargo-binstall (for fast Rust tool installation)"
-if ! command -v cargo-binstall >/dev/null 2>&1; then
-  curl -L --proto '=https' --tlsv1.2 -sSf \
-    https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh \
-    | bash
-fi
+# The image sets HOME=/home/dev for ./dev's callers. devcontainer.json's
+# remoteEnv gives the editor user its own HOME, but whether remoteEnv also
+# applies to lifecycle commands like this one is not verified, so take the
+# home directory from the account instead of trusting $HOME.
+HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+export HOME
 
-echo "==> Installing Rust dev tools (cargo-nextest, cargo-watch, sqlx-cli)"
-cargo binstall -y --no-confirm \
-  cargo-nextest \
-  cargo-watch \
-  sqlx-cli
+echo "==> Installing frontend dependencies (needed by the git hooks)"
+(cd frontend && pnpm install --frozen-lockfile)
 
-echo "==> Enabling corepack and activating pnpm"
-corepack enable
-corepack prepare pnpm@latest --activate
-
-echo "==> Installing Biome (Frontend linter + formatter)"
-npm install -g @biomejs/biome
-
-echo "==> Installing typescript-language-server (for Claude Code typescript-lsp plugin)"
-npm install -g typescript typescript-language-server
+echo "==> Installing typescript-language-server (for the Claude Code typescript-lsp plugin)"
+# The TypeScript version the lockfile installed, into the user's own prefix:
+# the image's global node_modules belong to root.
+ts_version="$(node -p "require('./frontend/node_modules/typescript/package.json').version")"
+npm install --global --prefix "$HOME/.local" typescript-language-server "typescript@${ts_version}"
 
 echo "==> Enabling the review-gate git hooks (.githooks/, see AGENTS.md)"
 git config core.hooksPath .githooks

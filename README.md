@@ -43,8 +43,8 @@ cd triary
 cp .env.example .env
 
 # 3. Open in VS Code and choose "Reopen in Container".
-#    Inside the devcontainer ./dev runs commands directly on the
-#    devcontainer's own toolchain (see the note below).
+#    The devcontainer is built from the dev image, and ./dev runs commands
+#    directly inside it (see the note below).
 
 # 4. Start the local infra (MySQL dev + test)
 make infra-up
@@ -65,9 +65,8 @@ toolchains on your machine; see "Common commands" in `AGENTS.md`.
 NOTE: two things are not settled yet (`.contexts/bootstrap-decisions.md`
 "2026-10-31 再実行 (3.0.1)"):
 
-- The devcontainer's toolchain is not aligned with the dev image yet (Rust
-  `latest`, unpinned nextest / sqlx-cli, no cargo-audit), so results there
-  can differ from CI.
+- The devcontainer is built from the dev image's Dockerfile (#56), so it has
+  the same toolchain as CI. Unverified until the owner rebuilds it once.
 - Step 6 outside the devcontainer is unverified. `./dev` publishes no ports,
   so under docker the dev servers are probably not reachable from the host
   browser. The backend's `DATABASE_URL` in `.env.example` uses the container

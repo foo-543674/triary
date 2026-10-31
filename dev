@@ -10,13 +10,12 @@
 # script never falls back to a toolchain on the calling machine: if it cannot
 # run the image, it fails.
 #
-# Inside the dev image (TRIARY_DEV_IMAGE=1) or the devcontainer
-# (TRIARY_DEV_DIRECT=1, set in devcontainer.json) the command runs directly.
-# NOTE: the devcontainer's toolchain is NOT the image's yet: it installs
-# rust "latest", unpinned nextest / sqlx-cli and no cargo-audit, so versions
-# can differ from CI and `./dev cargo audit` fails there. Aligning it was
-# left out of stage 2: it rebuilds the owner's environment, so the approach
-# is confirmed with the owner first (same document, "第 2 段の実施").
+# Inside the dev image (TRIARY_DEV_IMAGE=1, which the devcontainer also
+# sets because it is built from tools/dev-image/Dockerfile, #56) the command
+# runs directly. TRIARY_DEV_DIRECT=1 does the same for any other environment
+# that already provides the toolchain.
+# NOTE: unverified that the devcontainer built from the dev image works; it
+# can only be built on the owner's machine (#56).
 # Otherwise podman is preferred (the ai-box ships rootless single-UID Podman),
 # then docker (the owner's machine).
 #
@@ -124,12 +123,12 @@ case "$ENGINE" in
 esac
 
 # The bind mount resolves $ROOT on the engine's host. When that host does not
-# see this path (for example docker-outside-of-docker in a devcontainer that
-# lacks TRIARY_DEV_DIRECT), the engine mounts an empty directory instead; stop
-# rather than run against it.
+# see this path (for example docker-outside-of-docker from a container that is
+# neither the dev image nor marked TRIARY_DEV_DIRECT), the engine mounts an
+# empty directory instead; stop rather than run against it.
 exec "$ENGINE" "${args[@]}" "$IMAGE" bash -c '
   [[ -f "$TRIARY_DEV_ROOT/dev" && -f "$TRIARY_DEV_ROOT/tools/dev-image/Dockerfile" ]] || {
-    echo "dev: the repository is not visible inside the container at $TRIARY_DEV_ROOT (is the engine running on another host? in a devcontainer set TRIARY_DEV_DIRECT=1)" >&2
+    echo "dev: the repository is not visible inside the container at $TRIARY_DEV_ROOT (is the engine running on another host? the devcontainer runs commands directly; in another container that has the toolchain set TRIARY_DEV_DIRECT=1)" >&2
     exit 125
   }
   exec "$@"' dev "$@"
