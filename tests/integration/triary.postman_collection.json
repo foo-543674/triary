@@ -1163,6 +1163,318 @@
           }
         }
       ]
+    },
+    {
+      "name": "GET /api/v1/exercises (US-4)",
+      "item": [
+        {
+          "name": "exercises: sign up a fresh user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('exerciseHandle', ('ex' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('exerciseCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{exerciseHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: a new user sees the 15 presets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "const items = pm.response.json().items;",
+                  "pm.test('15 presets and nothing else', function () {",
+                  "  pm.expect(items.length).to.eql(15);",
+                  "  pm.expect(items.every((i) => i.owner === 'preset')).to.eql(true);",
+                  "});",
+                  "pm.test('IDs are exr_ + 26 Crockford base32 characters', function () {",
+                  "  pm.expect(items.every((i) => /^exr_[0-9A-HJKMNP-TV-Z]{26}$/.test(i.id))).to.eql(true);",
+                  "});",
+                  "pm.test('the progression parents are linked', function () {",
+                  "  const byName = Object.fromEntries(items.map((i) => [i.name, i]));",
+                  "  pm.expect(byName['倒立腕立て (HSPU)'].parent_id).to.eql(byName['パイクプッシュアップ'].id);",
+                  "  pm.expect(byName['倒立腕立て (HSPU)'].depth).to.eql(1);",
+                  "  pm.expect(byName['ピストルスクワット'].parent_id).to.eql(byName['バックスクワット'].id);",
+                  "  pm.expect(byName['ベンチプレス'].measurement_kinds).to.eql([{ kind: 'reps', required: true }, { kind: 'weight', required: true }]);",
+                  "  pm.collectionVariables.set('benchPressId', byName['ベンチプレス'].id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: owned_only is empty for a new user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no own exercises yet', function () { pm.expect(pm.response.json().items).to.eql([]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises?owned_only=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ],
+              "query": [
+                {
+                  "key": "owned_only",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: detail of a preset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('has the list fields and created_at', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.eql('ベンチプレス');",
+                  "  pm.expect(body.owner).to.eql('preset');",
+                  "  pm.expect(body.created_at).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/{{benchPressId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "{{benchPressId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: an unknown ID is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404 not_found without field', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  const errors = pm.response.json().errors;",
+                  "  pm.expect(errors.map((e) => e.code)).to.eql(['not_found']);",
+                  "  pm.expect(errors[0]).to.not.have.property('field');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: a malformed ID is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/not-an-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "not-an-id"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: listing needs a session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401 unauthenticated', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().errors.map((e) => e.code)).to.eql(['unauthenticated']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
     }
   ]
 }

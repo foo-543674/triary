@@ -106,6 +106,45 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/exercises': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Exercises the user can use (US-4)
+     * @description All presets and the user's own exercises, ordered by name. Not
+     *     paginated (tens to hundreds of items). `depth` is the position in
+     *     the progression tree and does not change with the filters.
+     */
+    get: operations['listExercises'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/exercises/{exercise_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One exercise (US-4) */
+    get: operations['getExercise'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -213,8 +252,66 @@ export interface components {
     SignedInUser: {
       user_id: components['schemas']['UserHandle'];
     };
+    /** @enum {string} */
+    MeasurementKind: 'reps' | 'weight' | 'time';
+    Measurement: {
+      kind: components['schemas']['MeasurementKind'];
+      /** @description Every set of the exercise must record this measurement. */
+      required: boolean;
+    };
+    Exercise: {
+      id: components['schemas']['IdString'];
+      name: string;
+      /**
+       * @description `preset`: provided by triary, read-only. `user`: the user's own.
+       * @enum {string}
+       */
+      owner: 'preset' | 'user';
+      measurement_kinds: components['schemas']['Measurement'][];
+      /** @description The exercise this one progresses from; null for a root. */
+      parent_id: components['schemas']['IdString'] | null;
+      /** @description Depth in the progression tree (0 = root). */
+      depth: number;
+    };
+    ExerciseDetail: components['schemas']['Exercise'] & {
+      created_at: components['schemas']['Timestamp'];
+    };
+    ExerciseList: {
+      items: components['schemas']['Exercise'][];
+    };
   };
-  responses: never;
+  responses: {
+    /** @description `unauthenticated`: no cookie, or an unknown or expired session. */
+    Unauthenticated: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        'application/json': components['schemas']['ErrorEnvelope'];
+      };
+    };
+    /**
+     * @description `not_found` without field: the path target does not exist or belongs
+     *     to another user (not told apart, so other users' data stays hidden).
+     */
+    NotFound: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        'application/json': components['schemas']['ErrorEnvelope'];
+      };
+    };
+    /** @description Unexpected error, in the common error envelope. */
+    UnexpectedError: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        'application/json': components['schemas']['ErrorEnvelope'];
+      };
+    };
+  };
   parameters: never;
   requestBodies: never;
   headers: never;
@@ -426,6 +523,70 @@ export interface operations {
           'application/json': components['schemas']['ErrorEnvelope'];
         };
       };
+    };
+  };
+  listExercises: {
+    parameters: {
+      query?: {
+        /**
+         * @description Case-insensitive part of the name. Surrounding spaces are
+         *     ignored; a blank value means no filter.
+         */
+        q?: string;
+        /** @description Only the user's own exercises. */
+        owned_only?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The visible exercises. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExerciseList'];
+        };
+      };
+      /** @description `invalid_format` without field: a query value that cannot be read (e.g. `owned_only=yes`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      default: components['responses']['UnexpectedError'];
+    };
+  };
+  getExercise: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        exercise_id: components['schemas']['IdString'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The exercise. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExerciseDetail'];
+        };
+      };
+      401: components['responses']['Unauthenticated'];
+      404: components['responses']['NotFound'];
+      default: components['responses']['UnexpectedError'];
     };
   };
 }

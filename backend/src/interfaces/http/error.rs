@@ -16,8 +16,12 @@
 
 use axum::{
     Json,
-    extract::{FromRequest, Request, rejection::JsonRejection},
+    extract::{
+        FromRequest, FromRequestParts, Query, Request,
+        rejection::{JsonRejection, QueryRejection},
+    },
     http::StatusCode,
+    http::request::Parts,
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -244,6 +248,27 @@ where
             .await
             .map(|Json(value)| Self(value))
             .map_err(|rejection: JsonRejection| from_json_rejection(&rejection))
+    }
+}
+
+/// Query string extractor whose rejections use the error envelope: a value
+/// that does not parse (`owned_only=yes`) is 400 `invalid_format` without
+/// field, like an unreadable body.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct QueryParams<T>(pub T);
+
+impl<T, S> FromRequestParts<S> for QueryParams<T>
+where
+    T: DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        Query::<T>::from_request_parts(parts, state)
+            .await
+            .map(|Query(value)| Self(value))
+            .map_err(|rejection: QueryRejection| AppError::BadRequest(rejection.body_text()))
     }
 }
 

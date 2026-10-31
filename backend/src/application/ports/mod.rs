@@ -5,6 +5,7 @@
 //! The traits return boxed futures so they can be used as trait objects
 //! (`Arc<dyn UserRepository>`) without an extra crate.
 
+pub mod exercise_repository;
 pub mod secrets;
 pub mod session_store;
 pub mod user_repository;

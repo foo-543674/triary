@@ -11,6 +11,8 @@ const Home = lazy(() => import('./routes/index'));
 const NotFound = lazy(() => import('./routes/not-found'));
 const Signup = lazy(() => import('./routes/signup'));
 const Login = lazy(() => import('./routes/login'));
+const Exercises = lazy(() => import('./routes/exercises/index'));
+const ExerciseDetail = lazy(() => import('./routes/exercises/detail'));
 
 const queryClient = createAppQueryClient();
 
@@ -22,15 +24,25 @@ const Layout: Component<{ children?: JSX.Element }> = (props) => {
   return (
     <div class="min-h-screen bg-white">
       <header class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <A class="text-lg font-semibold text-green-700" href="/">
-          triary
-        </A>
+        <nav class="flex items-center gap-4">
+          <A class="text-lg font-semibold text-green-700" href="/">
+            triary
+          </A>
+          <A class="text-sm text-gray-700 hover:text-green-700" href="/exercises">
+            種目
+          </A>
+        </nav>
         <AccountMenuContainer onSignedOut={() => navigate('/login', { replace: true })} />
       </header>
       <main class="mx-auto max-w-3xl px-4">{props.children}</main>
     </div>
   );
 };
+
+/** A page only signed-in users may open. */
+const Protected: Component<{ page: Component }> = (props) => (
+  <RequireAuthContainer loginPath="/login">{props.page({})}</RequireAuthContainer>
+);
 
 const App: Component = () => {
   return (
@@ -45,6 +57,8 @@ const App: Component = () => {
               </RequireAuthContainer>
             )}
           />
+          <Route path="/exercises" component={() => <Protected page={Exercises} />} />
+          <Route path="/exercises/:id" component={() => <Protected page={ExerciseDetail} />} />
           <Route path="/signup" component={Signup} />
           <Route path="/login" component={Login} />
           <Route path="*" component={NotFound} />

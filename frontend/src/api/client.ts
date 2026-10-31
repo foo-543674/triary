@@ -1,5 +1,5 @@
 import createClient from 'openapi-fetch';
-import type { paths } from './schema.gen';
+import type { components, paths } from './schema.gen';
 
 /**
  * API client typed against the OpenAPI schema (`openapi/openapi.yaml`).
@@ -23,3 +23,12 @@ export const apiClient = createClient<paths>({
   // (observed: "fetch failed" against a mocked /health).
   fetch: (request) => globalThis.fetch(request),
 });
+
+/*
+ * Domain shapes of the API, named for use outside `src/api/` (the generated
+ * file may only be imported here; .dependency-cruiser.cjs).
+ */
+export type Exercise = components['schemas']['Exercise'];
+export type ExerciseDetail = components['schemas']['ExerciseDetail'];
+export type Measurement = components['schemas']['Measurement'];
+export type MeasurementKind = components['schemas']['MeasurementKind'];

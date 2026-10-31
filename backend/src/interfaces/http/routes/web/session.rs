@@ -76,7 +76,6 @@ mod tests {
 
     use crate::application::ports::secrets::SessionToken;
     use crate::domain::user::UserId;
-    use crate::interfaces::http::state::AppState;
     use crate::testing::{Fakes, fakes, now};
 
     struct Reply {
@@ -86,9 +85,7 @@ mod tests {
     }
 
     fn router(fakes: &Fakes) -> Router {
-        crate::app(AppState {
-            auth: fakes.deps.clone(),
-        })
+        crate::app(fakes.state())
     }
 
     async fn send(

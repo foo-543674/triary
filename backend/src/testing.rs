@@ -9,11 +9,14 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 
 use crate::application::auth::AuthDeps;
+use crate::application::exercises::ExerciseDeps;
 use crate::application::ports::BoxFuture;
+use crate::application::ports::exercise_repository::ExerciseRepository;
 use crate::application::ports::secrets::{IdSource, SecretSource, SessionToken};
 use crate::application::ports::session_store::SessionStore;
 use crate::application::ports::user_repository::{InsertUserError, UserRepository};
 use crate::domain::clock::Clock;
+use crate::domain::exercise::{Exercise, ExerciseId};
 use crate::domain::password_hasher::{PasswordHasher, PasswordHashingFailed};
 use crate::domain::user::{Password, PasswordHash, User, UserHandle, UserId};
 use crate::interfaces::http::state::AppState;
@@ -160,11 +163,61 @@ pub fn now() -> DateTime<Utc> {
     DateTime::<Utc>::from_timestamp(1_800_000_000, 0).expect("valid timestamp")
 }
 
+#[derive(Default)]
+pub struct MemoryExercises(Mutex<Vec<Exercise>>);
+
+impl MemoryExercises {
+    pub fn add(&self, exercise: Exercise) {
+        self.0.lock().unwrap().push(exercise);
+    }
+}
+
+impl ExerciseRepository for MemoryExercises {
+    fn list_visible<'a>(&'a self, user: UserId) -> BoxFuture<'a, anyhow::Result<Vec<Exercise>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.is_visible_to(user))
+            .cloned()
+            .collect();
+        Box::pin(async move { Ok(found) })
+    }
+
+    fn find_visible<'a>(
+        &'a self,
+        user: UserId,
+        id: &'a ExerciseId,
+    ) -> BoxFuture<'a, anyhow::Result<Option<Exercise>>> {
+        let found = self
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|e| e.id() == *id && e.is_visible_to(user))
+            .cloned();
+        Box::pin(async move { Ok(found) })
+    }
+}
+
 /// Fakes with handles kept so tests can look inside.
 pub struct Fakes {
     pub users: Arc<MemoryUsers>,
     pub sessions: Arc<MemorySessions>,
+    pub exercises: Arc<MemoryExercises>,
     pub deps: AuthDeps,
+}
+
+impl Fakes {
+    pub fn state(&self) -> AppState {
+        AppState {
+            auth: self.deps.clone(),
+            exercises: ExerciseDeps {
+                exercises: self.exercises.clone(),
+            },
+        }
+    }
 }
 
 pub fn fakes() -> Fakes {
@@ -182,10 +235,11 @@ pub fn fakes() -> Fakes {
     Fakes {
         users,
         sessions,
+        exercises: Arc::new(MemoryExercises::default()),
         deps,
     }
 }
 
 pub fn state() -> AppState {
-    AppState { auth: fakes().deps }
+    fakes().state()
 }

@@ -65,13 +65,10 @@ mod tests {
     use serde_json::{Value, json};
     use tower::ServiceExt as _;
 
-    use crate::interfaces::http::state::AppState;
     use crate::testing::{Fakes, fakes};
 
     async fn post(fakes: &Fakes, body: Value) -> (StatusCode, Option<String>, Value) {
-        let state = AppState {
-            auth: fakes.deps.clone(),
-        };
+        let state = fakes.state();
         let response = crate::app(state)
             .oneshot(
                 Request::post("/web/v1/signup")

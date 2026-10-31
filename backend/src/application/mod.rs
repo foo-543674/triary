@@ -12,4 +12,5 @@
 //! - Transaction boundaries are defined here, not in handlers or repositories.
 
 pub mod auth;
+pub mod exercises;
 pub mod ports;

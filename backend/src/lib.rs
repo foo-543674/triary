@@ -29,9 +29,11 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::application::auth::AuthDeps;
+use crate::application::exercises::ExerciseDeps;
 use crate::config::CorsConfig;
 use crate::infrastructure::clock::SystemClock;
 use crate::infrastructure::password_hasher::Argon2idHasher;
+use crate::infrastructure::repositories::mysql_exercise_repository::MysqlExerciseRepository;
 use crate::infrastructure::repositories::mysql_session_store::MysqlSessionStore;
 use crate::infrastructure::repositories::mysql_user_repository::MysqlUserRepository;
 use crate::infrastructure::secrets::{OsSecrets, TimeOrderedIds};
@@ -57,6 +59,7 @@ pub fn app_with_cors(state: AppState, cors: CorsConfig) -> Router {
     Router::new()
         .merge(routes::health::router())
         .merge(routes::web::router())
+        .merge(routes::api::router())
         .fallback(error::route_not_found)
         .method_not_allowed_fallback(error::method_not_allowed)
         .with_state(state)
@@ -109,11 +112,14 @@ pub async fn run() -> anyhow::Result<()> {
     let state = AppState {
         auth: AuthDeps {
             users: Arc::new(MysqlUserRepository::new(pool.clone())),
-            sessions: Arc::new(MysqlSessionStore::new(pool)),
+            sessions: Arc::new(MysqlSessionStore::new(pool.clone())),
             hasher: Arc::new(Argon2idHasher::new()),
             clock: Arc::new(SystemClock),
             ids: Arc::new(TimeOrderedIds),
             secrets: Arc::new(OsSecrets),
+        },
+        exercises: ExerciseDeps {
+            exercises: Arc::new(MysqlExerciseRepository::new(pool)),
         },
     };
 
