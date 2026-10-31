@@ -114,17 +114,17 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 
 ## 人間の承認なしでマージしてよい変更
 
-条件の版: 2026-10-31 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。#63 のマージ (2026-10-31) で有効。最初の適用は #50 (rstest): 14:42 UTC に automerge ジョブが GitHub Actions として承認し、そのままマージされた (run 41211333898、ruleset 有効の状態で観測)。
+条件の版: 2026-10-31 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」(のち、code owner 保護との兼ね合いを説明したうえで承認ありに確定。下記)「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。#63 のマージ (2026-10-31) で有効。最初の適用は #50 (rstest): 14:42 UTC に automerge ジョブが GitHub Actions として承認し、そのままマージされた (run 41211333898、ruleset 有効の状態で観測)。
 
 | 区分 | 変更 | 検証器が確かめる証拠 (`tools/review-gate/acceptance.sh` の手順 0) |
 |---|---|---|
 | 承認なし | Dependabot による Rust / npm の依存更新 (patch / minor / major を問わない) | 判定は `tools/review-gate/src/dependency.ts` (単体テスト `dependency.test.ts`)。PR 作成者が `dependabot[bot]`。merge-base から判定した HEAD までの変更ファイル (リネーム元を含む) が `backend/Cargo.toml` / `backend/Cargo.lock` / `frontend/package.json` / `frontend/pnpm-lock.yaml` だけ。その範囲の全コミットについて、作成者が `dependabot[bot]`、コミッターが `web-flow` (GitHub)、署名検証が通っている (作成者は push する人が自由に書けるので、それだけでは足りない)。必須の CI ジョブがその SHA ですべて成功。台帳のスナップショットは求めない |
-| 人間の承認が要る | 上記以外のすべて。GitHub Actions の更新も今は含む (下記) | — |
+| 人間の承認が要る | 上記以外のすべて。GitHub Actions の更新も含む (下記) | — |
 
 - 合格すると、`acceptance.yml` の `acceptance / automerge dependency update` ジョブが GitHub Actions として承認し、判定した HEAD に限って auto-merge を有効にする。前提となるリポジトリ設定: 「Allow GitHub Actions to create and approve pull requests」(承認に必要。オーナーの操作) と「Allow auto-merge」(`gh pr merge --auto` に必要。2026-10-31 に API の `allow_auto_merge: true` で有効を確認)。この設定で PR のコードから書き込みトークンに届くと自分の PR を承認できてしまうので、PR のコードを動かす workflow はトークンを読み取り専用にした (`permissions: contents: read`)
 - 承認の後に Dependabot のブランチへ別のコミットが push された場合、その承認を使わせない仕組みは ruleset の `dismiss_stale_reviews_on_push` と `require_last_push_approval` (`docs/rulesets/main.json`) である。ruleset は 2026-10-31 から有効だが、これらが実際に効くことは動作確認 #7 が済むまで未確認。それまでの確かな防御は `--match-head-commit` (判定した HEAD 以外をマージしない) である
 - NOTE: 未確認 — Dependabot のブランチで、作成者を偽った上で `web-flow` の署名付きコミットを作れるか (GitHub の Web UI や contents API で作ったコミットを `web-flow` が署名するかどうか、`author` を指定できるかどうかも確かめていない)。書き込み権限が要る操作で、今の書き込み権限者はオーナーと AI の App だけ。確かめ方: テスト用のブランチで contents API に `author` を指定してコミットし、`author.login` と `committer.login` を見る。より強い対策は、`dependabot/**` への push を Dependabot に限る ruleset (オーナーの操作)
-- **GitHub Actions の更新はまだ承認ありのまま。** オーナーは含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。どちらを取るかを #43 でオーナーに確認している。それまでの暫定: Actions の更新 PR はオーナーが承認してマージする
+- **GitHub Actions の更新は承認あり (2026-10-31 にオーナーが確定、#43)。** オーナーは当初含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。この穴を説明したうえで、オーナーは承認ありを選んだ。運用: Actions の更新 PR は AI がレビューしてスナップショットを投稿し、オーナーが承認してマージする
 - NOTE: 未確認 — GITHUB_TOKEN で行ったマージは `main` への push の workflow を起動しない (GitHub のドキュメント「Triggering a workflow from a workflow」による)。そのため、この区分のマージでは `main` の CI が走らない。根拠は、ruleset の「ブランチを最新にする」で最新の HEAD に対して走った PR の CI とする
 - 変更されたパスは判定の材料の 1 つで、パスだけで安全と決めない。検証器が機械的に確かめられない部分は承認ありとする
 - 戻し方: `git revert` でロックファイルとマニフェストを戻す。データ変更・外部への作用は起きない (デプロイの仕組みがまだないため)。デプロイが入ったら見直す
