@@ -1,5 +1,5 @@
 //! Supply-chain guardrail: every direct dependency must have an entry in the
-//! ledger of `docs/dependency-policy.md` ("直接依存の台帳"), and the ledger must
+//! ledger `docs/dependency-ledger.md` ("直接依存の台帳"), and the ledger must
 //! not list crates that are gone. The entry records how the crate was vetted;
 //! adding a crate without one fails here.
 //!
@@ -16,7 +16,7 @@ use std::process::Command;
 
 use serde_json::Value;
 
-const LEDGER: &str = "../docs/dependency-policy.md";
+const LEDGER: &str = "../docs/dependency-ledger.md";
 const LEDGER_HEADING: &str = "## 直接依存の台帳";
 const PACKAGE: &str = "triary-backend";
 

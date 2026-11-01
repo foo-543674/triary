@@ -27,3 +27,12 @@
 /frontend/.dependency-cruiser.cjs @foo-543674
 /frontend/scripts/check-arch.mjs  @foo-543674
 /.github/                         @foo-543674
+# Configuration the required CI jobs read (R100): changing it changes what
+# the gates check, so it needs the owner like the gates themselves.
+# frontend/package.json and backend/Cargo.toml cannot be listed (Dependabot
+# updates them and merges without approval); tools/review-gate/src/ai-change.ts
+# keeps the AI's changes to them out of approval-free merging instead.
+/frontend/biome.json              @foo-543674
+/frontend/tsconfig.json           @foo-543674
+/frontend/vite.config.ts          @foo-543674
+/frontend/.storybook/             @foo-543674
