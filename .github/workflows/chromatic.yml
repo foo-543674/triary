@@ -76,6 +76,14 @@ jobs:
           #       the Chromatic UI; we do not want them to fail the PR check.
           #       Render errors and build errors still fail this job.
           exitZeroOnChanges: true
+          # Until the screens have a visual design, nobody is asked to accept
+          # visual changes: the owner cannot judge unstyled parts without
+          # their screen and flow, and anything accepted now would need a
+          # second review once styled (owner, 2026-11-01). Every build becomes
+          # the baseline; the published Storybook stays viewable.
+          # Revisit when a styling / design slice starts: remove this line so
+          # visual changes wait for a human again.
+          autoAcceptChanges: true
           # NOTE: With TurboSnap, PRs that touch neither story files nor
           #       their dependencies skip snapshotting entirely.
           onlyChanged: true
