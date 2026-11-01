@@ -11,13 +11,18 @@ servers:
     description: Local development environment
 tags:
   - name: health
-    description: Service health checks
+    description: Service health checks (not versioned)
+  - name: web-v1
+    description: Web UI BFF for the PWA (`/web/v1`); browser session lifecycle
+  - name: api-v1
+    description: REST API over the domain resources (`/api/v1`)
 paths:
   /health:
     get:
       tags: [health]
       summary: Service health check
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: Service is up and running.
@@ -25,7 +30,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+# Every operation needs the session cookie unless it declares `security: []`
+# (`.contexts/api-design.md` §1.3).
+security:
+  - cookieAuth: []
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: triary_session
+      description: |
+        Server-issued random 256-bit session token, set by signup and login
+        with `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`.
   schemas:
     Health:
       type: object
@@ -34,3 +57,97 @@ components:
         status:
           type: string
           enum: [ok]
+    ErrorEnvelope:
+      type: object
+      description: |
+        Body of every error response (`.contexts/api-design.md` §1.6). Never
+        a single-error object; validation errors are all collected.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          description: Order has no meaning.
+          items:
+            $ref: "#/components/schemas/ErrorItem"
+    ErrorItem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        field:
+          type: string
+          description: |
+            Path of the offending input (`name`, `sets[1].reps`). Present for
+            field-dependent codes. Absent for `unauthenticated`,
+            `invalid_credentials`, `preset_not_modifiable`, `not_found` on the
+            path target, `rate_limited`, `internal_error`, and for
+            `invalid_format` when the request could not be read at all: a body
+            that is not the expected JSON (400), or a protocol refusal that
+            keeps its own status (405 wrong method, 413 body too large, 415
+            not JSON). Such structural errors stop at the first one.
+          examples: ["name", "sets[1].reps"]
+        message:
+          type: string
+          description: |
+            Short English text for debugging. Clients show their own wording
+            based on `(code, field)`.
+    ErrorCode:
+      type: string
+      description: |
+        Kind of error, never including the field name. Adding a code is not a
+        breaking change; clients must tolerate codes they do not know.
+      enum:
+        - required
+        - too_short
+        - too_long
+        - invalid_charset
+        - invalid_format
+        - empty
+        - out_of_range
+        - in_future
+        - before_start
+        - reserved
+        - already_taken
+        - not_found
+        - locked_by_existing_records
+        - incompatible_with_existing_sets
+        - creates_cycle
+        - exceeds_max_depth
+        - exceeds_max_children
+        - exceeds_max_blocks
+        - missing_required_measurement
+        - unauthenticated
+        - invalid_credentials
+        - preset_not_modifiable
+        - rate_limited
+        - internal_error
+    PageInfo:
+      type: object
+      description: Cursor pagination state of a list response (`api-design.md` §1.5).
+      required: [next_cursor, has_next]
+      properties:
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque base64url cursor for the next page; null on the last page.
+        has_next:
+          type: boolean
+    IdString:
+      type: string
+      description: |
+        Resource ID: a type prefix (`usr_`, `exr_`, `ses_`, `blk_`, `set_`)
+        and a ULID in Crockford base32 (`api-design.md` §3).
+      pattern: "^(usr|exr|ses|blk|set)_[0-9A-HJKMNP-TV-Z]{26}$"
+      examples: ["exr_01HZX3Y5Q8K2M4N6P8R0T2V4W6"]
+    WorkoutDate:
+      type: string
+      format: date
+      description: Calendar date of the workout (`YYYY-MM-DD`) in the client's time zone.
+      examples: ["2026-10-31"]
+    Timestamp:
+      type: string
+      format: date-time
+      description: UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
+      pattern: "Z$"
+      examples: ["2026-10-31T09:30:00Z"]

@@ -26,7 +26,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::config::CorsConfig;
-use crate::interfaces::http::routes;
+use crate::interfaces::http::{error, routes};
 
 /// Builds the HTTP router.
 ///
@@ -46,6 +46,8 @@ pub fn app() -> Router {
 pub fn app_with_cors(cors: CorsConfig) -> Router {
     Router::new()
         .merge(routes::health::router())
+        .fallback(error::route_not_found)
+        .method_not_allowed_fallback(error::method_not_allowed)
         .layer(build_cors_layer(cors))
         .layer(TraceLayer::new_for_http())
 }
