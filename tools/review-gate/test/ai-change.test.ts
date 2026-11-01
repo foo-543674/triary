@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { AI_AUTHOR, classifyAiChange, HOLD_LABEL, type PullRequest } from "../src/ai-change.ts";
+import {
+  AI_AUTHOR,
+  classifyAiChange,
+  HOLD_LABEL,
+  isNewScreen,
+  NEEDS_UI_REVIEW_LABEL,
+  OWNER,
+  type PullRequest,
+  UI_REVIEWED_LABEL,
+} from "../src/ai-change.ts";
 
 const aiPr: PullRequest = {
   user: { login: AI_AUTHOR },
@@ -13,7 +22,7 @@ const classify = (
   pr: PullRequest,
   baseFiles: readonly string[] = [],
   changedFiles: readonly string[] = ["backend/src/main.rs"],
-) => classifyAiChange({ pr, defaultBranch: "main", baseFiles, changedFiles });
+) => classifyAiChange({ pr, defaultBranch: "main", baseFiles, changedFiles, addedFiles: [] });
 
 describe("classifyAiChange: accepted", () => {
   it("accepts a ready PR by the AI against the default branch that changes no base file", () => {
@@ -84,5 +93,54 @@ describe("classifyAiChange: rejected", () => {
   it("lists every base file it changes", () => {
     const result = classify(aiPr, ["AGENTS.md", ".github/workflows/ci.yml"]);
     assert.equal(result.reasons.length, 2);
+  });
+});
+
+describe("classifyAiChange: UI review", () => {
+  const screen = "frontend/src/routes/settings.tsx";
+  const judge = (labels: readonly string[], addedFiles: readonly string[], uiReviewedBy?: string) =>
+    classifyAiChange({
+      pr: { ...aiPr, labels: labels.map((name) => ({ name })) },
+      defaultBranch: "main",
+      baseFiles: [],
+      changedFiles: addedFiles,
+      addedFiles,
+      ...(uiReviewedBy === undefined ? {} : { uiReviewedBy }),
+    });
+
+  it("waits for the owner when the change adds a screen", () => {
+    const result = judge([], [screen]);
+    assert.equal(result.aiChange, false);
+    assert.match(result.reasons.join(), /adds the screen frontend\/src\/routes\/settings\.tsx/);
+  });
+
+  it("waits for the owner when the AI marked a large layout change", () => {
+    assert.match(judge([NEEDS_UI_REVIEW_LABEL], []).reasons.join(), /needs-ui-review/);
+  });
+
+  it("merges once the owner put ui-reviewed on it", () => {
+    assert.deepEqual(judge([NEEDS_UI_REVIEW_LABEL, UI_REVIEWED_LABEL], [screen], OWNER), {
+      aiChange: true,
+      reasons: [],
+    });
+  });
+
+  it("does not count a ui-reviewed label someone else added", () => {
+    assert.equal(judge([UI_REVIEWED_LABEL], [screen], AI_AUTHOR).aiChange, false);
+  });
+
+  it("does not count who added ui-reviewed once the label is gone", () => {
+    assert.equal(judge([], [screen], OWNER).aiChange, false);
+  });
+
+  it("treats only added route modules as screens", () => {
+    assert.equal(isNewScreen("frontend/src/routes/history/index.tsx"), true);
+    assert.equal(isNewScreen("frontend/src/routes/home.test.tsx"), false);
+    assert.equal(isNewScreen("frontend/src/routes/home.stories.tsx"), false);
+    assert.equal(isNewScreen("frontend/src/features/auth/components/login-form.tsx"), false);
+  });
+
+  it("does not wait when only existing screens change", () => {
+    assert.deepEqual(judge([], []), { aiChange: true, reasons: [] });
   });
 });

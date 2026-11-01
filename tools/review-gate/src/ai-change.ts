@@ -11,6 +11,19 @@
 export const AI_AUTHOR = "foo-543674-ai-agent[bot]";
 // A label the owner puts on a PR to keep it from merging automatically.
 export const HOLD_LABEL = "hold-merge";
+// UI review (owner decision 2026-11-01): the owner looks at new screens and
+// large layout changes only. A new screen is detected here; whether a change
+// is a large layout change is judged by the AI, which then puts
+// NEEDS_UI_REVIEW_LABEL on the PR. Either waits until the owner adds
+// UI_REVIEWED_LABEL (only the owner's label counts; the verifier reads who
+// added it). A missed review is acceptable: it is fixed afterwards.
+export const NEEDS_UI_REVIEW_LABEL = "needs-ui-review";
+export const UI_REVIEWED_LABEL = "ui-reviewed";
+export const OWNER = "foo-543674";
+
+/** A screen: a route module the change adds (tests and stories are not screens). */
+export const isNewScreen = (path: string): boolean =>
+  path.startsWith("frontend/src/routes/") && path.endsWith(".tsx") && !/\.(test|stories)\.tsx$/.test(path);
 
 // Files that would configure the required CI jobs but cannot be code-owned
 // because they do not exist yet (R100): adding one changes how a required job
@@ -48,12 +61,28 @@ export interface AiChangeInput {
   readonly baseFiles: readonly string[];
   // Every changed path of the PR, including rename sources.
   readonly changedFiles: readonly string[];
+  // Paths the change adds (merge base to the judged head).
+  readonly addedFiles: readonly string[];
+  // Who last added UI_REVIEWED_LABEL, if it is on the PR.
+  readonly uiReviewedBy?: string;
 }
 
 export interface AiChangeClassification {
   readonly aiChange: boolean;
   readonly reasons: readonly string[];
 }
+
+const uiReviewProblems = (input: AiChangeInput, labels: readonly (string | undefined)[]): readonly string[] => {
+  const reviewed = labels.includes(UI_REVIEWED_LABEL) && input.uiReviewedBy === OWNER;
+  if (reviewed) return [];
+  const screens = input.addedFiles.filter(isNewScreen);
+  return [
+    ...screens.map((f) => `adds the screen ${f} (waits for the owner's ${UI_REVIEWED_LABEL} label)`),
+    ...(labels.includes(NEEDS_UI_REVIEW_LABEL)
+      ? [`the PR has the ${NEEDS_UI_REVIEW_LABEL} label (waits for the owner's ${UI_REVIEWED_LABEL} label)`]
+      : []),
+  ];
+};
 
 export const classifyAiChange = (input: AiChangeInput): AiChangeClassification => {
   const author = input.pr.user?.login ?? "(unknown)";
@@ -68,6 +97,7 @@ export const classifyAiChange = (input: AiChangeInput): AiChangeClassification =
     ...input.changedFiles
       .filter((f) => GUARDRAIL_CONFIG.has(f))
       .map((f) => `changes ${f}, which configures the required CI jobs`),
+    ...uiReviewProblems(input, labels),
   ];
   return { aiChange: reasons.length === 0, reasons };
 };
