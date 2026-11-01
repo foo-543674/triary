@@ -73,12 +73,16 @@ mapfile -t added < <(git diff --name-only --diff-filter=A "$MERGE_BASE" "$HEAD_S
 # by GitHub). The compare range ends at HEAD_SHA, so the answer is about the
 # judged head even if the PR moves meanwhile. Any failure means "not a
 # dependency update", i.e. the normal path with a review ledger.
+# dependabot_authored: every commit is Dependabot's own whatever the files
+# (e.g. GitHub Actions pins); it only drops the snapshot requirement (step 2).
 compare_file="$(mktemp)"
 dependency_update=false
+dependabot_authored=false
 if gh api "repos/$REPO/compare/$MERGE_BASE...$HEAD_SHA" >"$compare_file"; then
   classification="$("${CLI[@]}" classify-dependency --pr-author "$(jq -r .user.login <<<"$pr_json")" \
     --head "$HEAD_SHA" --compare-file "$compare_file" || echo '{}')"
   dependency_update="$(jq -r 'if .dependencyUpdate == true then "true" else "false" end' <<<"$classification")"
+  dependabot_authored="$(jq -r 'if .dependabotAuthored == true then "true" else "false" end' <<<"$classification")"
   jq -r '.reasons[]? | "not a dependency update: " + .' <<<"$classification"
 fi
 DIFF_HASH="$("${CLI[@]}" range-hash --from "$MERGE_BASE" --to "$HEAD_SHA")"
@@ -126,11 +130,14 @@ fi
 
 # --- 2. review ledger snapshot matches this version and meets the contract -------
 # DO NOT REMOVE OR WEAKEN: no snapshot / broken snapshot / stale snapshot fails.
-# The only exception is a dependency update as decided in step 0 (#43).
-if [[ "$dependency_update" == "true" ]]; then
+# The only exception is a PR whose every commit is Dependabot's own, as decided
+# in step 0 (#43; extended to every Dependabot ecosystem by owner decision
+# 2026-11-01, provisional). No AI wrote it, so there is no AI review to bind.
+# Base files it touches (e.g. workflows) still need the code owner (step 4).
+if [[ "$dependabot_authored" == "true" ]]; then
   : >"$SNAPSHOT_FILE"
   snapshot_verdict='{"ok":true,"reasons":[],"decisionRefs":[],"contentHash":null}'
-  review_state="not required (Dependabot dependency update, #43)"
+  review_state="not required (Dependabot's own commits)"
 else
 gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" |
   jq -rs --argjson allowed "$ALLOWED_SNAPSHOT_AUTHORS" '
@@ -223,6 +230,10 @@ elif [[ "$dependency_update" == "true" ]]; then
   else
     post_status success "machine checks passed (Dependabot update; supply-chain check needs a human, see the run)"
   fi
+elif [[ "$dependabot_authored" == "true" ]]; then
+  # Dependabot's own commits outside the dependency files and base files: no
+  # snapshot was required (step 2), and it does not merge without approval.
+  post_status success "machine checks passed (CI; Dependabot's own commits, no review ledger required; human approval required)"
 else
   # --- 5. a change by the AI that merges without human approval? ------------------
   # Owner decision 2026-11-01 (contract: docs/remote-acceptance.md "人間の承認なしで
