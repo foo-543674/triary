@@ -50,6 +50,60 @@ const withCriticalOpen = (): Ledger => {
 const roundTrip = (ledger: Ledger, decisions: readonly string[] = []) =>
   parseSnapshotComment(renderSnapshotComment(buildSnapshot(ledger, context, decisions)));
 
+const withCriticalResolved = (): Ledger => {
+  const result = applyRound(
+    withCriticalOpen(),
+    {
+      diffHash: "d1",
+      scope: "push",
+      reviewer: "code-reviewer",
+      outputOk: true,
+      newFindings: [
+        { id: "R2", severity: "important", paths: ["b.rs"], basis: "naming", evidence: "Manager" },
+      ],
+      updates: [{ id: "R1", status: "resolved", resolution: "import removed" }],
+    },
+    "2026-10-31T00:00:01.000Z",
+  );
+  assert.equal(result.ok, true);
+  return result.ok ? result.value : emptyLedger();
+};
+
+describe("submitted ledger", () => {
+  it("leaves resolved findings out and keeps every other one", () => {
+    const snapshot = buildSnapshot(withCriticalResolved(), context, []);
+    assert.deepEqual(
+      snapshot.ledger.findings.map((f) => f.id),
+      ["R2"],
+    );
+  });
+
+  it("keeps only the rounds of the submitted diff", () => {
+    const other = applyRound(
+      withCriticalResolved(),
+      { diffHash: "d0", scope: "push", reviewer: "code-reviewer", outputOk: true, newFindings: [], updates: [] },
+      "2026-10-31T00:00:02.000Z",
+    );
+    assert.equal(other.ok, true);
+    if (!other.ok) return;
+    const snapshot = buildSnapshot(other.value, context, []);
+    assert.deepEqual(
+      snapshot.ledger.rounds.map((r) => r.diffHash),
+      ["d1", "d1"],
+    );
+  });
+
+  it("judges the same as the full ledger", () => {
+    const full = withCriticalResolved();
+    const parsed = parseSnapshotComment(renderSnapshotComment(buildSnapshot(full, context, [])));
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    const fromSnapshot = judgeAcceptance(parsed.value, context);
+    const fromFull = judgeAcceptance({ ...parsed.value, ledger: full }, context);
+    assert.deepEqual(fromSnapshot, fromFull);
+  });
+});
+
 describe("snapshot comment round trip", () => {
   it("parses what it renders", () => {
     const parsed = roundTrip(reviewed());
