@@ -1,7 +1,8 @@
 //! Argon2id password hashing (architecture.md "認証・セッション方針").
 
-use argon2::password_hash::phc::PasswordHash as PhcString;
-use argon2::password_hash::{PasswordHasher as _, PasswordVerifier as _};
+use argon2::password_hash::{
+    PasswordHash as PhcString, PasswordHasher as _, PasswordVerifier as _, SaltString,
+};
 use argon2::{Algorithm, Argon2, Params, Version};
 
 use crate::domain::password_hasher::{PasswordHasher, PasswordHashingFailed};
@@ -36,8 +37,13 @@ impl Default for Argon2idHasher {
 
 impl PasswordHasher for Argon2idHasher {
     fn hash(&self, password: &Password) -> Result<PasswordHash, PasswordHashingFailed> {
+        // A 128-bit salt from the OS CSPRNG (the length argon2 recommends).
+        let mut salt = [0u8; 16];
+        getrandom::fill(&mut salt).map_err(|error| PasswordHashingFailed(error.to_string()))?;
+        let salt = SaltString::encode_b64(&salt)
+            .map_err(|error| PasswordHashingFailed(error.to_string()))?;
         self.argon2
-            .hash_password(password.expose().as_bytes())
+            .hash_password(password.expose().as_bytes(), &salt)
             .map(|phc| PasswordHash::new(phc.to_string()))
             .map_err(|error| PasswordHashingFailed(error.to_string()))
     }
