@@ -223,6 +223,26 @@ describe("./dev entrypoint", () => {
     assert.ok(!call.includes("--name"));
   });
 
+  it("publishes on every interface when asked", () => {
+    const call = runCall(
+      runDev(["pnpm", "run", "dev"], {
+        env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_PUBLISH_ADDRESS: "0.0.0.0" },
+        fake: { engines: ["docker"] },
+      }),
+    );
+    assert.equal(call[call.indexOf("--publish") + 1], "0.0.0.0:3000:3000");
+  });
+
+  it("refuses any other publish address", () => {
+    const run = runDev(["pnpm", "run", "dev"], {
+      env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_PUBLISH_ADDRESS: "192.168.0.1" },
+      fake: { engines: ["docker"] },
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /use 127\.0\.0\.1 or 0\.0\.0\.0/);
+    assert.ok(!run.calls.some((words) => words[1] === "run"));
+  });
+
   it("refuses a published port that is not a number", () => {
     const run = runDev(["pnpm", "run", "dev"], {
       env: { TRIARY_DEV_PUBLISH: "0.0.0.0:3000" },

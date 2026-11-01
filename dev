@@ -29,6 +29,13 @@
 #                         own container on its own network, so a server inside it
 #                         is not reachable from the host without this. Podman in
 #                         the ai-box shares the host network and needs nothing.
+#   TRIARY_DEV_PUBLISH_ADDRESS
+#                         docker only: host address the ports are published on,
+#                         "127.0.0.1" (default) or "0.0.0.0" (every interface,
+#                         like docker-compose.yml's MySQL). Observed 2026-11-01
+#                         on the owner's WSL: a port published on 127.0.0.1
+#                         accepted TCP from Windows but never answered HTTP,
+#                         while MySQL published on 0.0.0.0 was reachable.
 #   TRIARY_DEV_NAME       docker only: container name, so another ./dev
 #                         container on triary-network can reach it by name
 
@@ -127,10 +134,12 @@ case "$ENGINE" in
     if docker network inspect triary-network >/dev/null 2>&1; then
       args+=(--network triary-network)
     fi
-    # Bound to the host's loopback only: the dev servers are not for the LAN.
+    publish_address="${TRIARY_DEV_PUBLISH_ADDRESS:-127.0.0.1}"
+    [[ "$publish_address" == 127.0.0.1 || "$publish_address" == 0.0.0.0 ]] ||
+      die "TRIARY_DEV_PUBLISH_ADDRESS: use 127.0.0.1 or 0.0.0.0, not $publish_address"
     for port in ${TRIARY_DEV_PUBLISH:-}; do
       [[ "$port" =~ ^[0-9]+$ ]] || die "TRIARY_DEV_PUBLISH: not a port number: $port"
-      args+=(--publish "127.0.0.1:$port:$port")
+      args+=(--publish "$publish_address:$port:$port")
     done
     if [[ -n "${TRIARY_DEV_NAME:-}" ]]; then
       args+=(--name "$TRIARY_DEV_NAME")
