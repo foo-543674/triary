@@ -61,6 +61,9 @@ BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
 MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
 mapfile -t changed < <(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" \
   -q '.[] | .filename, (.previous_filename // empty)')
+# Files the change adds, from the judged range itself (step 5: a new screen
+# waits for the owner's look).
+mapfile -t added < <(git diff --name-only --diff-filter=A "$MERGE_BASE" "$HEAD_SHA")
 
 # --- 0. is this a dependency update that needs no review ledger? -------------------
 # Dependency updates that merge without human approval (#43, owner decision;
@@ -231,7 +234,14 @@ else
   printf '%s' "$pr_json" >"$pr_file"
   changed_file="$(mktemp)"
   printf '%s\n' "${changed[@]}" >"$changed_file"
+  added_file="$(mktemp)"
+  printf '%s\n' "${added[@]}" >"$added_file"
+  # Who last put the ui-reviewed label on the PR: only the owner's counts.
+  ui_reviewed_by="$(gh api --paginate "repos/$REPO/issues/$PR/events?per_page=100" \
+    -q '[.[] | select(.event == "labeled" and .label.name == "ui-reviewed") | .actor.login] | last // empty' \
+    2>/dev/null | tail -n 1 || true)"
   ai_classification="$("${CLI[@]}" classify-ai-change --pr-file "$pr_file" --changed-file "$changed_file" \
+    --added-file "$added_file" --ui-reviewed-by "$ui_reviewed_by" \
     --default-branch "$(jq -r .base.repo.default_branch <<<"$pr_json")" \
     --base-files "$(IFS=,; echo "${base_changes[*]}")" || echo '{}')"
   jq -r '.reasons[]? | "not an AI change that merges without approval: " + .' <<<"$ai_classification"

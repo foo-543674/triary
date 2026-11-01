@@ -15,7 +15,8 @@
 //   classify-dependency --pr-author <login> --head <sha> --compare-file <f>
 //                                                        remote verifier: is this a Dependabot
 //                                                        dependency update (#43)? prints JSON
-//   classify-ai-change --pr-file <f> --default-branch <b> --changed-file <f> [--base-files "a,b"]
+//   classify-ai-change --pr-file <f> --default-branch <b> --changed-file <f> --added-file <f>
+//             [--base-files "a,b"] [--ui-reviewed-by <login>]
 //                                                        remote verifier: is this an AI change
 //                                                        that merges without a human? prints JSON
 //   check-dependencies --from <sha> --to <sha>           remote verifier: manifest parts touched and
@@ -284,6 +285,10 @@ const commands: Record<string, (values: Record<string, string | undefined>) => n
       changedFiles: readFileSync(required(v["changed-file"], "changed-file"), "utf8")
         .split("\n")
         .filter((f) => f !== ""),
+      addedFiles: readFileSync(required(v["added-file"], "added-file"), "utf8")
+        .split("\n")
+        .filter((f) => f !== ""),
+      ...(v["ui-reviewed-by"] ? { uiReviewedBy: v["ui-reviewed-by"] } : {}),
     });
     console.log(JSON.stringify(result));
     return 0;
@@ -326,6 +331,8 @@ const main = async (argv: readonly string[]): Promise<number> => {
         "default-branch",
         "base-files",
         "changed-file",
+        "added-file",
+        "ui-reviewed-by",
       ].map((name) => [name, { type: "string" as const }]),
     ),
   });

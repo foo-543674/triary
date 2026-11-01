@@ -206,7 +206,14 @@ bind the AI, plus the CI configuration listed in `ai-change.ts` and the
 manifest parts other than the dependency lists), new npm packages, package
 versions younger than the cooldown, and GitHub Actions updates still need the
 owner's approval. The owner can hold a PR back
-with the `hold-merge` label (reliable only before its verdict passes). The
+with the `hold-merge` label (reliable only before its verdict passes).
+UI review: the owner looks only at new screens and large layout changes.
+The verifier detects a new screen (an added route module); when opening a
+PR, judge whether it is a large layout change and, if so, open it with the
+`needs-ui-review` label (`gh pr create --label needs-ui-review`) so it waits
+for the owner's `ui-reviewed` label. Add the label at creation: once the
+verdict passes, auto-merge is too fast to stop. Do not add `ui-reviewed`
+yourself (it only counts when the owner adds it). The
 "Stop and confirm first" items below do not stop a merge by themselves: list
 their decision issue in the snapshot's `decisions` so the open issue holds
 the PR. The AI never approves
