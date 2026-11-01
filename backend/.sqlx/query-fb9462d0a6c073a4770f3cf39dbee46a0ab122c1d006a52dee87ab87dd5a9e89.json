@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "INSERT INTO exercise_blocks (block_id, session_id, exercise_id, block_order, workout_date, created_at, updated_at)\n                 VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "fb9462d0a6c073a4770f3cf39dbee46a0ab122c1d006a52dee87ab87dd5a9e89"
+}

@@ -1,0 +1,74 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT s.session_id AS \"session_id!\", s.workout_date AS \"workout_date!\", s.started_at AS \"started_at!\", s.ended_at,\n                          (SELECT COUNT(*) FROM exercise_blocks b WHERE b.session_id = s.session_id) AS \"block_count!: i64\",\n                          (SELECT COUNT(*) FROM workout_sets ws JOIN exercise_blocks b ON b.block_id = ws.block_id\n                            WHERE b.session_id = s.session_id) AS \"set_count!: i64\"\n                     FROM sessions s\n                    WHERE s.user_id = ?\n                      AND (? IS NULL OR s.workout_date >= ?)\n                      AND (? IS NULL OR s.workout_date <= ?)\n                      AND (? IS NULL OR s.workout_date < ? OR (s.workout_date = ? AND s.session_id < ?))\n                    ORDER BY s.workout_date DESC, s.session_id DESC\n                    LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id!",
+        "type_info": {
+          "type": "String",
+          "flags": "PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "workout_date!",
+        "type_info": {
+          "type": "Date",
+          "flags": "BINARY | NO_DEFAULT_VALUE",
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "started_at!",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "ended_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "block_count!: i64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "BINARY",
+          "max_size": 21
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "set_count!: i64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "BINARY",
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "66f80002066ba50c0354b9ebed1686fc4145bd730d4f43ac2cb233092073a908"
+}

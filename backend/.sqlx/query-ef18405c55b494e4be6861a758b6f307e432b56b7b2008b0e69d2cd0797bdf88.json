@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT b.session_id FROM workout_sets ws\n                   JOIN exercise_blocks b ON b.block_id = ws.block_id\n                   JOIN sessions s ON s.session_id = b.session_id\n                  WHERE ws.set_id = ? AND s.user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ef18405c55b494e4be6861a758b6f307e432b56b7b2008b0e69d2cd0797bdf88"
+}

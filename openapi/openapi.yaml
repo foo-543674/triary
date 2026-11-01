@@ -11,13 +11,18 @@ servers:
     description: Local development environment
 tags:
   - name: health
-    description: Service health checks
+    description: Service health checks (not versioned)
+  - name: web-v1
+    description: Web UI BFF for the PWA (`/web/v1`); browser session lifecycle
+  - name: api-v1
+    description: REST API over the domain resources (`/api/v1`)
 paths:
   /health:
     get:
       tags: [health]
       summary: Service health check
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: Service is up and running.
@@ -25,7 +30,654 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/signup:
+    post:
+      tags: [web-v1]
+      summary: Sign up and sign in (US-1)
+      description: |
+        Creates the user and starts a browser session. The handle is stored
+        lower-cased. Every violation of the handle and the password is
+        reported at once. A taken handle is `already_taken`, the same answer
+        as any other unusable handle from the user's point of view.
+      operationId: signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "201":
+          description: Signed up and signed in.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "400":
+          description: |
+            `user_id`: `too_short`, `too_long`, `invalid_charset`, `reserved`,
+            `already_taken`. `password`: `too_short`, `too_long`. Or
+            `invalid_format` without field for an unreadable body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/login:
+    post:
+      tags: [web-v1]
+      summary: Sign in (US-2)
+      description: |
+        Starts a new browser session. The handle is matched
+        case-insensitively. A wrong password and an unknown user get the same
+        answer, so the reply does not reveal which handles exist.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=<64 hex digits>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "400":
+          description: "`invalid_format` without field for an unreadable body."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: "`invalid_credentials`: unknown user or wrong password."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/me:
+    get:
+      tags: [web-v1]
+      summary: The signed-in user
+      description: Lets the PWA check on start whether its session is still valid.
+      operationId: getMe
+      responses:
+        "200":
+          description: The session is valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedInUser"
+        "401":
+          description: "`unauthenticated`: no cookie, or an unknown or expired session."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /web/v1/logout:
+    post:
+      tags: [web-v1]
+      summary: Sign out (US-2)
+      description: Deletes the session on the server at once and clears the cookie.
+      operationId: logout
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              description: "`triary_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`"
+              schema:
+                type: string
+        "401":
+          description: "`unauthenticated`: there was no valid session to end."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        default:
+          description: Unexpected error, in the common error envelope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /api/v1/exercises:
+    get:
+      tags: [api-v1]
+      summary: Exercises the user can use (US-4)
+      description: |
+        All presets and the user's own exercises, ordered by name. Not
+        paginated (tens to hundreds of items). `depth` is the position in
+        the progression tree and does not change with the filters.
+      operationId: listExercises
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: |
+            Case-insensitive part of the name. Surrounding spaces are
+            ignored; a blank value means no filter.
+          schema:
+            type: string
+        - name: owned_only
+          in: query
+          required: false
+          description: Only the user's own exercises.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The visible exercises.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseList"
+        "400":
+          description: "`invalid_format` without field: a query value that cannot be read (e.g. `owned_only=yes`)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/exercises/{exercise_id}:
+    get:
+      tags: [api-v1]
+      summary: One exercise (US-4)
+      description: The list item plus `created_at`. Missing, malformed and other users' IDs are all 404.
+      operationId: getExercise
+      parameters:
+        - name: exercise_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IdString"
+      responses:
+        "200":
+          description: The exercise.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseDetail"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/history/sessions:
+    get:
+      tags: [api-v1]
+      summary: Sessions by date, newest first (US-9)
+      description: |
+        Summaries only (no sets); open a session with GET /api/v1/sessions/{id}.
+        Ordered by `workout_date`, then session, both descending. Page with
+        `cursor` = the previous page's `page_info.next_cursor`.
+      operationId: listSessionsByDate
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Only sessions on or after this date.
+          schema:
+            $ref: "#/components/schemas/WorkoutDate"
+        - name: to
+          in: query
+          required: false
+          description: Only sessions on or before this date.
+          schema:
+            $ref: "#/components/schemas/WorkoutDate"
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque; from `page_info.next_cursor`.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionHistoryPage"
+        "400":
+          description: "`from` / `to` / `cursor`: `invalid_format`. `limit`: `out_of_range`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions:
+    post:
+      tags: [api-v1]
+      summary: Start a workout session (US-7)
+      description: |
+        `started_at` is the server's current time. `workout_date` is
+        required: the server keeps no time zone, so the client sends its
+        local date. A date later than today's date anywhere on Earth
+        (UTC+14) is `in_future`.
+      operationId: startSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSessionRequest"
+      responses:
+        "201":
+          description: The new session, without blocks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: "`workout_date`: `required`, `invalid_format`, `in_future`. `note`: `too_long`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}:
+    get:
+      tags: [api-v1]
+      summary: A whole session with its blocks and sets (US-7 / US-8)
+      description: Blocks carry the exercise's name and measurements so the session reads on its own.
+      operationId: getSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    patch:
+      tags: [api-v1]
+      summary: Edit a session's date, note or end time (US-8)
+      description: |
+        Partial update: a missing field is kept, `null` clears `note` or
+        `ended_at`. Changing `workout_date` also moves its blocks in the
+        by-exercise history.
+      operationId: updateSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionPatch"
+      responses:
+        "200":
+          description: The updated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: |
+            `workout_date`: `invalid_format`, `in_future`. `note`: `too_long`.
+            `ended_at`: `invalid_format`, `before_start`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a session with its blocks and sets (US-8)
+      description: Removes the session and everything recorded in it.
+      operationId: deleteSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "204":
+          description: Deleted; there is no way to restore it.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}/end:
+    post:
+      tags: [api-v1]
+      summary: End the session now (US-7)
+      description: Sets `ended_at` to the server's time. Ending an ended session changes nothing and answers the same.
+      operationId: endSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: The ended session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/blocks/{block_id}:
+    patch:
+      tags: [api-v1]
+      summary: Change a block's exercise or position (US-8)
+      description: |
+        `order` moves the block; the others are renumbered. A new exercise
+        must fit every recorded set (required measurements present, nothing
+        it does not record).
+      operationId: updateBlock
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exercise_id:
+                  $ref: "#/components/schemas/IdString"
+                order:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: The updated block.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseBlock"
+        "400":
+          description: "`exercise_id`: `not_found`, `incompatible_with_existing_sets`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a block with its sets (US-8)
+      description: The blocks after it move up one position.
+      operationId: deleteBlock
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      responses:
+        "204":
+          description: Deleted; the later blocks move up.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sets/{set_id}:
+    patch:
+      tags: [api-v1]
+      summary: Change a set's values or position (US-7 / US-8)
+      description: |
+        Partial update: a missing field is kept, `null` clears it. The
+        resulting set is checked like a new one. `order` moves the set.
+      operationId: updateSet
+      parameters:
+        - name: set_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IdString"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SetValues"
+                - type: object
+                  properties:
+                    order:
+                      type: integer
+                      minimum: 0
+      responses:
+        "200":
+          description: The updated set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutSet"
+        "400":
+          description: The same codes as adding a set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+    delete:
+      tags: [api-v1]
+      summary: Delete a set
+      description: The sets after it move up one position.
+      operationId: deleteSet
+      parameters:
+        - name: set_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/IdString"
+      responses:
+        "204":
+          description: Deleted; the later sets move up.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/sessions/{session_id}/blocks:
+    post:
+      tags: [api-v1]
+      summary: Add an exercise block at the end of the session (US-7)
+      description: The block gets the next position and starts without sets. The same exercise may appear in several blocks.
+      operationId: appendBlock
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exercise_id]
+              properties:
+                exercise_id:
+                  $ref: "#/components/schemas/IdString"
+      responses:
+        "201":
+          description: The new, empty block.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseBlock"
+        "400":
+          description: |
+            `exercise_id`: `required`, or `not_found` for an exercise that is
+            missing or not visible to the user. `blocks`:
+            `exceeds_max_blocks` (50 per session).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+  /api/v1/blocks/{block_id}/sets:
+    post:
+      tags: [api-v1]
+      summary: Add a set at the end of a block (US-7)
+      description: |
+        Values are checked against the block's exercise: every required
+        measurement present, every value in range, and no value for a
+        measurement the exercise does not record.
+      operationId: appendSet
+      parameters:
+        - $ref: "#/components/parameters/BlockId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetValues"
+      responses:
+        "201":
+          description: The new set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutSet"
+        "400":
+          description: |
+            `reps` / `weight_kg` / `duration_seconds` / `interval_seconds`:
+            `out_of_range`. `weight_kg`: `invalid_format` when not a multiple
+            of 0.1. `reps` / `weight_kg` / `duration_seconds`:
+            `missing_required_measurement`, or `invalid_format` for a
+            measurement the exercise does not record. `set`: `empty` when
+            reps, weight and duration are all missing. `sets`:
+            `exceeds_max_sets` (50 per block, specification US-7).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+# Every operation needs the session cookie unless it declares `security: []`
+# (`.contexts/api-design.md` §1.3).
+security:
+  - cookieAuth: []
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: triary_session
+      description: |
+        Server-issued random 256-bit session token, set by signup and login
+        with `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`.
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/IdString"
+    BlockId:
+      name: block_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/IdString"
+  responses:
+    Unauthenticated:
+      description: "`unauthenticated`: no cookie, or an unknown or expired session."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: |
+        `not_found` without field: the path target does not exist or belongs
+        to another user (not told apart, so other users' data stays hidden).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    UnexpectedError:
+      description: Unexpected error, in the common error envelope.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
     Health:
       type: object
@@ -34,3 +686,317 @@ components:
         status:
           type: string
           enum: [ok]
+    ErrorEnvelope:
+      type: object
+      description: |
+        Body of every error response (`.contexts/api-design.md` §1.6). Never
+        a single-error object; validation errors are all collected.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          description: Order has no meaning.
+          items:
+            $ref: "#/components/schemas/ErrorItem"
+    ErrorItem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        field:
+          type: string
+          description: |
+            Path of the offending input (`name`, `sets[1].reps`). Present for
+            field-dependent codes. Absent for `unauthenticated`,
+            `invalid_credentials`, `preset_not_modifiable`, `not_found` on the
+            path target, `rate_limited`, `internal_error`, and for
+            `invalid_format` when the request could not be read at all: a body
+            that is not the expected JSON (400), or a protocol refusal that
+            keeps its own status (405 wrong method, 413 body too large, 415
+            not JSON). Such structural errors stop at the first one.
+          examples: ["name", "sets[1].reps"]
+        message:
+          type: string
+          description: |
+            Short English text for debugging. Clients show their own wording
+            based on `(code, field)`.
+    ErrorCode:
+      type: string
+      description: |
+        Kind of error, never including the field name. Adding a code is not a
+        breaking change; clients must tolerate codes they do not know.
+      enum:
+        - required
+        - too_short
+        - too_long
+        - invalid_charset
+        - invalid_format
+        - empty
+        - out_of_range
+        - in_future
+        - before_start
+        - reserved
+        - already_taken
+        - not_found
+        - locked_by_existing_records
+        - incompatible_with_existing_sets
+        - creates_cycle
+        - exceeds_max_depth
+        - exceeds_max_children
+        - exceeds_max_blocks
+        - exceeds_max_sets
+        - missing_required_measurement
+        - unauthenticated
+        - invalid_credentials
+        - preset_not_modifiable
+        - rate_limited
+        - internal_error
+    PageInfo:
+      type: object
+      description: Cursor pagination state of a list response (`api-design.md` §1.5).
+      required: [next_cursor, has_next]
+      properties:
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque base64url cursor for the next page; null on the last page.
+        has_next:
+          type: boolean
+    IdString:
+      type: string
+      description: |
+        Resource ID: a type prefix (`usr_`, `exr_`, `ses_`, `blk_`, `set_`)
+        and a ULID in Crockford base32 (`api-design.md` §3).
+      pattern: "^(usr|exr|ses|blk|set)_[0-9A-HJKMNP-TV-Z]{26}$"
+      examples: ["exr_01HZX3Y5Q8K2M4N6P8R0T2V4W6"]
+    WorkoutDate:
+      type: string
+      format: date
+      description: Calendar date of the workout (`YYYY-MM-DD`) in the client's time zone.
+      examples: ["2026-10-31"]
+    Timestamp:
+      type: string
+      format: date-time
+      description: UTC instant, always ending in `Z` (`YYYY-MM-DDTHH:MM:SSZ`).
+      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+      examples: ["2026-10-31T09:30:00Z"]
+    UserHandle:
+      type: string
+      description: |
+        The name a user signs in with (`user_id` in the API). 3-32 of
+        `a-z 0-9 _ -`, case-insensitive: stored and returned in lower case.
+        Reserved names are refused.
+      minLength: 3
+      maxLength: 32
+      examples: ["alice"]
+    Credentials:
+      type: object
+      required: [user_id, password]
+      properties:
+        user_id:
+          type: string
+          description: A handle as typed; checked and lower-cased by the server (see `UserHandle`).
+        password:
+          type: string
+          description: 12-128 characters of any kind.
+    SignedInUser:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          $ref: "#/components/schemas/UserHandle"
+    MeasurementKind:
+      type: string
+      enum: [reps, weight, time]
+    Measurement:
+      type: object
+      required: [kind, required]
+      properties:
+        kind:
+          $ref: "#/components/schemas/MeasurementKind"
+        required:
+          type: boolean
+          description: Every set of the exercise must record this measurement.
+    Exercise:
+      type: object
+      required: [id, name, owner, measurement_kinds, parent_id, depth]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        name:
+          type: string
+        owner:
+          type: string
+          enum: [preset, user]
+          description: "`preset`: provided by triary, read-only. `user`: the user's own."
+        measurement_kinds:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Measurement"
+        parent_id:
+          description: The exercise this one progresses from; null for a root.
+          oneOf:
+            - $ref: "#/components/schemas/IdString"
+            - type: "null"
+        depth:
+          type: integer
+          minimum: 0
+          description: Depth in the progression tree (0 = root).
+    ExerciseDetail:
+      allOf:
+        - $ref: "#/components/schemas/Exercise"
+        - type: object
+          required: [created_at]
+          properties:
+            created_at:
+              $ref: "#/components/schemas/Timestamp"
+    ExerciseList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Exercise"
+    StartSessionRequest:
+      type: object
+      required: [workout_date]
+      properties:
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        note:
+          type: [string, "null"]
+          maxLength: 2000
+    SetValues:
+      type: object
+      description: |
+        A set's values. Weight is signed: positive adds load, negative is
+        assistance (kg, 0.1 steps).
+      properties:
+        reps:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 9999
+        weight_kg:
+          type: [number, "null"]
+          minimum: -500.0
+          maximum: 999.9
+          multipleOf: 0.1
+        duration_seconds:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 86400
+        interval_seconds:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 3600
+    WorkoutSet:
+      allOf:
+        - $ref: "#/components/schemas/SetValues"
+        - type: object
+          required: [id, order, reps, weight_kg, duration_seconds, interval_seconds]
+          properties:
+            id:
+              $ref: "#/components/schemas/IdString"
+            order:
+              type: integer
+              minimum: 0
+    ExerciseBlock:
+      type: object
+      required: [id, session_id, exercise_id, exercise_name, exercise_measurement_kinds, order, sets]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        session_id:
+          $ref: "#/components/schemas/IdString"
+        exercise_id:
+          $ref: "#/components/schemas/IdString"
+        exercise_name:
+          type: string
+        exercise_measurement_kinds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Measurement"
+        order:
+          type: integer
+          minimum: 0
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutSet"
+    Session:
+      type: object
+      required: [id, workout_date, started_at, ended_at, note, blocks]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        ended_at:
+          description: null while the session has not been ended.
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        note:
+          type: [string, "null"]
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExerciseBlock"
+    SessionPatch:
+      type: object
+      properties:
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        note:
+          type: [string, "null"]
+          maxLength: 2000
+        ended_at:
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+    SessionSummary:
+      type: object
+      required: [id, workout_date, started_at, ended_at, block_count, set_count, exercise_summary]
+      properties:
+        id:
+          $ref: "#/components/schemas/IdString"
+        workout_date:
+          $ref: "#/components/schemas/WorkoutDate"
+        started_at:
+          $ref: "#/components/schemas/Timestamp"
+        ended_at:
+          oneOf:
+            - $ref: "#/components/schemas/Timestamp"
+            - type: "null"
+        block_count:
+          type: integer
+          minimum: 0
+        set_count:
+          type: integer
+          minimum: 0
+        exercise_summary:
+          type: array
+          description: Exercises in block order, each once.
+          items:
+            type: object
+            required: [exercise_id, exercise_name]
+            properties:
+              exercise_id:
+                $ref: "#/components/schemas/IdString"
+              exercise_name:
+                type: string
+    SessionHistoryPage:
+      type: object
+      required: [items, page_info]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionSummary"
+        page_info:
+          $ref: "#/components/schemas/PageInfo"

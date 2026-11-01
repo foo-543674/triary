@@ -1,0 +1,44 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT k.exercise_id, k.kind, k.is_required AS \"is_required: i8\"\n                     FROM exercise_measurement_kinds k\n                    WHERE k.exercise_id IN (SELECT b.exercise_id FROM exercise_blocks b WHERE b.session_id = ?)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exercise_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | ENUM | NO_DEFAULT_VALUE",
+          "max_size": 24
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_required: i8",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 1
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "afe3a88542bdce65d813847cb1e10a59580aa680191dcf86d45844d349ecab03"
+}

@@ -12,3 +12,11 @@
 //! - Use `chrono::DateTime<chrono::Utc>` as the default timestamp type.
 //!
 //! Submodules are split per feature (e.g. `workout`, `exercise`, `user`).
+
+pub mod validation;
+
+pub mod clock;
+pub mod exercise;
+pub mod password_hasher;
+pub mod session;
+pub mod user;
