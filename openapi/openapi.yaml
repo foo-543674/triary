@@ -690,21 +690,30 @@ components:
       type: object
       description: |
         Body of every error response (`.contexts/api-design.md` §1.6). Never
-        a single-error object; validation errors are all collected.
+        a single-error object; validation errors are all collected and
+        grouped by field (#67).
       required: [errors]
       properties:
         errors:
           type: array
           minItems: 1
-          description: Order has no meaning.
+          description: |
+            One group per field, in the order the fields were first found.
+            The errors without a field form one group without `field`.
           items:
-            $ref: "#/components/schemas/ErrorItem"
-    ErrorItem:
+            $ref: "#/components/schemas/ErrorGroup"
+      example:
+        errors:
+          - field: name
+            reasons:
+              - code: invalid_charset
+                message: Contains characters that are not allowed
+              - code: too_long
+                message: Too long
+    ErrorGroup:
       type: object
-      required: [code, message]
+      required: [reasons]
       properties:
-        code:
-          $ref: "#/components/schemas/ErrorCode"
         field:
           type: string
           description: |
@@ -717,6 +726,18 @@ components:
             keeps its own status (405 wrong method, 413 body too large, 415
             not JSON). Such structural errors stop at the first one.
           examples: ["name", "sets[1].reps"]
+        reasons:
+          type: array
+          minItems: 1
+          description: Every violation found for this field. Order has no meaning.
+          items:
+            $ref: "#/components/schemas/ErrorReason"
+    ErrorReason:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
         message:
           type: string
           description: |

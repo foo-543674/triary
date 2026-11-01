@@ -67,10 +67,10 @@ architecture に既出。実装エージェントは本書を入口に該当ド�
 
 - 触れる: `backend/src/{domain,application,interfaces}/error*.rs`、
   `backend/tests/architecture.rs`、`openapi/openapi.yaml`
-  (`ErrorEnvelope` / `ErrorItem`)。
+  (`ErrorEnvelope` / `ErrorGroup` / `ErrorReason`)。
 - 主参照: `api-design.md §1.6` (エラーコード表)、`api-design.md §1.3`
   (envelope 形)、`architecture.md §エラー境界の設計` / ADR #7 / ADR #8。
-- DoD: 任意ハンドラが `Vec<DomainError>` を返したとき配列形式で返ること
+- DoD: 任意ハンドラが `Vec<Violation>` を返したときフィールドごとのグループで返ること
   を単体テストで確認、`AppError::BadRequest("..")` も同 envelope に乗る。
 
 ### 2.2 P0-B OpenAPI 共通 schema 定義

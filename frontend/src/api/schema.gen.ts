@@ -346,14 +346,34 @@ export interface components {
     };
     /**
      * @description Body of every error response (`.contexts/api-design.md` §1.6). Never
-     *     a single-error object; validation errors are all collected.
+     *     a single-error object; validation errors are all collected and
+     *     grouped by field (#67).
+     * @example {
+     *       "errors": [
+     *         {
+     *           "field": "name",
+     *           "reasons": [
+     *             {
+     *               "code": "invalid_charset",
+     *               "message": "Contains characters that are not allowed"
+     *             },
+     *             {
+     *               "code": "too_long",
+     *               "message": "Too long"
+     *             }
+     *           ]
+     *         }
+     *       ]
+     *     }
      */
     ErrorEnvelope: {
-      /** @description Order has no meaning. */
-      errors: components['schemas']['ErrorItem'][];
+      /**
+       * @description One group per field, in the order the fields were first found.
+       *     The errors without a field form one group without `field`.
+       */
+      errors: components['schemas']['ErrorGroup'][];
     };
-    ErrorItem: {
-      code: components['schemas']['ErrorCode'];
+    ErrorGroup: {
       /**
        * @description Path of the offending input (`name`, `sets[1].reps`). Present for
        *     field-dependent codes. Absent for `unauthenticated`,
@@ -367,6 +387,11 @@ export interface components {
        * @example sets[1].reps
        */
       field?: string;
+      /** @description Every violation found for this field. Order has no meaning. */
+      reasons: components['schemas']['ErrorReason'][];
+    };
+    ErrorReason: {
+      code: components['schemas']['ErrorCode'];
       /**
        * @description Short English text for debugging. Clients show their own wording
        *     based on `(code, field)`.

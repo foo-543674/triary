@@ -1,7 +1,9 @@
 /**
  * Reading the API's error envelope (`ErrorEnvelope` in `openapi/openapi.yaml`,
  * `.contexts/api-design.md` §1.6): every error response is
- * `{ errors: [{ code, field?, message }] }` with at least one item.
+ * `{ errors: [{ field?, reasons: [{ code, message }] }] }`, one group per
+ * field. The screens look errors up by `(code, field)`, so the groups are
+ * flattened into one item per reason here.
  *
  * Pure functions only; they never throw on unexpected input. Anything that is
  * not a well-formed envelope becomes a single `unknown` item so callers can
@@ -22,22 +24,25 @@ export type ApiError = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const toItem = (value: unknown): ApiErrorItem | undefined => {
-  if (!isRecord(value) || typeof value.code !== 'string') {
-    return undefined;
+const toReason = (value: unknown): { code: string; message: string } | undefined =>
+  isRecord(value) && typeof value.code === 'string'
+    ? { code: value.code, message: typeof value.message === 'string' ? value.message : '' }
+    : undefined;
+
+const toItems = (group: unknown): readonly ApiErrorItem[] => {
+  if (!isRecord(group) || !Array.isArray(group.reasons)) {
+    return [];
   }
-  const message = typeof value.message === 'string' ? value.message : '';
-  return typeof value.field === 'string'
-    ? { code: value.code, field: value.field, message }
-    : { code: value.code, message };
+  const field = typeof group.field === 'string' ? group.field : undefined;
+  return group.reasons
+    .map(toReason)
+    .filter((reason) => reason !== undefined)
+    .map((reason) => (field === undefined ? reason : { ...reason, field }));
 };
 
 /** Builds an {@link ApiError} from a response status and its parsed body. */
 export const toApiError = (status: number, body: unknown): ApiError => {
-  const items =
-    isRecord(body) && Array.isArray(body.errors)
-      ? body.errors.map(toItem).filter((item): item is ApiErrorItem => item !== undefined)
-      : [];
+  const items = isRecord(body) && Array.isArray(body.errors) ? body.errors.flatMap(toItems) : [];
   const [first, ...rest] = items;
   return first === undefined
     ? { status, errors: [{ code: 'unknown', message: `HTTP ${status}` }] }

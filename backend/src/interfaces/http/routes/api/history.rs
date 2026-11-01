@@ -394,12 +394,7 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        let pairs: Vec<(&str, &str)> = body["errors"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| (e["field"].as_str().unwrap(), e["code"].as_str().unwrap()))
-            .collect();
+        let pairs = crate::testing::error_pairs(&body);
         assert_eq!(
             pairs,
             [
@@ -407,6 +402,7 @@ mod tests {
                 ("cursor", "invalid_format"),
                 ("limit", "out_of_range")
             ]
+            .map(|(f, c)| (f.to_owned(), c.to_owned()))
         );
         let (status, _, _) = call(
             &router,

@@ -4,11 +4,14 @@
 //! `ErrorEnvelope` in `openapi/openapi.yaml`):
 //!
 //! ```json
-//! { "errors": [ { "code": "too_long", "field": "name", "message": "..." } ] }
+//! { "errors": [ { "field": "name", "reasons": [
+//!     { "code": "too_long", "message": "..." },
+//!     { "code": "invalid_charset", "message": "..." } ] } ] }
 //! ```
 //!
-//! `errors` always has at least one item. `field` is present only for
-//! field-dependent codes. HTTP status is a protocol concern; the kind of
+//! `errors` always has at least one group, one per field, each with at least
+//! one reason (#67). `field` is present only for field-dependent codes; the
+//! errors without a field form one group without it. HTTP status is a protocol concern; the kind of
 //! domain violation lives in `code`.
 //!
 //! Handlers return `Result<_, AppError>`; use cases map their own errors into
@@ -75,16 +78,51 @@ pub enum AppError {
 /// Body of every error response.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct ErrorEnvelope {
-    pub errors: Vec<ErrorItem>,
+    pub errors: Vec<ErrorGroup>,
 }
 
-/// One error in [`ErrorEnvelope`].
+/// The reasons one input (or, without `field`, the request) was refused.
 #[derive(Debug, Serialize, PartialEq, Eq)]
-pub struct ErrorItem {
-    pub code: &'static str,
+pub struct ErrorGroup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    pub reasons: Vec<ErrorReason>,
+}
+
+/// One reason in an [`ErrorGroup`].
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct ErrorReason {
+    pub code: &'static str,
     pub message: String,
+}
+
+/// One error before grouping by field.
+#[derive(Debug)]
+struct ErrorItem {
+    code: &'static str,
+    field: Option<String>,
+    message: String,
+}
+
+/// Groups the errors by field, in the order each field first appears.
+fn group_by_field(items: Vec<ErrorItem>) -> Vec<ErrorGroup> {
+    items.into_iter().fold(Vec::new(), |mut groups, item| {
+        let reason = ErrorReason {
+            code: item.code,
+            message: item.message,
+        };
+        match groups
+            .iter_mut()
+            .find(|g: &&mut ErrorGroup| g.field == item.field)
+        {
+            Some(group) => group.reasons.push(reason),
+            None => groups.push(ErrorGroup {
+                field: item.field,
+                reasons: vec![reason],
+            }),
+        }
+        groups
+    })
 }
 
 impl ErrorItem {
@@ -208,7 +246,9 @@ impl AppError {
                 "Internal server error",
             )],
         };
-        ErrorEnvelope { errors }
+        ErrorEnvelope {
+            errors: group_by_field(errors),
+        }
     }
 }
 
@@ -320,7 +360,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn validation_errors_become_one_item_each_with_field() {
+    async fn validation_errors_are_grouped_by_field() {
         let error = AppError::from(vec![
             Violation::new(FieldPath::new("name"), ViolationCode::TooLong),
             Violation::new(FieldPath::new("name"), ViolationCode::InvalidCharset),
@@ -331,25 +371,38 @@ mod tests {
         ]);
         let (status, body) = render(error).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        let items: Vec<(&str, &str)> = body["errors"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|item| {
-                (
-                    item["code"].as_str().unwrap(),
-                    item["field"].as_str().unwrap(),
-                )
-            })
-            .collect();
         assert_eq!(
-            items,
-            [
-                ("too_long", "name"),
-                ("invalid_charset", "name"),
-                ("out_of_range", "sets[1].reps"),
-            ]
+            body,
+            json!({ "errors": [
+                { "field": "name", "reasons": [
+                    { "code": "too_long", "message": "Too long" },
+                    { "code": "invalid_charset", "message": "Contains characters that are not allowed" }
+                ] },
+                { "field": "sets[1].reps", "reasons": [
+                    { "code": "out_of_range", "message": "Out of range" }
+                ] }
+            ] })
         );
+    }
+
+    #[tokio::test]
+    async fn a_field_keeps_its_first_position_when_its_violations_are_apart() {
+        let error = AppError::from(vec![
+            Violation::new(FieldPath::new("name"), ViolationCode::TooLong),
+            Violation::new(FieldPath::new("note"), ViolationCode::TooLong),
+            Violation::new(FieldPath::new("name"), ViolationCode::InvalidCharset),
+        ]);
+        let (_, body) = render(error).await;
+        assert_eq!(
+            crate::testing::error_pairs(&body),
+            [
+                ("name", "too_long"),
+                ("name", "invalid_charset"),
+                ("note", "too_long")
+            ]
+            .map(|(f, c)| (f.to_owned(), c.to_owned()))
+        );
+        assert_eq!(body["errors"].as_array().unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -358,7 +411,7 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(
             body,
-            json!({ "errors": [ { "code": "invalid_format", "message": "expected an object" } ] })
+            json!({ "errors": [ { "reasons": [ { "code": "invalid_format", "message": "expected an object" } ] } ] })
         );
     }
 
@@ -389,7 +442,7 @@ mod tests {
         for (error, expected_status, expected_code) in cases {
             let (status, body) = render(error).await;
             assert_eq!(status, expected_status);
-            assert_eq!(body["errors"][0]["code"], expected_code);
+            assert_eq!(body["errors"][0]["reasons"][0]["code"], expected_code);
             assert_eq!(body["errors"][0].get("field"), None);
             assert_eq!(body["errors"].as_array().unwrap().len(), 1);
         }
@@ -402,7 +455,7 @@ mod tests {
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(
             body,
-            json!({ "errors": [ { "code": "internal_error", "message": "Internal server error" } ] })
+            json!({ "errors": [ { "reasons": [ { "code": "internal_error", "message": "Internal server error" } ] } ] })
         );
     }
 
@@ -459,7 +512,7 @@ mod extractor_tests {
         let router = Router::new().route("/echo", post(echo));
         let (status, body) = call(router, "/echo", "{\"name\": 1}").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["errors"][0]["code"], "invalid_format");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "invalid_format");
         assert_eq!(body["errors"][0].get("field"), None);
     }
 
@@ -480,20 +533,20 @@ mod extractor_tests {
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         let body: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(body["errors"][0]["code"], "invalid_format");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "invalid_format");
     }
 
     #[tokio::test]
     async fn wrong_method_keeps_405_in_the_envelope() {
         let (status, body) = call(crate::app(crate::testing::state()), "/health", "{}").await;
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
-        assert_eq!(body["errors"][0]["code"], "invalid_format");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "invalid_format");
     }
 
     #[tokio::test]
     async fn unknown_route_is_answered_in_the_envelope() {
         let (status, body) = call(crate::app(crate::testing::state()), "/nowhere", "{}").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
-        assert_eq!(body["errors"][0]["code"], "not_found");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "not_found");
     }
 }

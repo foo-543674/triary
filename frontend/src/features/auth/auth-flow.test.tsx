@@ -16,7 +16,7 @@ import { createCurrentUserQuery } from './queries/current-user';
  * in the TanStack Query cache (the behavior other screens rely on).
  */
 
-const envelope = (code: string) => ({ errors: [{ code, message: code }] });
+const envelope = (code: string) => ({ errors: [{ reasons: [{ code, message: code }] }] });
 
 const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 

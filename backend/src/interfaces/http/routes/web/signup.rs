@@ -88,17 +88,7 @@ mod tests {
     }
 
     fn codes(body: &Value) -> Vec<(String, String)> {
-        body["errors"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| {
-                (
-                    e["field"].as_str().unwrap_or("").to_owned(),
-                    e["code"].as_str().unwrap().to_owned(),
-                )
-            })
-            .collect()
+        crate::testing::error_pairs(body)
     }
 
     #[tokio::test]
@@ -182,6 +172,6 @@ mod tests {
     async fn a_body_missing_fields_is_invalid_format() {
         let (status, _, body) = post(&fakes(), json!({ "user_id": "alice" })).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["errors"][0]["code"], "invalid_format");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "invalid_format");
     }
 }
