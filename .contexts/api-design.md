@@ -93,7 +93,7 @@ triary は HTTP エンドポイントを **2 つの独立したパスファミ�
 | セッショントークン | サーバー発行のランダム 256bit。Cookie 名 `triary_session` |
 | Cookie 属性 | `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Max-Age=2592000` (30 日) |
 | 認証必須エンドポイント | `/web/v1/signup`, `/web/v1/login`, `/health` 以外すべて (詳細は §2.1 を参照) |
-| 未認証アクセス | `401 Unauthorized` + `{"errors":[{"code":"unauthenticated","message":"..."}]}` （§1.6 の共通エラー envelope と一致） |
+| 未認証アクセス | `401 Unauthorized` + `{"errors":[{"reasons":[{"code":"unauthenticated","message":"..."}]}]}` （§1.6 の共通エラー envelope と一致） |
 | ログアウト | `POST /web/v1/logout` でサーバー側の `user_sessions` 行を削除し、`Set-Cookie: triary_session=; Max-Age=0` を返す |
 | CSRF 対策 | 同一オリジン配信前提で `SameSite=Lax` のみ。クロスオリジン化したら double-submit cookie をヘッダ `X-CSRF-Token` で追加（運用フェーズ判断） |
 
@@ -168,25 +168,32 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 {
   "errors": [
     {
-      "code": "too_long",
       "field": "name",
-      "message": "Must be 64 characters or fewer"
-    },
-    {
-      "code": "invalid_charset",
-      "field": "name",
-      "message": "Only hyphen and underscore are allowed as symbols"
+      "reasons": [
+        {
+          "code": "invalid_charset",
+          "message": "Only hyphen and underscore are allowed as symbols"
+        },
+        {
+          "code": "too_long",
+          "message": "Must be 64 characters or fewer"
+        }
+      ]
     }
   ]
 }
 ```
 
+違反はフィールドごとにまとめる (2026-11-01 オーナー判断、#67)。フィールドに
+紐付かないエラーは、`field` を持たない 1 つのグループになる。
+
 | フィールド | 必須 | 説明 |
 |---|---|---|
-| `errors` | 必須 | 1 件以上のエラー要素の配列。順序に意味はない |
-| `errors[].code` | 必須 | プログラム的に判別する **エラーコード**。snake_case の API 独自語彙。内部実装の例外型・SQL エラーコードを **絶対に漏らさない** |
-| `errors[].message` | 必須 | デバッグ向け短文。フロントは原則そのままユーザーに見せず、`code` と `field` の組に基づき自前の文言を出す |
-| `errors[].field` | 任意 | バリデーション系の場合、問題のあったフィールドのパス。ネストは `blocks[0].sets[1].reps` のようにドット / ブラケット記法。フィールド非依存のエラー（`not_found`, `unauthenticated` 等）では省略 |
+| `errors` | 必須 | 1 件以上のグループの配列。フィールドごとに 1 グループで、フィールドが最初に見つかった順 |
+| `errors[].field` | 任意 | バリデーション系の場合、問題のあったフィールドのパス。ネストは `blocks[0].sets[1].reps` のようにドット / ブラケット記法。フィールド非依存のエラー（`not_found`, `unauthenticated` 等）のグループでは省略 |
+| `errors[].reasons` | 必須 | そのフィールドの違反 1 件以上の配列。順序に意味はない |
+| `errors[].reasons[].code` | 必須 | プログラム的に判別する **エラーコード**。snake_case の API 独自語彙。内部実装の例外型・SQL エラーコードを **絶対に漏らさない** |
+| `errors[].reasons[].message` | 必須 | デバッグ向け短文。フロントは原則そのままユーザーに見せず、`code` と `field` の組に基づき自前の文言を出す |
 
 #### コード設計の大原則: **コードに field 名を埋め込まない**
 
@@ -215,8 +222,9 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 {
   "errors": [
     {
-      "code": "not_found",
-      "message": "Exercise not found"
+      "reasons": [
+        { "code": "not_found", "message": "Exercise not found" }
+      ]
     }
   ]
 }
@@ -228,9 +236,10 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 {
   "errors": [
     {
-      "code": "already_taken",
       "field": "name",
-      "message": "This name is already in use"
+      "reasons": [
+        { "code": "already_taken", "message": "This name is already in use" }
+      ]
     }
   ]
 }
@@ -247,10 +256,10 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 
 #### バックエンドの実装方針（API 設計の一部として規定）
 
-- `domain::Validator`（arch §Create フローの 4 役割）は `Result<Validated, Vec<DomainError>>`
-  を返す。単一の `DomainError` ではなく **収集型**
+- `domain::Validator`（arch §Create フローの 4 役割）は `Result<Validated, Vec<Violation>>`
+  を返す。単一の違反ではなく **収集型**
 - 1 つの値オブジェクトの中で複数違反が出るケース（例: `ExerciseName` の
-  長さと文字種）は `ExerciseName::try_new` が `Result<_, Vec<DomainError>>`
+  長さと文字種）は `ExerciseName::try_new` が `Result<_, Vec<Violation>>`
   を返す
 - 複数フィールドを持つ `Input` の Validator は、各フィールドの検証結果を
   連結してから返す（失敗があったら即 `return` しない）
@@ -262,7 +271,7 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 
 各ステータスコードは **HTTP プロトコル層の関心事** に限定して使い、ドメイン
 バリデーションエラーは原則すべて **400** に集約する。ドメインエラーの種別は
-`errors[].code` で表現する。
+`errors[].reasons[].code` で表現する。
 
 | HTTP | 使いどころ | 使わないケース |
 |---|---|---|
@@ -274,10 +283,10 @@ triary は **envelope を採用しない**。リソースを直接 JSON のト�
 | **429** | レート制限超過 | |
 | **500** | 予期しない内部例外 | `message` に内部詳細を出さない |
 
-`errors[].code` は **フィールド横断で再利用される汎用コード**。どの
-フィールドに対する違反かは必ず `field` で特定する。`DomainError` enum
-（arch §domain エラーの分類）と N:1 対応にはならず、`(code, field)` の
-組で個別違反を表現する。
+`errors[].reasons[].code` は **フィールド横断で再利用される汎用コード**。どの
+フィールドに対する違反かは必ず `field` で特定する。domain の `Violation`
+（arch §domain エラーの分類）がそのまま `(field, code)` の組で、1 つの違反が
+1 つの `reasons[]` 要素になる。
 
 #### フィールド依存のコード（`field` 必須）
 

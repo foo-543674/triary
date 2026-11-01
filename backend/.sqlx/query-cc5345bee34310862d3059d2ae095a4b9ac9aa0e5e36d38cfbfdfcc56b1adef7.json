@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "DELETE FROM workout_sets WHERE set_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "cc5345bee34310862d3059d2ae095a4b9ac9aa0e5e36d38cfbfdfcc56b1adef7"
+}

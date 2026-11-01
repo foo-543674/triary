@@ -8,3 +8,16 @@
 *.pdf binary
 *.woff binary
 *.woff2 binary
+
+# Generated files: GitHub collapses them in diffs so a review starts from the
+# code. They are checked by tools, not by reading: the sqlx query metadata by
+# the SQLX_OFFLINE build in CI (`make db-prepare` writes it), the lockfiles by
+# --locked / --frozen-lockfile and the acceptance verifier's supply-chain
+# check. The API types are regenerated with `make api-generate`; NOTE: CI does
+# not yet regenerate and compare them, so a stale schema.gen.ts is caught only
+# indirectly by typecheck and tests. New packages a lockfile brings in are
+# listed in the PR description instead.
+backend/.sqlx/** linguist-generated=true
+frontend/src/api/schema.gen.ts linguist-generated=true
+backend/Cargo.lock linguist-generated=true
+frontend/pnpm-lock.yaml linguist-generated=true

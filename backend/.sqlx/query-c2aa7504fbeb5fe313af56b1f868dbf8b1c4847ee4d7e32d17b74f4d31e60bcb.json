@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE exercise_blocks SET exercise_id = ?, block_order = ?, updated_at = UTC_TIMESTAMP(3)\n                      WHERE block_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c2aa7504fbeb5fe313af56b1f868dbf8b1c4847ee4d7e32d17b74f4d31e60bcb"
+}

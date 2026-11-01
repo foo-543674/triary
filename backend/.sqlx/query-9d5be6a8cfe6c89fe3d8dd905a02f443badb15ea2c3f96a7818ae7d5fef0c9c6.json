@@ -1,0 +1,34 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT kind, is_required AS \"is_required: i8\" FROM exercise_measurement_kinds WHERE exercise_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | ENUM | NO_DEFAULT_VALUE",
+          "max_size": 24
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "is_required: i8",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 1
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "9d5be6a8cfe6c89fe3d8dd905a02f443badb15ea2c3f96a7818ae7d5fef0c9c6"
+}

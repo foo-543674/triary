@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE exercise_blocks SET block_order = block_order + 1000 WHERE session_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "3e19a8f62a215f4fd90948a93a088322cc107b7213066ca4558a3f296f14d60b"
+}

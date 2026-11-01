@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE sessions SET workout_date = ?, note = ?, ended_at = ?, updated_at = UTC_TIMESTAMP(3)\n                  WHERE session_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "73224d7f901d32d19447b2ef8dbca3e9b698cf9655897dec2b78d3eb18a1ad04"
+}

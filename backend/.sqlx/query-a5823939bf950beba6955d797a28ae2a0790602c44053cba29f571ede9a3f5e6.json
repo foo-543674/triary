@@ -1,0 +1,44 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT b.block_id AS \"block_id!\", b.exercise_id AS \"exercise_id!\",\n                          (SELECT COUNT(*) FROM workout_sets s WHERE s.block_id = b.block_id) AS \"set_count!: i64\"\n                     FROM exercise_blocks b JOIN sessions se ON se.session_id = b.session_id\n                    WHERE b.block_id = ? AND se.user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "block_id!",
+        "type_info": {
+          "type": "String",
+          "flags": "PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "exercise_id!",
+        "type_info": {
+          "type": "String",
+          "flags": "MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "set_count!: i64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "BINARY",
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a5823939bf950beba6955d797a28ae2a0790602c44053cba29f571ede9a3f5e6"
+}

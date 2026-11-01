@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "triary integration smoke",
-    "description": "Smoke tests that verify the backend is at least up and serving requests.",
+    "name": "triary integration",
+    "description": "Language-agnostic integration tests against a running backend and database (AGENTS.md \"Integration tests are language agnostic\"). Scenarios create their own users with unique handles, so they can run repeatedly against the same database.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,8 +18,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/health",
-          "host": ["{{baseUrl}}"],
-          "path": ["health"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
         }
       },
       "event": [
@@ -36,6 +40,3235 @@
               "  pm.expect(body.status).to.eql('ok');",
               "});"
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /web/v1/signup (US-1)",
+      "item": [
+        {
+          "name": "signup: creates the user and signs them in (handle normalized)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "const handle = unique(20);",
+                  "pm.collectionVariables.set('signupHandle', handle);",
+                  "pm.collectionVariables.set('signupHandleUpper', handle.toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});",
+                  "pm.test('answers the lower-cased handle', function () {",
+                  "  pm.expect(pm.response.json()).to.eql({ user_id: pm.collectionVariables.get('signupHandle') });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{signupHandleUpper}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: the same handle in another case is already taken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"already_taken\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{signupHandleUpper}}\", \"password\": \"anotherpassword1\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 2 characters is too short",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_short\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"ab\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 3 characters passes the length rule",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';",
+                  "pm.collectionVariables.set('handle3', Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted, or refused only because a previous run took it', function () {",
+                  "  if (pm.response.code === 201) { return; }",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['already_taken']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle3}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 32 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('handle32', unique(32));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle32}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle of 33 characters is too long",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('handle33', unique(33));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_long\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{handle33}}\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: handle with a disallowed character",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"invalid_charset\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"bad handle\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: reserved handle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"reserved\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"Admin\", \"password\": \"correcthorsebattery\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 11 characters is too short",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h11', unique(20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"password\", \"too_short\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h11}}\", \"password\": \"12345678901\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 12 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h12', unique(20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h12}}\", \"password\": \"123456789012\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 128 characters is accepted",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h128', unique(20));",
+                  "pm.collectionVariables.set('p128', 'p'.repeat(128));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('sets the session cookie with the contract attributes', function () {",
+                  "  const cookie = pm.response.headers.get('Set-Cookie');",
+                  "  pm.expect(cookie).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h128}}\", \"password\": \"{{p128}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: password of 129 characters is too long",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique per run: 'it' + base36 time + random, cut to the length asked for.",
+                  "const unique = (length) => ('it' + Date.now().toString(36) + Math.random().toString(36).slice(2) + 'x'.repeat(40)).slice(0, length);",
+                  "pm.collectionVariables.set('h129', unique(20));",
+                  "pm.collectionVariables.set('p129', 'p'.repeat(129));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"password\", \"too_long\"]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{h129}}\", \"password\": \"{{p129}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: every problem is reported at once",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('reports exactly the expected (field, code) pairs', function () {",
+                  "  const pairs = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code]);",
+                  "  pm.expect(pairs).to.eql([[\"user_id\", \"too_short\"], [\"user_id\", \"invalid_charset\"], [\"password\", \"too_short\"]]);",
+                  "  const groups = pm.response.json().errors.map((g) => [g.field, g.reasons.length]);",
+                  "  pm.expect(groups, 'one group per field (#67)').to.eql([[\"user_id\", 2], [\"password\", 1]]);",
+                  "});",
+                  "pm.test('sets no session cookie', function () { pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"a!\", \"password\": \"short\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "signup: a body that is not the expected JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('invalid_format without field', function () {",
+                  "  const errors = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r })));",
+                  "  pm.expect(errors.length).to.eql(1);",
+                  "  pm.expect(errors[0].code).to.eql('invalid_format');",
+                  "  pm.expect(errors[0]).to.not.have.property('field');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": 1}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /web/v1/login, GET /web/v1/me, POST /web/v1/logout (US-2)",
+      "item": [
+        {
+          "name": "login: sign up a user for this run",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('loginHandle', ('lg' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{loginHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "login: correct credentials (handle in upper case)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('loginHandleUpper', pm.collectionVariables.get('loginHandle').toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answers the handle', function () { pm.expect(pm.response.json()).to.eql({ user_id: pm.collectionVariables.get('loginHandle') }); });",
+                  "pm.test('sets the session cookie', function () {",
+                  "  pm.expect(pm.response.headers.get('Set-Cookie')).to.match(/^triary_session=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\\/; Max-Age=2592000$/);",
+                  "});",
+                  "// Newman's cookie jar does not send Secure cookies over plain http, so the",
+                  "// session cookie is carried by hand in a collection variable.",
+                  "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+                  "pm.collectionVariables.set('sessionCookie', setCookie.split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{loginHandleUpper}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "me: the session from login is valid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('answers the handle', function () { pm.expect(pm.response.json()).to.eql({ user_id: pm.collectionVariables.get('loginHandle') }); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "login: wrong password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is invalid_credentials, and no cookie', function () {",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['invalid_credentials']);",
+                  "  pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{loginHandle}}\", \"password\": \"wrongpassword!!\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "login: unknown user gets the same answer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is invalid_credentials, and no cookie', function () {",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['invalid_credentials']);",
+                  "  pm.expect(pm.response.headers.has('Set-Cookie')).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"nobody-{{$timestamp}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "me: no cookie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is unauthenticated', function () { pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['unauthenticated']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "me: unknown session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is unauthenticated', function () { pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['unauthenticated']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "triary_session=0000000000000000000000000000000000000000000000000000000000000000"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "logout: ends the session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', function () { pm.response.to.have.status(204); });",
+                  "pm.test('clears the cookie', function () {",
+                  "  pm.expect(pm.response.headers.get('Set-Cookie')).to.eql('triary_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "logout"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "me: the ended session is no longer valid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is unauthenticated', function () { pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['unauthenticated']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{sessionCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "me"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "logout: without a session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('code is unauthenticated', function () { pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['unauthenticated']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "logout"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /api/v1/exercises (US-4)",
+      "item": [
+        {
+          "name": "exercises: sign up a fresh user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('exerciseHandle', ('ex' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('exerciseCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{exerciseHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: a new user sees the 15 presets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "const items = pm.response.json().items;",
+                  "pm.test('15 presets and nothing else', function () {",
+                  "  pm.expect(items.length).to.eql(15);",
+                  "  pm.expect(items.every((i) => i.owner === 'preset')).to.eql(true);",
+                  "});",
+                  "pm.test('IDs are exr_ + 26 Crockford base32 characters', function () {",
+                  "  pm.expect(items.every((i) => /^exr_[0-9A-HJKMNP-TV-Z]{26}$/.test(i.id))).to.eql(true);",
+                  "});",
+                  "pm.test('the progression parents are linked', function () {",
+                  "  const byName = Object.fromEntries(items.map((i) => [i.name, i]));",
+                  "  pm.expect(byName['倒立腕立て (HSPU)'].parent_id).to.eql(byName['パイクプッシュアップ'].id);",
+                  "  pm.expect(byName['倒立腕立て (HSPU)'].depth).to.eql(1);",
+                  "  pm.expect(byName['ピストルスクワット'].parent_id).to.eql(byName['バックスクワット'].id);",
+                  "  pm.expect(byName['ベンチプレス'].measurement_kinds).to.eql([{ kind: 'reps', required: true }, { kind: 'weight', required: true }]);",
+                  "  pm.collectionVariables.set('benchPressId', byName['ベンチプレス'].id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: owned_only is empty for a new user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no own exercises yet', function () { pm.expect(pm.response.json().items).to.eql([]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises?owned_only=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ],
+              "query": [
+                {
+                  "key": "owned_only",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: detail of a preset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('has the list fields and created_at', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.name).to.eql('ベンチプレス');",
+                  "  pm.expect(body.owner).to.eql('preset');",
+                  "  pm.expect(body.created_at).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/{{benchPressId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "{{benchPressId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: an unknown ID is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404 not_found without field', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  const errors = pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r })));",
+                  "  pm.expect(errors.map((e) => e.code)).to.eql(['not_found']);",
+                  "  pm.expect(errors[0]).to.not.have.property('field');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: a malformed ID is not found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises/not-an-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises",
+                "not-an-id"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "exercises: listing needs a session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401 unauthenticated', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => e.code)).to.eql(['unauthenticated']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/v1/sessions, blocks, sets (US-7)",
+      "item": [
+        {
+          "name": "record: sign up",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('recordHandle', ('rc' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('recordCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{recordHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: find the bench press preset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const bench = pm.response.json().items.find((i) => i.name === 'ベンチプレス');",
+                  "pm.test('bench press is there', function () { pm.expect(bench).to.not.eql(undefined); });",
+                  "pm.collectionVariables.set('benchId', bench.id);",
+                  "pm.collectionVariables.set('plankId', pm.response.json().items.find((i) => i.name === 'プランク').id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exercises",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "exercises"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: start a session today",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('today', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('an empty, running session', function () {",
+                  "  pm.expect(body.id).to.match(/^ses_[0-9A-HJKMNP-TV-Z]{26}$/);",
+                  "  pm.expect(body.workout_date).to.eql(pm.collectionVariables.get('today'));",
+                  "  pm.expect(body.started_at).to.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/);",
+                  "  pm.expect(body.ended_at).to.eql(null);",
+                  "  pm.expect(body.blocks).to.eql([]);",
+                  "});",
+                  "pm.collectionVariables.set('sessionId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"{{today}}\", \"note\": \"integration\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: a date three days ahead is in the future",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('future', new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"workout_date\", \"in_future\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"{{future}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: the date is required",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"workout_date\", \"required\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: add a bench press block",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('first block of the bench press', function () {",
+                  "  pm.expect(body.order).to.eql(0);",
+                  "  pm.expect(body.exercise_id).to.eql(pm.collectionVariables.get('benchId'));",
+                  "  pm.expect(body.exercise_name).to.eql('ベンチプレス');",
+                  "  pm.expect(body.sets).to.eql([]);",
+                  "});",
+                  "pm.collectionVariables.set('blockId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/blocks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "blocks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"{{benchId}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: an unknown exercise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"exercise_id\", \"not_found\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/blocks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "blocks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"exr_7ZZZZZZZZZZZZZZZZZZZZZZZZZ\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: add a set (weight on the 0.1 grid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('stored as sent', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect([body.order, body.reps, body.weight_kg, body.interval_seconds]).to.eql([0, 8, 80.5, 120]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 8, \"weight_kg\": 80.5, \"interval_seconds\": 120}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: assisted weight (negative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201, order 1', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect([pm.response.json().order, pm.response.json().weight_kg]).to.eql([1, -10]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 5, \"weight_kg\": -10.0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: a required measurement is missing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"weight_kg\", \"missing_required_measurement\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 8}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: an empty set",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"set\", \"empty\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"interval_seconds\": 60}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: values out of range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 with the expected (field, code) pairs', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([[\"reps\", \"out_of_range\"], [\"weight_kg\", \"out_of_range\"]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 10000, \"weight_kg\": 1000.0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: read the whole session back",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('one block with two sets in order', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.note).to.eql('integration');",
+                  "  pm.expect(body.blocks.length).to.eql(1);",
+                  "  pm.expect(body.blocks[0].exercise_measurement_kinds).to.eql([{ kind: 'reps', required: true }, { kind: 'weight', required: true }]);",
+                  "  pm.expect(body.blocks[0].sets.map((s) => [s.order, s.reps, s.weight_kg])).to.eql([[0, 8, 80.5], [1, 5, -10]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "record: another user cannot read it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "PATCH / DELETE sessions, blocks, sets (US-8)",
+      "item": [
+        {
+          "name": "edit: add a third set",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('thirdSetId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}",
+                "sets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reps\": 3, \"weight_kg\": 70.0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: move the third set to the top and change it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('moved and changed', function () {",
+                  "  const s = pm.response.json();",
+                  "  pm.expect([s.order, s.reps, s.weight_kg]).to.eql([0, 4, 70]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sets/{{thirdSetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sets",
+                "{{thirdSetId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"order\": 0, \"reps\": 4}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: a change that breaks the rules is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 missing_required_measurement', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([['weight_kg', 'missing_required_measurement']]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sets/{{thirdSetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sets",
+                "{{thirdSetId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"weight_kg\": null}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: the sets are renumbered",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('order 0..2 with the moved set first', function () {",
+                  "  const sets = pm.response.json().blocks[0].sets;",
+                  "  pm.expect(sets.map((s) => [s.order, s.reps])).to.eql([[0, 4], [1, 8], [2, 5]]);",
+                  "  pm.collectionVariables.set('firstSetId', sets[1].id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: delete a set",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sets/{{firstSetId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sets",
+                "{{firstSetId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: the later sets move up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('two sets left, renumbered', function () {",
+                  "  pm.expect(pm.response.json().blocks[0].sets.map((s) => [s.order, s.reps])).to.eql([[0, 4], [1, 5]]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: add a second block (plank)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('plankBlockId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/blocks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "blocks"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"{{plankId}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: move the plank block first",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('order 0', function () { pm.expect(pm.response.json().order).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{plankBlockId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{plankBlockId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"order\": 0}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: bench press sets do not fit the plank",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 incompatible_with_existing_sets', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([['exercise_id', 'incompatible_with_existing_sets']]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{blockId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{blockId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"exercise_id\": \"{{plankId}}\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: delete the plank block",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/blocks/{{plankBlockId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "blocks",
+                "{{plankBlockId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: change the date and note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('changed', function () {",
+                  "  const s = pm.response.json();",
+                  "  pm.expect([s.workout_date, s.note, s.blocks.length, s.blocks[0].order]).to.eql(['2020-02-29', 'edited', 1, 0]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2020-02-29\", \"note\": \"edited\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: end the session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('ended_at is set', function () { pm.expect(pm.response.json().ended_at).to.match(/Z$/); });",
+                  "pm.collectionVariables.set('endedAt', pm.response.json().ended_at);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/end",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "end"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: ending again changes nothing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('same ended_at', function () { pm.expect(pm.response.json().ended_at).to.eql(pm.collectionVariables.get('endedAt')); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}/end",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}",
+                "end"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: another user cannot delete it",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{exerciseCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: delete the session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "edit: it is gone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{recordCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions/{{sessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions",
+                "{{sessionId}}"
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /api/v1/history/sessions (US-9)",
+      "item": [
+        {
+          "name": "history: sign up",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('historyHandle', ('hs' + Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 20));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('historyCookie', pm.response.headers.get('Set-Cookie').split(';')[0]);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web/v1/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web",
+                "v1",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\": \"{{historyHandle}}\", \"password\": \"correcthorsebattery\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-01",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-01\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-03",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-03\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a session on 2025-03-02",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sessions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"workout_date\": \"2025-03-02\"}"
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: newest first, two per page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('first page', function () {",
+                  "  pm.expect(body.items.map((i) => i.workout_date)).to.eql(['2025-03-03', '2025-03-02']);",
+                  "  pm.expect(body.items[0]).to.include.keys('block_count', 'set_count', 'exercise_summary');",
+                  "  pm.expect(body.page_info.has_next).to.eql(true);",
+                  "  pm.expect(body.page_info.next_cursor).to.match(/^[A-Za-z0-9_-]+$/);",
+                  "});",
+                  "pm.collectionVariables.set('historyCursor', body.page_info.next_cursor);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?limit=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: the next page",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('last page', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.items.map((i) => i.workout_date)).to.eql(['2025-03-01']);",
+                  "  pm.expect(body.page_info).to.eql({ next_cursor: null, has_next: false });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?limit=2&cursor={{historyCursor}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                },
+                {
+                  "key": "cursor",
+                  "value": "{{historyCursor}}"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: date range",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('only 2025-03-02', function () { pm.expect(pm.response.json().items.map((i) => i.workout_date)).to.eql(['2025-03-02']); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?from=2025-03-02&to=2025-03-02",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2025-03-02"
+                },
+                {
+                  "key": "to",
+                  "value": "2025-03-02"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          }
+        },
+        {
+          "name": "history: a broken cursor and limit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 with both problems', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().errors.flatMap((g) => g.reasons.map((r) => (g.field === undefined ? { ...r } : { field: g.field, ...r }))).map((e) => [e.field, e.code])).to.eql([['cursor', 'invalid_format'], ['limit', 'out_of_range']]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "{{historyCookie}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/history/sessions?cursor=!!&limit=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "history",
+                "sessions"
+              ],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "!!"
+                },
+                {
+                  "key": "limit",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "protocolProfileBehavior": {
+            "disableCookies": true
           }
         }
       ]
