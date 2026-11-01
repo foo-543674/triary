@@ -52,26 +52,10 @@ make infra-up
 # 5. Apply migrations
 make db-migrate
 
-# 6. Start the backend and the frontend, in two terminals
-make run-backend    # http://localhost:8080 (reads DATABASE_URL from .env)
-make run-frontend   # http://localhost:3000, open this one in the browser
+# 6. Then start the dev servers individually
+cd backend  && ../dev cargo run
+cd frontend && ../dev pnpm install && ../dev pnpm run dev
 ```
-
-Open http://localhost:3000 (not 127.0.0.1: the dev server listens on
-`localhost`). The browser only talks to the Vite dev server, which forwards
-`/api`, `/web` and `/health` to the backend, so the session cookie is
-same-origin. Run the backend through `make`: it gets `DATABASE_URL` only from
-the environment, and the Makefile exports `.env`.
-
-NOTE: this was observed only in the AI's box (podman, `netns = "host"`, so
-both servers share one network), on 2026-10-31: `/health` and the sign-up
-through `localhost:3000` reached the backend. Inside the devcontainer `./dev`
-runs commands directly, so both servers run in the same container and should
-behave the same; not verified there yet. Check by opening
-http://localhost:3000/health from the host browser while both run (VS Code
-forwards the ports). Outside the devcontainer under docker it does not work
-as is: every `./dev` call is its own container without published ports, so
-the Vite proxy's `localhost:8080` is not the backend.
 
 Language commands (cargo, pnpm, npx, ...) go through `./dev`, which runs them
 in the dev image (`tools/dev-image/Dockerfile`). Inside the devcontainer it
