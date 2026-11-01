@@ -104,7 +104,7 @@ description: triary の変更を、プロジェクト固有の品質基準でレ
 
 - ドメインルール違反を 409 / 404 で返していないか (→ 400 + body の domain code)
 - エラーレスポンスが `errors[]` 配列形式か (`error: {...}` は禁止)
-- Validator が `Result<_, Vec<DomainError>>` を返し、fail-fast していないか
+- Validator が `Result<_, Vec<Violation>>` を返し、fail-fast していないか
 - ボディ参照 ID の不存在が `_not_found_in_body` 系の専用コードか (パスの 404 と分離)
 - `openapi/openapi.yaml` と実装が乖離していないか。ID が `{prefix}_{ulid}` 形式か
 
