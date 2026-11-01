@@ -62,13 +62,29 @@ db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx
 
 # Run the app through make: this Makefile exports the variables of .env (see
 # the top), e.g. the database settings the backend reads from its environment.
+# Under docker every ./dev call is its own container (./dev --engine): the
+# backend gets a name on triary-network (created by `make infra-up`), the
+# frontend reaches it by that name, listens on the container's interfaces and
+# is published on the host's 127.0.0.1:3000. Directly (devcontainer) and under
+# the ai-box's podman both servers share one network and need none of this.
+# NOTE: unverified under docker (only the arguments are tested, by
+# `make dev-test`). Check: `make run-backend` and `make run-frontend` in two
+# WSL terminals, then open http://localhost:3000/health from the browser.
+BACKEND_CONTAINER := triary-backend
+
 .PHONY: run-backend
 run-backend: ## Run the backend on :8080 with the variables of .env
-	cd backend && "$(DEV)" cargo run
+	cd backend && TRIARY_DEV_NAME=$(BACKEND_CONTAINER) "$(DEV)" cargo run
 
 .PHONY: run-frontend
-run-frontend: ## Run the Vite dev server on :3000 (proxies /api and /web to :8080)
-	cd frontend && "$(DEV)" pnpm install --frozen-lockfile && "$(DEV)" pnpm run dev
+run-frontend: ## Run the Vite dev server on :3000 (proxies /api, /web and /health to the backend)
+	cd frontend && "$(DEV)" pnpm install --frozen-lockfile
+	@if [[ "$$("$(DEV)" --engine)" == docker ]]; then \
+	  cd frontend && TRIARY_DEV_PUBLISH=3000 BACKEND_ORIGIN=http://$(BACKEND_CONTAINER):$(or $(BACKEND_PORT),8080) \
+	    "$(DEV)" pnpm run dev --host 0.0.0.0; \
+	else \
+	  cd frontend && "$(DEV)" pnpm run dev; \
+	fi
 
 # ---------- Frontend ----------
 

@@ -449,7 +449,7 @@ because those must work wherever git and `./dev` run. Why:
 | `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `node tools/review-gate/src/cli.ts check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
+| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports by default: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
 
 ## devcontainer and local infra
 
