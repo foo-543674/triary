@@ -4,6 +4,7 @@
 #   ./dev cargo nextest run        # from backend/
 #   ./dev pnpm run lint:ci         # from frontend/
 #   ./dev --image-ref              # print the image this checkout uses
+#   ./dev --engine                 # print how commands run: direct, podman or docker
 #
 # Language toolchains live only in the dev image (tools/dev-image/Dockerfile);
 # why: .contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)". This
@@ -23,6 +24,13 @@
 #   TRIARY_DEV_IMAGE_REF  use this image instead of the content-derived tag
 #                         (CI uses it for the image it has just built)
 #   TRIARY_DEV_ENGINE     force "podman" or "docker"
+#   TRIARY_DEV_PUBLISH    docker only: ports to publish on the host's 127.0.0.1
+#                         (space separated, e.g. "3000"). Each docker call is its
+#                         own container on its own network, so a server inside it
+#                         is not reachable from the host without this. Podman in
+#                         the ai-box shares the host network and needs nothing.
+#   TRIARY_DEV_NAME       docker only: container name, so another ./dev
+#                         container on triary-network can reach it by name
 
 set -euo pipefail
 
@@ -64,13 +72,21 @@ pick_engine() {
   fi
 }
 
+runs_directly() {
+  [[ "${TRIARY_DEV_IMAGE:-}" == "1" || "${TRIARY_DEV_DIRECT:-}" == "1" ]]
+}
+
 if [[ "${1:-}" == "--image-ref" ]]; then
   image_ref
   exit 0
 fi
-[[ $# -gt 0 ]] || die "usage: ./dev <command> [args...]   (or ./dev --image-ref)"
+if [[ "${1:-}" == "--engine" ]]; then
+  if runs_directly; then echo direct; else pick_engine; fi
+  exit 0
+fi
+[[ $# -gt 0 ]] || die "usage: ./dev <command> [args...]   (or ./dev --image-ref / --engine)"
 
-if [[ "${TRIARY_DEV_IMAGE:-}" == "1" || "${TRIARY_DEV_DIRECT:-}" == "1" ]]; then
+if runs_directly; then
   exec "$@"
 fi
 
@@ -99,7 +115,7 @@ args=(run --rm -i
   --env TRIARY_DEV_ROOT="$ROOT")
 [[ -t 0 && -t 1 ]] && args+=(--tty)
 
-for name in DATABASE_URL TEST_DATABASE_URL SQLX_OFFLINE RUSTFLAGS CARGO_TERM_COLOR RUST_LOG RUST_BACKTRACE CI TERM REVIEW_GATE_BASE; do
+for name in DATABASE_URL TEST_DATABASE_URL SQLX_OFFLINE RUSTFLAGS CARGO_TERM_COLOR RUST_LOG RUST_BACKTRACE CI TERM REVIEW_GATE_BASE BACKEND_PORT BACKEND_ORIGIN; do
   [[ -n "${!name:-}" ]] && args+=(--env "$name")
 done
 
@@ -110,6 +126,14 @@ case "$ENGINE" in
     # Reach the local MySQL (docker-compose.yml) when it is running.
     if docker network inspect triary-network >/dev/null 2>&1; then
       args+=(--network triary-network)
+    fi
+    # Bound to the host's loopback only: the dev servers are not for the LAN.
+    for port in ${TRIARY_DEV_PUBLISH:-}; do
+      [[ "$port" =~ ^[0-9]+$ ]] || die "TRIARY_DEV_PUBLISH: not a port number: $port"
+      args+=(--publish "127.0.0.1:$port:$port")
+    done
+    if [[ -n "${TRIARY_DEV_NAME:-}" ]]; then
+      args+=(--name "$TRIARY_DEV_NAME")
     fi
     ;;
   podman)

@@ -53,25 +53,33 @@ make infra-up
 make db-migrate
 
 # 6. Start the backend and the frontend, in two terminals
-make run-backend    # http://localhost:8080 (with the variables of .env)
+make run-backend    # :8080 (with the variables of .env; the browser does not open it)
 make run-frontend   # http://localhost:3000, open this one in the browser
 ```
 
-Open http://localhost:3000 (not 127.0.0.1: the dev server listens on
-`localhost`). The browser only talks to the Vite dev server, which forwards
+Open http://localhost:3000 (under `direct` and `podman` not 127.0.0.1: the
+dev server listens on `localhost` there, see below). The browser only talks to the Vite dev server, which forwards
 `/api`, `/web` and `/health` to the backend, so the session cookie is
 same-origin. Run the backend through `make`: the Makefile exports `.env` to
 it.
 
-NOTE: this was observed only in the AI's box (podman, `netns = "host"`, so
-both servers share one network), on 2026-10-31: `/health` through
-`localhost:3000` reached the backend. Inside the devcontainer `./dev`
-runs commands directly, so both servers run in the same container and should
-behave the same; not verified there yet. Check by opening
-http://localhost:3000/health from the host browser while both run (VS Code
-forwards the ports). Outside the devcontainer under docker it does not work
-as is: every `./dev` call is its own container without published ports, so
-the Vite proxy's `localhost:8080` is not the backend.
+How the two servers find each other depends on how `./dev` runs commands
+(`./dev --engine`):
+
+- `direct` (devcontainer) and `podman` (the AI's box, `netns = "host"`): both
+  servers share one network. Observed in the AI's box on 2026-10-31:
+  `/health` through `localhost:3000` reached the backend. Not verified in the
+  devcontainer yet; check by opening http://localhost:3000/health from the
+  host browser while both run (VS Code forwards the ports).
+- `docker` (e.g. WSL without the devcontainer): every `./dev` call is its own
+  container. `make run-backend` names the backend container `triary-backend`
+  on `triary-network` (run `make infra-up` first, it creates the network);
+  `make run-frontend` proxies to it by that name and publishes the dev server
+  on the host's `127.0.0.1:3000`. NOTE: unverified; before this was added,
+  `localhost:3000` was unreachable from the browser on WSL (reported
+  2026-11-01). Check the same way, from the browser. If `make run-backend`
+  reports that the name `triary-backend` is in use while no backend runs, a
+  killed run left the container behind: `docker rm -f triary-backend`.
 
 Language commands (cargo, pnpm, npx, ...) go through `./dev`, which runs them
 in the dev image (`tools/dev-image/Dockerfile`). Inside the devcontainer it
@@ -83,9 +91,8 @@ NOTE: two things are not settled yet (`.contexts/bootstrap-decisions.md`
 
 - The devcontainer is built from the dev image's Dockerfile (#56), so it has
   the same toolchain as CI. Unverified until the owner rebuilds it once.
-- Step 6 outside the devcontainer is unverified. `./dev` publishes no ports,
-  so under docker the dev servers are probably not reachable from the host
-  browser. The backend's `DATABASE_URL` in `.env.example` uses the container
+- Step 6 outside the devcontainer is unverified (see the list above for
+  docker). The backend's `DATABASE_URL` in `.env.example` uses the container
   name `triary-mysql`: under docker `./dev` joins `triary-network`, which
   resolves it; under podman in the ai-box the container shares the box's
   network and that name probably does not resolve. Check by running step 6
