@@ -12,6 +12,14 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    # Supply-chain guardrail (docs/dependency-policy.md): do not propose a
+    # release until it has been public for a while, so a compromised release
+    # is more likely to be caught and yanked before it reaches us (Rust / npm
+    # updates merge without human approval). Security updates are not delayed
+    # (GitHub docs, Dependabot options reference "cooldown", read 2026-10-31).
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
     groups:
       # NOTE: Split dev and runtime dependencies into separate update PRs so
       #       reviews stay focused.
@@ -43,6 +51,14 @@ updates:
     labels:
       - "dependencies"
       - "backend"
+    # Supply-chain guardrail (docs/dependency-policy.md): do not propose a
+    # release until it has been public for a while, so a compromised release
+    # is more likely to be caught and yanked before it reaches us (Rust / npm
+    # updates merge without human approval). Security updates are not delayed
+    # (GitHub docs, Dependabot options reference "cooldown", read 2026-10-31).
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
 
   # ---------- GitHub Actions ----------
   - package-ecosystem: "github-actions"
@@ -56,3 +72,6 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    # Same guardrail; github-actions supports only default-days.
+    cooldown:
+      default-days: 7

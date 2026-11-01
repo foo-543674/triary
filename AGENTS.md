@@ -294,7 +294,9 @@ GitHub would not stop you.
 
 ### Stop and confirm first (file it as above and keep working)
 
-- Adding a new external dependency (Cargo crate or npm package)
+- Adding a new external dependency: npm packages. Cargo crates are
+  pre-approved by the owner (#65, 2026-10-31) as long as the vetting and
+  ledger procedure in `docs/dependency-policy.md` is followed
 - Operations that affect the user's working environment (stopping or
   recreating containers, deleting volumes, rewriting branch history). Before
   deciding "it's only for verification", observe whether you actually started
@@ -446,6 +448,8 @@ database, you do not have to run `make infra-up`.
 - `.contexts/setup-plan.md`: environment build plan
 - `.contexts/bootstrap-decisions.md`: AI context bootstrap decisions
 - `.contexts/security-overrides.md`: ledger for the pnpm.overrides patches
+- `docs/dependency-policy.md`: supply-chain rules for adding crates / npm
+  packages, the direct-dependency ledger, and which approvals exist
 - `openapi/openapi.yaml`: OpenAPI schema (the source of truth for the API)
 - `docs/review-contract.md`: how review findings are recorded and when a
   change is complete
