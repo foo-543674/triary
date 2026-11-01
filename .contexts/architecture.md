@@ -88,7 +88,7 @@ domain の **両方が定義するポートトレイト** を実装する。
     `Weight`, `Reps`, `DurationSeconds`, `WorkoutDate` 等
   - **入力型 (Input)**: バリデーション前の素の入力を表す `pub` 構造体
   - **バリデータ (Validator)**: 入力 + 必要な外部事実から
-    `Result<ValidatedXxx, DomainError>` を返す
+    `Result<ValidatedXxx, Vec<Violation>>` を返す
   - **検証済み入力型 (Validated)**: 内部フィールドが `pub(crate)` などで
     封じられた構造体。バリデータを通った値だけが構成できる
   - **ファクトリ (Factory)**: `Validated*` を受け取り、集約を生成する
@@ -111,8 +111,10 @@ domain の **両方が定義するポートトレイト** を実装する。
 
 - **panic はプログラマのバグ専用**。`unwrap` / `expect` は「ここに到達したら
   バグ」と言い切れる箇所だけ
-- **ユーザー入力・外界由来の失敗はすべて `Result<T, DomainError>`**。
-  `DomainError` は `thiserror` で枚挙する
+- **ユーザー入力・外界由来の失敗はすべて `Result<T, Vec<Violation>>`**。
+  `Violation` は `(field, code)` の組 (`domain::validation`)。違反は収集し、
+  1 つの値に複数の違反 (長さと文字種など) があれば全部を返す (2026-11-01
+  オーナー判断、#67)
 - 「インスタンス化のときに値チェックして例外」は採用しない。代わりに
   **型レベルで「未検証 / 検証済み」を区別** することで、検証していない値
   が集約に紛れ込むことをコンパイル時に防ぐ
@@ -123,14 +125,14 @@ domain の **両方が定義するポートトレイト** を実装する。
 しないことを最優先しつつ、責務ごとに **具体的な型** に落とす。
 
 1. **値オブジェクト** — 単一の値が満たすべき制約。`Type::try_new(raw)`
-   または `Type::parse(raw)` が `Result<Self, DomainError>` を返す。
+   または `Type::parse(raw)` が `Result<Self, Vec<Violation>>` を返す。
    一度作られた値オブジェクトは常に妥当（型がそれを保証する）。例:
    `MeasurementKindSet::try_new(set)`, `UserId::parse(raw)`,
    `Weight::try_new(value)`
 2. **集約 / エンティティのメソッド** — 既存集約の状態に対する操作。
    必要な外部事実（祖先列、bool フラグ、別集約のスナップショット）は
    呼び出し側 application 層が事前ロードして引数で渡す。メソッドは
-   `Result<(), DomainError>` を返し、集約自身が「与えられた事実を
+   `Result<(), Vec<Violation>>` を返し、集約自身が「与えられた事実を
    前提に自分を更新する／拒否する」ことに集中する
 3. **入力型 / バリデータ / 検証済み入力型 / ファクトリ** — 集約の **生成**
    フロー。次節「Create フローの 4 役割」参照。Create に限らず、複雑な
@@ -153,7 +155,7 @@ pub struct CreateExerciseInput {
     pub parent_id: Option<String>,
 }
 
-// 2. バリデータ: 入力 + 外部事実 → Result<Validated, DomainError>
+// 2. バリデータ: 入力 + 外部事実 → Result<Validated, Vec<Violation>>
 pub struct CreateExerciseValidator;
 
 impl CreateExerciseValidator {
@@ -162,9 +164,9 @@ impl CreateExerciseValidator {
         owner: UserId,
         name_taken: bool,                  // 外部事実: 同名種目の存在
         parent: Option<&Exercise>,         // 外部事実: 親種目のスナップショット
-    ) -> Result<ValidatedCreateExerciseInput, DomainError> {
+    ) -> Result<ValidatedCreateExerciseInput, Vec<Violation>> {
         let name = ExerciseName::try_new(input.name)?;
-        if name_taken { return Err(DomainError::ExerciseNameConflict); }
+        if name_taken { return Err(vec![Violation::new(FieldPath::new("name"), ViolationCode::AlreadyTaken)]); }
         let kinds = MeasurementKindSet::try_new(input.kinds)?;
         // 親の妥当性（同じ owner に属するか等）も検証
         let parent_id = parent.map(|p| p.id().clone());
@@ -267,7 +269,7 @@ impl ReparentExerciseValidator {
     pub fn validate(
         input: ReparentExerciseInput,
         ledger: &dyn ExerciseLedger,
-    ) -> Result<ValidatedReparent, DomainError> {
+    ) -> Result<ValidatedReparent, Vec<Violation>> {
         // 必要なときだけ ledger を引いて検証する
     }
 }
@@ -293,7 +295,7 @@ impl ReparentExerciseValidator {
     pub fn validate(
         input: ReparentExerciseInput,
         load_parent: impl Fn(&ExerciseId) -> Option<Exercise>,
-    ) -> Result<ValidatedReparent, DomainError> {
+    ) -> Result<ValidatedReparent, Vec<Violation>> {
         // load_parent をたどって祖先列を構築し、循環・深さを検証する。
         // 循環が早期に検出できればその時点で打ち切れる
     }
@@ -565,7 +567,7 @@ proxy 経由で `/api/*` をバックエンドに転送して同一 origin に�
 infrastructure error  (sqlx::Error 等)
        │  infrastructure 内で domain error or anyhow に変換
        v
-domain error (DomainError enum)
+domain error (Vec<Violation>: (field, code) の組)
        │  application 層でユースケースごとの UseCaseError にラップ
        v
 application error (UseCaseError enum)
@@ -576,61 +578,46 @@ HTTP response (4xx / 5xx + ProblemDetails 風 JSON)
 
 ### domain エラーの分類（MVP）
 
+入力とビジネスルールの違反は、意味ごとの enum ではなく `(field, code)` の
+組 `Violation` で表す (2026-11-01 オーナー判断、#67)。`code` は違反の種類
+だけを表す `ViolationCode` (`api-design.md` §1.6 のフィールド依存コード) で、
+どの入力の話かは `field` (`FieldPath`) が持つ。意味ごとの enum
+(`ExerciseNameConflict` など) を採らない理由:
+
+- 1 つの値に複数の違反 (長さと文字種) があることを表せない
+- HTTP 層で `(code, field)` に変換する表が増え、同じ違反を 2 か所で表すことになる
+
 ```rust
-pub enum DomainError {
-    // 入力検証
-    InvalidUserId,
-    InvalidPassword,
-    InvalidExerciseName,
-    EmptyMeasurementSet,
-    InvalidWeight,
-    InvalidReps,
-    InvalidDuration,
-    InvalidWorkoutDate,
-
-    // ビジネスルール違反
-    UserIdAlreadyTaken,
-    UserIdReserved,
-    ExerciseNameConflict,
-    MeasurementSetLockedByExistingRecords,
-    ProgressionCycleDetected,
-    ProgressionDepthExceeded,
-    ProgressionFanoutExceeded,
-    SetMissingRequiredMeasurement,
-    SessionEndBeforeStart,
-    WorkoutDateInFuture,
-
-    // 認証
-    InvalidCredentials,
-    SessionExpired,
-
-    // not-found / 認可
-    UserNotFound,
-    ExerciseNotFound,
-    SessionNotFound,
-    Forbidden,
-}
+pub struct Violation { pub field: FieldPath, pub code: ViolationCode }
+// 例: 種目名の衝突
+Violation::new(FieldPath::new("name"), ViolationCode::AlreadyTaken)
 ```
+
+フィールドに紐付かない失敗 (未認証、ログイン失敗、パス対象の不存在、
+プリセットの変更禁止) は domain の違反ではなく、application / interfaces の
+エラー (`AppError`) が持つ。実装は `backend/src/domain/validation.rs` と
+`backend/src/interfaces/http/error.rs`。
 
 ### HTTP マッピング指針
 
 `api-design.md §1.5 / §1.6` を正とする。HTTP ステータスはプロトコル層の
-関心事に限定し、ドメインバリデーションの細分類はボディの `errors[].code`
-で表現する。
+関心事に限定し、ドメインバリデーションの細分類はボディの
+`errors[].reasons[].code` で表現する。
 
 | エラー種別 | HTTP ステータス | 補足 |
 |---|---|---|
-| 入力検証エラー (`Invalid*`) | 400 | 形式不正・値域違反 |
-| ビジネスルール違反 (`*Conflict`, `*Exceeded`, `*Detected` 等) | 400 | ユーザー ID 重複・種目名衝突・上限超過もここ |
-| ボディで参照された ID の不存在 (`*NotFoundInBody`) | 400 | パスの 404 とは別 |
-| `InvalidCredentials` / `SessionExpired` | 401 | |
-| `Forbidden` | 403 | プリセット編集禁止のみ |
-| `*NotFound`（パスパラメータが指すリソース不存在） | 404 | 認可エラーも同じ 404 にして存在露呈を防ぐ |
+| 入力検証の違反 (`Violation`、形式不正・値域違反) | 400 | |
+| ビジネスルールの違反 (`Violation`、`already_taken`・`exceeds_*`・`creates_cycle` など) | 400 | ユーザー ID 重複・種目名衝突・上限超過もここ |
+| ボディで参照された ID の不存在 (`Violation`、`not_found` + `field`) | 400 | パスの 404 とは別 |
+| 未認証・ログイン失敗 (`AppError::Unauthenticated` / `InvalidCredentials`) | 401 | |
+| プリセットの変更 (`AppError::PresetNotModifiable`) | 403 | プリセット編集禁止のみ |
+| パスパラメータが指すリソースの不存在 (`AppError::NotFound`) | 404 | 認可エラーも同じ 404 にして存在露呈を防ぐ |
 | 楽観的排他制御の並行更新コンフリクト | 409 | MVP では未使用。ETag 対応の将来拡張用に予約 |
 | 内部例外（infrastructure の予期せぬ失敗） | 500 | 構造化ログに詳細、レスポンスには出さない |
 
 レスポンスボディは **必ず `errors` 配列**を返す
-（`api-design.md §1.6`）。単一エラーでも `errors[]` の長さ 1 で表現し、
+（`api-design.md §1.6`）。要素はフィールドごとのグループで、違反は各グループの
+`reasons[]` に入る (#67)。単一エラーでも `errors[]` の長さ 1 で表現し、
 `{ "error": "code", "message": "..." }` のような単一エラー封筒は使わない。
 バリデーションは fail-fast せず、複数フィールド・複数制約の違反を 1 レス
 ポンスにまとめて返す。ProblemDetails (RFC 7807) は MVP ではオーバースペッ
@@ -1178,7 +1165,7 @@ triary/
 │       │   │   ├── append_block.rs
 │       │   │   ├── append_set.rs
 │       │   │   └── reassign_block_exercise.rs
-│       │   └── error.rs             # DomainError
+│       │   └── validation.rs        # Violation (field, code)
 │       │   # NOTE: 複数集約をまたぐ「ワークフロー」が必要になったら
 │       │   #       domain/workflows/ を新設する。MVP では不要
 │       │   # NOTE: 永続化ポート (Repository, SessionStore) は application/ports/ へ
@@ -1245,7 +1232,7 @@ triary/
    → Factory / apply_\* の型付きパイプライン** — 値検証の経路をコンパイラ
    で強制し、未検証データから集約が作られないことを型レベルで保証する。
    panic はプログラマのバグ専用、ユーザー入力起因の失敗はすべて
-   `Result<_, DomainError>` で返す
+   `Result<_, Vec<Violation>>` で返す
 9. **ポートトレイトは「現実の概念か / アプリケーションの営みか」で
    配置先を分ける** — `Clock` や `PasswordHasher` のように現実に存在する
    概念をモデル化したものは domain に置く。`Repository` / `SessionStore`

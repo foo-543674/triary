@@ -238,7 +238,7 @@ mod tests {
         let fakes = fakes();
         let (status, body) = get(&crate::app(fakes.state()), "/api/v1/exercises", None).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
-        assert_eq!(body["errors"][0]["code"], "unauthenticated");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "unauthenticated");
     }
 
     #[tokio::test]
@@ -300,7 +300,7 @@ mod tests {
         let (cookie, _) = setup(&fakes, &router).await;
         let (status, body) = get(&router, "/api/v1/exercises?owned_only=yes", Some(&cookie)).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["errors"][0]["code"], "invalid_format");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "invalid_format");
         assert_eq!(body["errors"][0].get("field"), None);
     }
 
@@ -352,7 +352,7 @@ mod tests {
             let (status, body) =
                 get(&router, &format!("/api/v1/exercises/{id}"), Some(&cookie)).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{id}");
-            assert_eq!(body["errors"][0]["code"], "not_found");
+            assert_eq!(body["errors"][0]["reasons"][0]["code"], "not_found");
             assert_eq!(body["errors"][0].get("field"), None);
         }
     }

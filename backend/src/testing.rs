@@ -478,3 +478,21 @@ pub fn fakes() -> Fakes {
 pub fn state() -> AppState {
     fakes().state()
 }
+
+/// The `(field, code)` pairs of an error response body, flattened from the
+/// field groups in order; `field` is empty for errors without one.
+pub fn error_pairs(body: &serde_json::Value) -> Vec<(String, String)> {
+    body["errors"]
+        .as_array()
+        .expect("errors array")
+        .iter()
+        .flat_map(|group| {
+            let field = group["field"].as_str().unwrap_or("").to_owned();
+            group["reasons"]
+                .as_array()
+                .expect("reasons array")
+                .iter()
+                .map(move |r| (field.clone(), r["code"].as_str().expect("code").to_owned()))
+        })
+        .collect()
+}

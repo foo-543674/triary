@@ -40,7 +40,9 @@ describe('createCredentialsFormState', () => {
       state.setPassword('correcthorsebattery');
       state.attemptSubmit();
       state.showServerError(
-        toApiError(400, { errors: [{ code: 'already_taken', field: 'user_id', message: '' }] }),
+        toApiError(400, {
+          errors: [{ field: 'user_id', reasons: [{ code: 'already_taken', message: '' }] }],
+        }),
       );
       expect(state.fieldErrors().user_id).toEqual(['already_taken']);
       state.setUserId('alice2');

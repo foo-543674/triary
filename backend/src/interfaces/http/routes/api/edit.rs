@@ -395,18 +395,14 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        let codes: Vec<(&str, &str)> = body["errors"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| (e["field"].as_str().unwrap(), e["code"].as_str().unwrap()))
-            .collect();
+        let codes = crate::testing::error_pairs(&body);
         assert_eq!(
             codes,
             [
                 ("reps", "out_of_range"),
                 ("weight_kg", "missing_required_measurement")
             ]
+            .map(|(f, c)| (f.to_owned(), c.to_owned()))
         );
         assert_eq!(reps(&r.session().await), [5, 6, 7]);
     }
@@ -445,7 +441,10 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert_eq!(body["errors"][0]["code"], "incompatible_with_existing_sets");
+        assert_eq!(
+            body["errors"][0]["reasons"][0]["code"],
+            "incompatible_with_existing_sets"
+        );
         let (status, _, _) = call(
             &r.router,
             "DELETE",
@@ -485,7 +484,7 @@ mod tests {
             Some(json!({ "ended_at": "2027-01-15T07:00:00Z" })),
         )
         .await;
-        assert_eq!(body["errors"][0]["code"], "before_start");
+        assert_eq!(body["errors"][0]["reasons"][0]["code"], "before_start");
         let (status, ended, _) = call(
             &r.router,
             "POST",

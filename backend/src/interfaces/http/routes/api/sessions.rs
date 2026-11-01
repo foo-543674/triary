@@ -299,17 +299,7 @@ mod tests {
     }
 
     fn pairs(body: &Value) -> Vec<(String, String)> {
-        body["errors"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| {
-                (
-                    e["field"].as_str().unwrap_or("").to_owned(),
-                    e["code"].as_str().unwrap().to_owned(),
-                )
-            })
-            .collect()
+        crate::testing::error_pairs(body)
     }
 
     #[tokio::test]
@@ -441,7 +431,7 @@ mod tests {
         for (method, uri, body) in attempts {
             let (status, body, _) = world.call(method, &uri, Some(&bob), body).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{method} {uri}");
-            assert_eq!(body["errors"][0]["code"], "not_found");
+            assert_eq!(body["errors"][0]["reasons"][0]["code"], "not_found");
         }
         assert_eq!(world.fakes.records.blocks_of(session_id), 1);
     }

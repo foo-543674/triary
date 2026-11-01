@@ -170,7 +170,7 @@ mod tests {
             assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "cookie {cookie:?}");
             assert_eq!(
                 reply.body,
-                json!({ "errors": [ { "code": "unauthenticated", "message": "Authentication required" } ] })
+                json!({ "errors": [ { "reasons": [ { "code": "unauthenticated", "message": "Authentication required" } ] } ] })
             );
         }
     }
@@ -240,7 +240,7 @@ mod tests {
             assert_eq!(reply.cookie, None);
             assert_eq!(
                 reply.body,
-                json!({ "errors": [ { "code": "invalid_credentials", "message": "Invalid user ID or password" } ] })
+                json!({ "errors": [ { "reasons": [ { "code": "invalid_credentials", "message": "Invalid user ID or password" } ] } ] })
             );
         }
     }

@@ -14,7 +14,7 @@ describe('call', () => {
     server.use(
       http.get('*/health', () =>
         HttpResponse.json(
-          { errors: [{ code: 'internal_error', message: 'Internal server error' }] },
+          { errors: [{ reasons: [{ code: 'internal_error', message: 'Internal server error' }] }] },
           { status: 500 },
         ),
       ),

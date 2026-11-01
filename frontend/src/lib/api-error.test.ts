@@ -3,12 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { codesForField, generalErrors, isUnauthenticated, toApiError } from './api-error';
 
 describe('toApiError', () => {
-  it('keeps every item of a well-formed envelope', () => {
+  it('flattens every reason of every field group', () => {
     const error = toApiError(400, {
       errors: [
-        { code: 'too_long', field: 'name', message: 'Too long' },
-        { code: 'invalid_charset', field: 'name', message: 'Bad' },
-        { code: 'too_short', field: 'password', message: 'Too short' },
+        {
+          field: 'name',
+          reasons: [
+            { code: 'too_long', message: 'Too long' },
+            { code: 'invalid_charset', message: 'Bad' },
+          ],
+        },
+        { field: 'password', reasons: [{ code: 'too_short', message: 'Too short' }] },
       ],
     });
     expect(error.status).toBe(400);
@@ -17,9 +22,9 @@ describe('toApiError', () => {
     expect(generalErrors(error)).toEqual([]);
   });
 
-  it('treats items without field as general errors', () => {
+  it('treats the group without field as general errors', () => {
     const error = toApiError(404, {
-      errors: [{ code: 'not_found', message: 'Exercise not found' }],
+      errors: [{ reasons: [{ code: 'not_found', message: 'Exercise not found' }] }],
     });
     expect(generalErrors(error)).toEqual([{ code: 'not_found', message: 'Exercise not found' }]);
   });
@@ -29,7 +34,9 @@ describe('toApiError', () => {
     ['plain text', 'Internal Server Error'],
     ['empty list', { errors: [] }],
     ['single-error object', { error: 'not_found', message: 'x' }],
-    ['items without code', { errors: [{ message: 'x' }] }],
+    ['reasons without code', { errors: [{ field: 'name', reasons: [{ message: 'x' }] }] }],
+    ['groups without reasons', { errors: [{ field: 'name' }] }],
+    ['the old flat items', { errors: [{ code: 'too_long', field: 'name', message: 'x' }] }],
   ])('falls back to one unknown item for %s', (_, body) => {
     const error = toApiError(502, body);
     expect(error.errors).toEqual([{ code: 'unknown', message: 'HTTP 502' }]);
@@ -48,15 +55,19 @@ describe('toApiError', () => {
 describe('isUnauthenticated', () => {
   it('is true only for 401 with the unauthenticated code', () => {
     expect(
-      isUnauthenticated(toApiError(401, { errors: [{ code: 'unauthenticated', message: '' }] })),
+      isUnauthenticated(
+        toApiError(401, { errors: [{ reasons: [{ code: 'unauthenticated', message: '' }] }] }),
+      ),
     ).toBe(true);
     expect(
       isUnauthenticated(
-        toApiError(401, { errors: [{ code: 'invalid_credentials', message: '' }] }),
+        toApiError(401, { errors: [{ reasons: [{ code: 'invalid_credentials', message: '' }] }] }),
       ),
     ).toBe(false);
     expect(
-      isUnauthenticated(toApiError(400, { errors: [{ code: 'unauthenticated', message: '' }] })),
+      isUnauthenticated(
+        toApiError(400, { errors: [{ reasons: [{ code: 'unauthenticated', message: '' }] }] }),
+      ),
     ).toBe(false);
   });
 });
