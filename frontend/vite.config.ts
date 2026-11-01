@@ -56,8 +56,11 @@ export default defineConfig({
     // is the backend's default port; override it with the BACKEND_ORIGIN
     // environment variable (read from the process environment, not from
     // .env files).
-    // NOTE: not observed against a running backend yet; check with
-    //       `curl localhost:3000/health` while both servers run.
+    // Observed 2026-10-31 in the ai-box: /health through localhost:3000
+    // reached the backend. The dev server listens on `localhost` only
+    // (127.0.0.1 was refused there, where localhost resolves to ::1), so open
+    // http://localhost:3000. NOTE: not yet observed from a browser or in the
+    // devcontainer.
     proxy: Object.fromEntries(
       ['/api', '/web', '/health'].map((prefix) => [
         prefix,
