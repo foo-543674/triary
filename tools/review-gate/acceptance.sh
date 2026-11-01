@@ -202,8 +202,29 @@ elif [[ "$dependency_update" == "true" ]]; then
   post_status success "machine checks passed (Dependabot dependency update; merges without human approval, #43)"
   # Read by the automerge job in .github/workflows/acceptance.yml.
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    printf 'automerge=true\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
+    printf 'automerge=true\nkind=dependency\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
   fi
 else
-  post_status success "machine checks passed (CI + review ledger)"
+  # --- 5. a change by the AI that merges without human approval? ------------------
+  # Owner decision 2026-11-01 (contract: docs/remote-acceptance.md "人間の承認なしで
+  # マージしてよい変更"). Reached only when every check above passed: CI, a
+  # review ledger snapshot bound to this head, no open decision, no base file.
+  # DO NOT REMOVE OR WEAKEN: the rules live in tools/review-gate/src/ai-change.ts.
+  # Any failure means "not this class", i.e. a human approves and merges.
+  pr_file="$(mktemp)"
+  printf '%s' "$pr_json" >"$pr_file"
+  changed_file="$(mktemp)"
+  printf '%s\n' "${changed[@]}" >"$changed_file"
+  ai_classification="$("${CLI[@]}" classify-ai-change --pr-file "$pr_file" --changed-file "$changed_file" \
+    --default-branch "$(jq -r .base.repo.default_branch <<<"$pr_json")" \
+    --base-files "$(IFS=,; echo "${base_changes[*]}")" || echo '{}')"
+  jq -r '.reasons[]? | "not an AI change that merges without approval: " + .' <<<"$ai_classification"
+  if [[ "$(jq -r '.aiChange == true' <<<"$ai_classification")" == "true" ]]; then
+    post_status success "machine checks passed (CI + review ledger; AI change, merges without human approval)"
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+      printf 'automerge=true\nkind=ai-change\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
+    fi
+  else
+    post_status success "machine checks passed (CI + review ledger)"
+  fi
 fi

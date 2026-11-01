@@ -15,6 +15,9 @@
 //   classify-dependency --pr-author <login> --head <sha> --compare-file <f>
 //                                                        remote verifier: is this a Dependabot
 //                                                        dependency update (#43)? prints JSON
+//   classify-ai-change --pr-file <f> --default-branch <b> --changed-file <f> [--base-files "a,b"]
+//                                                        remote verifier: is this an AI change
+//                                                        that merges without a human? prints JSON
 //
 // The rules live in docs/review-contract.md and docs/remote-acceptance.md.
 
@@ -32,6 +35,7 @@ import {
   parseSubmission,
   type Scope,
 } from "./ledger.ts";
+import { classifyAiChange, type PullRequest } from "./ai-change.ts";
 import { classifyDependencyUpdate, type CompareResponse } from "./dependency.ts";
 import { buildSnapshot, judgeAcceptance, parseSnapshotComment, renderSnapshotComment } from "./snapshot.ts";
 
@@ -209,6 +213,19 @@ const commands: Record<string, (values: Record<string, string | undefined>) => n
     console.log(JSON.stringify(result));
     return 0;
   },
+  "classify-ai-change": (v) => {
+    const pr = JSON.parse(readFileSync(required(v["pr-file"], "pr-file"), "utf8")) as PullRequest;
+    const result = classifyAiChange({
+      pr,
+      defaultBranch: required(v["default-branch"], "default-branch"),
+      baseFiles: (v["base-files"] ?? "").split(",").filter((f) => f !== ""),
+      changedFiles: readFileSync(required(v["changed-file"], "changed-file"), "utf8")
+        .split("\n")
+        .filter((f) => f !== ""),
+    });
+    console.log(JSON.stringify(result));
+    return 0;
+  },
   "contract-version": (v) => {
     console.log(contractVersionAt(v.base ?? "HEAD"));
     return 0;
@@ -243,6 +260,10 @@ const main = (argv: readonly string[]): number => {
         "to",
         "pr-author",
         "compare-file",
+        "pr-file",
+        "default-branch",
+        "base-files",
+        "changed-file",
       ].map((name) => [name, { type: "string" as const }]),
     ),
   });
