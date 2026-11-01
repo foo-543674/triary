@@ -40,7 +40,7 @@ guide. This file is the always-on context Cursor should respect.
 
 - TDD: write the failing test first. Use `proptest` / `@fast-check/vitest`
   for property-based tests where applicable.
-- Validators return `Result<T, Vec<DomainError>>` (collected errors).
+- Validators return `Result<T, Vec<Violation>>` (collected errors).
 - API errors come back as `errors[]` arrays, never `{error: {...}}`.
 - HTTP status reserved for protocol concerns; domain rule violations are
   always HTTP 400 with a domain-specific `code` in the body.

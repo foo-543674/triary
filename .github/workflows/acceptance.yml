@@ -15,7 +15,10 @@ on:
     workflows: [CI]
     types: [completed]
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # labeled / unlabeled / converted_to_draft: the hold-merge label and the
+    # draft state decide approval-free merging, so changing them re-judges
+    # (and the hold job below withdraws a pending auto-merge, R101).
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled, converted_to_draft]
   issue_comment:
     types: [created, edited]
   workflow_dispatch:
@@ -38,6 +41,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       automerge: ${{ steps.judge.outputs.automerge }}
+      kind: ${{ steps.judge.outputs.kind }}
       head: ${{ steps.judge.outputs.head }}
     # NOTE: Runs for the same PR are serialized and nothing is ever
     #       cancelled: a cancelled verdict would leave the status pending.
@@ -88,10 +92,12 @@ jobs:
           path: ${{ runner.temp }}/review-snapshot.md
           if-no-files-found: warn
 
-  # Dependabot dependency updates that passed the verdict merge without human
-  # approval (#43; contract: docs/remote-acceptance.md "人間の承認なしでマージ
-  # してよい変更"). The verdict job sets `automerge` only for that class. This
-  # job checks out nothing and runs no repository code.
+  # Changes that passed the verdict and merge without human approval
+  # (contract: docs/remote-acceptance.md "人間の承認なしでマージしてよい変更"):
+  # Dependabot dependency updates (#43) and changes by the AI that touch no
+  # base file (owner decision 2026-11-01). The verdict job sets `automerge`
+  # only for those classes. This job checks out nothing and runs no
+  # repository code.
   # NOTE: approving needs the repository setting "Allow GitHub Actions to
   #       create and approve pull requests" (owner action, listed in #43).
   #       A merge made with GITHUB_TOKEN does not trigger push workflows on
@@ -99,7 +105,7 @@ jobs:
   #       CI does not re-run on main for these merges; the PR's CI on the
   #       up-to-date head (ruleset: strict status checks) is the evidence.
   automerge:
-    name: acceptance / automerge dependency update
+    name: acceptance / automerge
     needs: verdict
     if: needs.verdict.outputs.automerge == 'true'
     runs-on: ubuntu-latest
@@ -115,13 +121,46 @@ jobs:
           PR: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || inputs.pr }}
           # The head the verdict judged; a newer push must be judged again.
           HEAD_SHA: ${{ needs.verdict.outputs.head }}
+          KIND: ${{ needs.verdict.outputs.kind }}
         run: |
           head="$HEAD_SHA"
+          case "$KIND" in
+            dependency) why="Dependabot dependency update (#43)" ;;
+            ai-change) why="change by the AI touching no base file (owner decision 2026-11-01)" ;;
+            *) echo "unknown automerge kind: $KIND" >&2; exit 1 ;;
+          esac
           gh pr review "$PR" -R "$REPO" --approve \
-            --body "Dependabot dependency update; acceptance / verdict passed on ${head:0:7} (#43)."
+            --body "$why; acceptance / verdict passed on ${head:0:7}."
           # --auto waits for the ruleset's requirements. --match-head-commit
           # refuses to merge if the head moved after the verdict.
           # Observed 2026-10-31 with the ruleset active: on #50 (rstest) this
           # job approved and the PR merged within seconds (run 41211333898).
           # NOTE: unverified how it behaves with the ruleset disabled.
           gh pr merge "$PR" -R "$REPO" --auto --merge --match-head-commit "$head"
+
+  # The owner's stop switch (R101): putting the hold-merge label on a PR or
+  # turning it back into a draft withdraws an auto-merge the automerge job
+  # already enabled. It cannot undo a merge that already happened: auto-merge
+  # merges as soon as the ruleset is satisfied, so the label is reliable only
+  # before the verdict passes. This job checks out nothing and runs no
+  # repository code.
+  hold:
+    name: acceptance / hold
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      ((github.event.action == 'labeled' && github.event.label.name == 'hold-merge') ||
+       github.event.action == 'converted_to_draft')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: disable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        # NOTE: unverified how `gh pr merge --disable-auto` exits when
+        #       auto-merge was not enabled; that case is not a failure here.
+        run: gh pr merge "$PR" -R "$REPO" --disable-auto || echo "auto-merge was not enabled on #$PR"

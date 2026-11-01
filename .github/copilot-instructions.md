@@ -41,7 +41,7 @@ Naming, anywhere in the codebase:
 
 - TDD: write the failing test first (`cargo nextest`, `vitest`, or
   `proptest`/`fast-check` for property-based).
-- Validation collects errors: return `Result<_, Vec<DomainError>>`, not
+- Validation collects errors: return `Result<_, Vec<Violation>>`, not
   fail-fast on the first error.
 - HTTP: errors as `errors[]` array, never single-error envelopes. HTTP
   status reserved for protocol concerns; domain rule violations return 400
