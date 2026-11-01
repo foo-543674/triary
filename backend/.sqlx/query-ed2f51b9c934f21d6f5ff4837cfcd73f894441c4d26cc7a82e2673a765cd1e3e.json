@@ -1,0 +1,54 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT b.block_id, b.exercise_id, b.block_order, e.name\n                   FROM exercise_blocks b JOIN exercises e ON e.exercise_id = b.exercise_id\n                  WHERE b.session_id = ? ORDER BY b.block_order",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "block_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "exercise_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "block_order",
+        "type_info": {
+          "type": "Short",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 6
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 256
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ed2f51b9c934f21d6f5ff4837cfcd73f894441c4d26cc7a82e2673a765cd1e3e"
+}

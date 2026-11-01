@@ -1,0 +1,84 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT s.set_id, s.block_id, s.set_order, s.reps,\n                          CAST(ROUND(s.weight_kg * 10) AS SIGNED) AS \"weight_tenths?: i64\",\n                          s.duration_seconds, s.interval_seconds\n                     FROM workout_sets s JOIN exercise_blocks b ON b.block_id = s.block_id\n                    WHERE b.session_id = ? ORDER BY s.set_order",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "set_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "block_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "set_order",
+        "type_info": {
+          "type": "Short",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 6
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "reps",
+        "type_info": {
+          "type": "Short",
+          "flags": "",
+          "max_size": 6
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "weight_tenths?: i64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "BINARY",
+          "max_size": 21
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "duration_seconds",
+        "type_info": {
+          "type": "Long",
+          "flags": "",
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "interval_seconds",
+        "type_info": {
+          "type": "Long",
+          "flags": "",
+          "max_size": 11
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f54d535ac2afd143bd411709cb844f46b5e6f787a37226add4352dbf38f8e988"
+}

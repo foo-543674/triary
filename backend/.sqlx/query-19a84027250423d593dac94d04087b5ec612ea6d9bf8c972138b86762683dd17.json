@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE exercise_blocks SET workout_date = ? WHERE session_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "19a84027250423d593dac94d04087b5ec612ea6d9bf8c972138b86762683dd17"
+}

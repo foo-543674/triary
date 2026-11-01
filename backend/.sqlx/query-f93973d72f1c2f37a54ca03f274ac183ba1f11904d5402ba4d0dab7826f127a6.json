@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "DELETE FROM exercise_blocks WHERE block_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f93973d72f1c2f37a54ca03f274ac183ba1f11904d5402ba4d0dab7826f127a6"
+}

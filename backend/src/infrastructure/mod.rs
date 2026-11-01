@@ -10,3 +10,9 @@
 //! - Keep DB schema mapping (e.g. `FromRow`) confined to this layer.
 //! - Migrations are SQL based (`backend/migrations/`); ORM model-based
 //!   generation is intentionally not used (per CLAUDE.md).
+
+pub mod clock;
+pub mod db;
+pub mod password_hasher;
+pub mod repositories;
+pub mod secrets;
