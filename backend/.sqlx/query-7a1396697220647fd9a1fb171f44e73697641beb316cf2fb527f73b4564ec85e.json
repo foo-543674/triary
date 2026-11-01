@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE workout_sets\n                        SET set_order = ?, reps = ?, weight_kg = ? / 10, duration_seconds = ?, interval_seconds = ?,\n                            updated_at = UTC_TIMESTAMP(3)\n                      WHERE set_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "7a1396697220647fd9a1fb171f44e73697641beb316cf2fb527f73b4564ec85e"
+}

@@ -16,8 +16,11 @@ pub mod config;
 pub mod domain;
 pub mod infrastructure;
 pub mod interfaces;
+#[cfg(test)]
+pub(crate) mod testing;
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Context as _;
 use axum::Router;
@@ -25,7 +28,20 @@ use axum::http::{HeaderValue, Method, header};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 
+use crate::application::auth::AuthDeps;
+use crate::application::exercises::ExerciseDeps;
+use crate::application::history::HistoryDeps;
+use crate::application::sessions::SessionDeps;
 use crate::config::CorsConfig;
+use crate::infrastructure::clock::SystemClock;
+use crate::infrastructure::password_hasher::Argon2idHasher;
+use crate::infrastructure::repositories::mysql_exercise_repository::MysqlExerciseRepository;
+use crate::infrastructure::repositories::mysql_history_queries::MysqlHistoryQueries;
+use crate::infrastructure::repositories::mysql_session_repository::MysqlSessionRepository;
+use crate::infrastructure::repositories::mysql_session_store::MysqlSessionStore;
+use crate::infrastructure::repositories::mysql_user_repository::MysqlUserRepository;
+use crate::infrastructure::secrets::{OsSecrets, TimeOrderedIds};
+use crate::interfaces::http::state::AppState;
 use crate::interfaces::http::{error, routes};
 
 /// Builds the HTTP router.
@@ -37,17 +53,20 @@ use crate::interfaces::http::{error, routes};
 /// Development and tests default to no explicit allowed origin (i.e. only
 /// same-origin requests pass), and production must always set
 /// `CORS_ALLOWED_ORIGINS` explicitly.
-pub fn app() -> Router {
-    app_with_cors(CorsConfig::from_env())
+pub fn app(state: AppState) -> Router {
+    app_with_cors(state, CorsConfig::from_env())
 }
 
 /// Same as [`app`] but takes an explicit [`CorsConfig`] for tests that need to
 /// override the env-driven default.
-pub fn app_with_cors(cors: CorsConfig) -> Router {
+pub fn app_with_cors(state: AppState, cors: CorsConfig) -> Router {
     Router::new()
         .merge(routes::health::router())
+        .merge(routes::web::router())
+        .merge(routes::api::router())
         .fallback(error::route_not_found)
         .method_not_allowed_fallback(error::method_not_allowed)
+        .with_state(state)
         .layer(build_cors_layer(cors))
         .layer(TraceLayer::new_for_http())
 }
@@ -92,8 +111,36 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {addr}"))?;
 
+    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL is not set")?;
+    let pool = infrastructure::db::connect(&database_url).await?;
+    let clock = Arc::new(SystemClock);
+    let ids = Arc::new(TimeOrderedIds);
+    let exercises = Arc::new(MysqlExerciseRepository::new(pool.clone()));
+    let state = AppState {
+        auth: AuthDeps {
+            users: Arc::new(MysqlUserRepository::new(pool.clone())),
+            sessions: Arc::new(MysqlSessionStore::new(pool.clone())),
+            hasher: Arc::new(Argon2idHasher::new()),
+            clock: clock.clone(),
+            ids: ids.clone(),
+            secrets: Arc::new(OsSecrets),
+        },
+        exercises: ExerciseDeps {
+            exercises: exercises.clone(),
+        },
+        history: HistoryDeps {
+            queries: Arc::new(MysqlHistoryQueries::new(pool.clone())),
+        },
+        sessions: SessionDeps {
+            sessions: Arc::new(MysqlSessionRepository::new(pool)),
+            exercises,
+            clock,
+            ids,
+        },
+    };
+
     tracing::info!(%addr, "triary-backend listening");
-    axum::serve(listener, app())
+    axum::serve(listener, app(state))
         .await
         .context("axum server error")?;
 

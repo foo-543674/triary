@@ -16,8 +16,12 @@
 
 use axum::{
     Json,
-    extract::{FromRequest, Request, rejection::JsonRejection},
+    extract::{
+        FromRequest, FromRequestParts, Query, Request,
+        rejection::{JsonRejection, QueryRejection},
+    },
     http::StatusCode,
+    http::request::Parts,
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -124,6 +128,7 @@ pub fn violation_code(code: ViolationCode) -> &'static str {
         ViolationCode::ExceedsMaxDepth => "exceeds_max_depth",
         ViolationCode::ExceedsMaxChildren => "exceeds_max_children",
         ViolationCode::ExceedsMaxBlocks => "exceeds_max_blocks",
+        ViolationCode::ExceedsMaxSets => "exceeds_max_sets",
         ViolationCode::MissingRequiredMeasurement => "missing_required_measurement",
     }
 }
@@ -150,6 +155,7 @@ fn violation_message(code: ViolationCode) -> &'static str {
         ViolationCode::ExceedsMaxDepth => "Exceeds the maximum depth",
         ViolationCode::ExceedsMaxChildren => "Exceeds the maximum number of children",
         ViolationCode::ExceedsMaxBlocks => "Exceeds the maximum number of blocks",
+        ViolationCode::ExceedsMaxSets => "Exceeds the maximum number of sets",
         ViolationCode::MissingRequiredMeasurement => "A required measurement is missing",
     }
 }
@@ -244,6 +250,27 @@ where
             .await
             .map(|Json(value)| Self(value))
             .map_err(|rejection: JsonRejection| from_json_rejection(&rejection))
+    }
+}
+
+/// Query string extractor whose rejections use the error envelope: a value
+/// that does not parse (`owned_only=yes`) is 400 `invalid_format` without
+/// field, like an unreadable body.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct QueryParams<T>(pub T);
+
+impl<T, S> FromRequestParts<S> for QueryParams<T>
+where
+    T: DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        Query::<T>::from_request_parts(parts, state)
+            .await
+            .map(|Query(value)| Self(value))
+            .map_err(|rejection: QueryRejection| AppError::BadRequest(rejection.body_text()))
     }
 }
 
@@ -458,14 +485,14 @@ mod extractor_tests {
 
     #[tokio::test]
     async fn wrong_method_keeps_405_in_the_envelope() {
-        let (status, body) = call(crate::app(), "/health", "{}").await;
+        let (status, body) = call(crate::app(crate::testing::state()), "/health", "{}").await;
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(body["errors"][0]["code"], "invalid_format");
     }
 
     #[tokio::test]
     async fn unknown_route_is_answered_in_the_envelope() {
-        let (status, body) = call(crate::app(), "/nowhere", "{}").await;
+        let (status, body) = call(crate::app(crate::testing::state()), "/nowhere", "{}").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["errors"][0]["code"], "not_found");
     }

@@ -1,0 +1,84 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT e.exercise_id, e.owner_user_id, e.name, e.parent_exercise_id, e.created_at,\n                          k.kind AS \"kind?\", k.is_required AS \"is_required?: i8\"\n                     FROM exercises e\n                     LEFT JOIN exercise_measurement_kinds k ON k.exercise_id = e.exercise_id\n                    WHERE e.exercise_id = ? AND (e.owner_user_id IS NULL OR e.owner_user_id = ?)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exercise_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "owner_user_id",
+        "type_info": {
+          "type": "String",
+          "flags": "MULTIPLE_KEY | BINARY",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 256
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "parent_exercise_id",
+        "type_info": {
+          "type": "String",
+          "flags": "MULTIPLE_KEY | BINARY",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "kind?",
+        "type_info": {
+          "type": "String",
+          "flags": "PRIMARY_KEY | ENUM | NO_DEFAULT_VALUE",
+          "max_size": 24
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "is_required?: i8",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NO_DEFAULT_VALUE",
+          "max_size": 1
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9d1f9b84f900ee402c3727b2468c63ab97cb24700bff345689dd37fde4bc5364"
+}

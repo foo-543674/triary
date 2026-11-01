@@ -1,0 +1,64 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT session_id, workout_date, started_at, ended_at, note\n                   FROM sessions WHERE session_id = ? AND user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "session_id",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 16
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "workout_date",
+        "type_info": {
+          "type": "Date",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "started_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "ended_at",
+        "type_info": {
+          "type": "Datetime",
+          "flags": "BINARY",
+          "max_size": 23
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "note",
+        "type_info": {
+          "type": "Blob",
+          "flags": "BLOB",
+          "max_size": 262140
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "69be2caa55f1ab484680ec0b9ee479796334312cde22458d9c217dacd973178a"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "UPDATE workout_sets SET set_order = set_order + 1000 WHERE block_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f3f9e8e924b55753ffb4c7b37f6f8109096d28af63787be6d97ee7f1d2486c3c"
+}
