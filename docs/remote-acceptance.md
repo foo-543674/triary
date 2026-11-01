@@ -60,7 +60,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 2. 検証処理は、許可された投稿者 (`foo-543674-ai-agent[bot]`、`foo-543674`) のコメントのうちマーカー `<!-- triary-review-snapshot -->` を含む最新のものを使う
 3. 検証に使ったコメントの内容を artifact `review-snapshot-<PR>-<HEAD>` に保存し、判定結果 (job summary) から内容ハッシュで参照する。PR コメントは編集できるため
 
-スナップショットが含むもの: リポジトリ、PR 番号、HEAD の SHA、base の SHA、merge-base、差分の範囲の定義 (`merge-base..head`)、diff ハッシュ、契約と検証器の版 (`docs/review-contract.md` の blob と `tools/review-gate` の tree)、依存する判断依頼、台帳、内容ハッシュ。
+スナップショットが含むもの: リポジトリ、PR 番号、HEAD の SHA、base の SHA、merge-base、差分の範囲の定義 (`merge-base..head`)、diff ハッシュ、契約と検証器の版 (`docs/review-contract.md` の blob と `tools/review-gate` の tree)、依存する判断依頼、台帳、内容ハッシュ。台帳のうち resolved の指摘と、提出する差分以外のラウンドは載せない (前者はどのモードでも判定を通り、後者は判定が差分ハッシュで絞り込むので、除いても結果は変わらない。全部を載せると PR コメントの上限を超えた: 2026-11-01 に 263,298 文字のコメントが拒否された。251,810 文字は受け付けられていた)。全体は手元の台帳 (`cli.ts show`) に残る
 
 PR 差分のレビュー証跡と、CI の成功は別の証拠として扱い、どちらを検証したかを結果に別項目で出す。
 

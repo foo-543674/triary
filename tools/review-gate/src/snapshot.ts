@@ -51,6 +51,20 @@ const canonicalize = (value: unknown): unknown => {
 export const hashContent = (body: SnapshotBody): string =>
   createHash("sha256").update(JSON.stringify(canonicalize(body))).digest("hex");
 
+// The ledger is shared by every branch of the clone and keeps growing; with
+// every finding it outgrew the PR comment size limit (2026-11-01: a 263,298
+// character comment was refused, 251,810 had been accepted). A resolved
+// finding passes in every mode (`judgeFinding` in ledger.ts), so leaving it
+// out cannot change the verdict. Every other status stays, including
+// rejected and deferred ones, whose reasons a reader should still see.
+// Likewise only the rounds of the submitted diff count (`evaluate` filters
+// rounds by diff hash). The full ledger stays in the clone (`cli.ts show`).
+export const submittedLedger = (ledger: Ledger, diffHash: string): Ledger => ({
+  ...ledger,
+  rounds: ledger.rounds.filter((r) => r.diffHash === diffHash),
+  findings: ledger.findings.filter((f) => f.status !== "resolved"),
+});
+
 export const buildSnapshot = (
   ledger: Ledger,
   context: SnapshotContext,
@@ -62,7 +76,7 @@ export const buildSnapshot = (
     diffRange: "merge-base..head",
     ...context,
     decisions,
-    ledger,
+    ledger: submittedLedger(ledger, context.diffHash),
   };
   return { ...body, contentHash: hashContent(body) };
 };
