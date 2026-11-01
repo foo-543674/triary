@@ -34,7 +34,11 @@ const classify = (prAuthor: string, response: CompareResponse) =>
 
 describe("classifyDependencyUpdate: accepted", () => {
   it("accepts a Dependabot PR that only changes manifests and lockfiles", () => {
-    assert.deepEqual(classify(DEPENDENCY_BOT, lockfileUpdate), { dependencyUpdate: true, reasons: [] });
+    assert.deepEqual(classify(DEPENDENCY_BOT, lockfileUpdate), {
+      dependencyUpdate: true,
+      dependabotAuthored: true,
+      reasons: [],
+    });
   });
 
   it("accepts several Dependabot commits (a rebased update)", () => {
@@ -50,6 +54,9 @@ describe("classifyDependencyUpdate: rejected", () => {
   const rejects = (response: CompareResponse, reason: RegExp, prAuthor = DEPENDENCY_BOT) => {
     const result = classify(prAuthor, response);
     assert.equal(result.dependencyUpdate, false);
+    // A reason about the files alone leaves the PR Dependabot's own; any
+    // other reason means it is not.
+    assert.equal(result.dependabotAuthored, result.reasons.every((r) => r.startsWith("changes ")));
     assert.ok(
       result.reasons.some((r) => reason.test(r)),
       `expected a reason matching ${reason}, got ${JSON.stringify(result.reasons)}`,
@@ -69,6 +76,12 @@ describe("classifyDependencyUpdate: rejected", () => {
 
   it("rejects a workflow change (GitHub Actions updates still need approval)", () => {
     rejects(compare([{ filename: ".github/workflows/ci.yml" }], [botCommit(HEAD)]), /changes \.github/);
+  });
+
+  it("still marks a GitHub Actions update as Dependabot's own (no snapshot needed)", () => {
+    const result = classify(DEPENDENCY_BOT, compare([{ filename: ".github/workflows/ci.yml" }], [botCommit(HEAD)]));
+    assert.equal(result.dependencyUpdate, false);
+    assert.equal(result.dependabotAuthored, true);
   });
 
   it("rejects a rename whose old path is outside the allowed set", () => {

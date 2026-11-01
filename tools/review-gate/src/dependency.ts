@@ -51,7 +51,14 @@ export interface DependencyInput {
 }
 
 export interface DependencyClassification {
+  // Merges without human approval: Dependabot's own commits, and only the
+  // manifests and lockfiles in DEPENDENCY_FILES.
   readonly dependencyUpdate: boolean;
+  // Every commit is Dependabot's own (authored by Dependabot, committed and
+  // signed by GitHub), whatever files it touches (e.g. GitHub Actions pins).
+  // Such a PR needs no review ledger snapshot: no AI wrote it, so there is no
+  // AI review to bind. It does not by itself merge without approval.
+  readonly dependabotAuthored: boolean;
   readonly reasons: readonly string[];
 }
 
@@ -73,11 +80,10 @@ export const classifyDependencyUpdate = (input: DependencyInput): DependencyClas
   const files = input.compare.files ?? [];
   const commits = input.compare.commits ?? [];
   const paths = touchedPaths(files);
-  const reasons = [
+  const originReasons = [
     ...(input.prAuthor === DEPENDENCY_BOT ? [] : [`author is ${input.prAuthor}, not ${DEPENDENCY_BOT}`]),
     ...(files.length === 0 ? ["no changed files"] : []),
     ...(files.length >= MAX_FILES ? ["too many changed files to trust the compare response"] : []),
-    ...paths.filter((p) => !DEPENDENCY_FILES.has(p)).map((p) => `changes ${p}`),
     ...(commits.length === 0 ? ["no commits"] : []),
     ...(commits.length >= MAX_COMMITS || commits.length !== input.compare.total_commits
       ? ["the compare response does not list every commit"]
@@ -85,5 +91,7 @@ export const classifyDependencyUpdate = (input: DependencyInput): DependencyClas
     ...(commits.at(-1)?.sha === input.headSha ? [] : ["the compared range does not end at the judged head"]),
     ...commits.flatMap(commitProblems),
   ];
-  return { dependencyUpdate: reasons.length === 0, reasons };
+  const fileReasons = paths.filter((p) => !DEPENDENCY_FILES.has(p)).map((p) => `changes ${p}`);
+  const reasons = [...originReasons, ...fileReasons];
+  return { dependencyUpdate: reasons.length === 0, dependabotAuthored: originReasons.length === 0, reasons };
 };
