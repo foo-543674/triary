@@ -40,7 +40,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 - `integration / newman` は `integration / detect` が成功していれば `skipped` を許す (検出対象がない PR では走らない設計のため)
 - `security / cargo audit` と `security / pnpm audit` は 2026-10-31 に必須に加えた (#45 のオーナー判断「1」)。それまでは base (`main`) 自体が既知の脆弱性で失敗していて、必須にすると PR の内容と無関係に全 PR が止まるため外していた。依存の更新で緑に戻した (pnpm は PR #47、cargo は `Cargo.lock` の更新)。今後、新しい advisory が出ると PR の内容と無関係に止まる。そのときは依存を更新するか、`.contexts/security-overrides.md` の台帳に載せる対処で緑に戻す
-- `security / cargo deny` は 2026-10-31 に必須に加えた (オーナーの指示「サプライチェーンなどのセキュリティリスクを考慮したガードレールを設けて」)。方針は `docs/dependency-policy.md`、設定は `backend/deny.toml`。Dependabot の自動マージもこの job の成功を必要とするので、許可外のライセンスや crates.io 以外の取得元を持ち込む更新は自動ではマージされない
+- `security / cargo deny` は 2026-10-31 に必須に加えた (オーナー承認 #65: crate の追加の条件として、サプライチェーンのガードレールを求められた)。方針は `docs/dependency-policy.md`、設定は `backend/deny.toml`。Dependabot の自動マージもこの job の成功を必要とするので、許可外のライセンスや crates.io 以外の取得元を持ち込む更新は自動ではマージされない
 
 ## 信頼できる検証経路
 
@@ -78,7 +78,7 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 - 依存のサプライチェーン対策 (`docs/dependency-policy.md`、`backend/deny.toml`、`backend/.cargo/audit.toml`、`backend/tests/dependency_ledger.rs`)。`backend/Cargo.toml` 自体は含めない (含めると Dependabot の自動マージが code owner の承認で止まる。直接依存の追加は台帳の検査で `docs/dependency-policy.md` の変更を伴うので、承認を経る)
 - 開発コマンドの入口 (`dev`) と開発イメージ (`tools/dev-image/`)。決定的ゲートが何の上で走るかを決めるため
 - CI の workflow と設定 (`.github/`)、`Makefile`、`.devcontainer/`
-- 必須 CI ジョブが読む設定 (`frontend/biome.json`、`frontend/tsconfig.json`、`frontend/vite.config.ts`、`frontend/.storybook/`)。変えるとゲートが何を確かめるかが変わるため (2026-11-01、R100)。`frontend/package.json` と `backend/Cargo.toml` は Dependabot の自動マージと両立しないので載せず、AI の変更を承認なしの区分から外すことで代える
+- 必須 CI ジョブが読む設定 (`frontend/biome.json`、`frontend/tsconfig.json`、`frontend/vite.config.ts`、`frontend/.storybook/`)。変えるとゲートが何を確かめるかが変わるため (2026-11-01、R100)。`frontend/package.json` と `backend/Cargo.toml` は依存の更新と同居するので載せず、検証器が依存以外の区画への変更を承認なしの区分から外す (手順 6)
 - `.github/CODEOWNERS` 自身
 
 承認後に push されたら承認を失効させる (`dismiss_stale_reviews_on_push` と `require_last_push_approval`)。bootstrap の再実行による変更も基準の改訂として同じ承認を経る。
@@ -120,13 +120,19 @@ Dependabot の PR も同じ条件で判定する。取り込む AI が手元で�
 
 条件の版: 2026-11-01。依存更新の区分は 2026-10-31 版 (#43 のオーナー判断。「依存パッケージの更新は CI などで壊れなければ自動でマージしてよい」「GitHub Actions の更新も含める」(のち、code owner 保護との兼ね合いを説明したうえで承認ありに確定。下記)「自動マージする更新に台帳は要らない」「action は commit SHA で固定する」)。#63 のマージ (2026-10-31) で有効。最初の適用は #50 (rstest): 14:42 UTC に automerge ジョブが GitHub Actions として承認し、そのままマージされた (run 41211333898、ruleset 有効の状態で観測)。
 
-2026-11-01 の改訂 (オーナー判断、会話での指示。PR の説明に原文を引用): AI の変更も、受け入れ判定が通れば承認なしでマージする区分に加えた。オーナーの論拠は「レビューの観点設計と CI のガードレールのスクリプト化で品質を作り込んでいるのに、全部を人の目で見るのは AI の物量に追いつかず、結局流し見でマージされて同じことになる」。人の承認を残すのは、AI を縛る基準ファイル (下の「保護する基準ファイル」) の変更だけ。AI が自分の検証器や規則を緩めてそのままマージできると、ほかのすべての証拠が意味を失うため。
+2026-11-01 の改訂 (オーナー判断): AI の変更も、受け入れ判定が通れば承認なしでマージする区分に加えた。品質は自動レビューの観点と CI のガードレールで作り込み、AI の PR を人がすべて読む運用は作業量に追いつかないため。人の承認を残すのは、AI を縛る基準ファイル (下の「保護する基準ファイル」) の変更だけ。AI が自分の検証器や規則を緩めてそのままマージできると、ほかのすべての証拠が意味を失うため。同日、依存の追加・更新もサプライチェーンの確認 (手順 6) を通れば承認なしとした。承認が要る部分 (マニフェストの依存以外の区画) は、ファイルではなく区画で切り分ける
 
 | 区分 | 変更 | 検証器が確かめる証拠 (`tools/review-gate/acceptance.sh`) |
 |---|---|---|
 | 承認なし | Dependabot による Rust / npm の依存更新 (patch / minor / major を問わない) | 手順 0。判定は `tools/review-gate/src/dependency.ts` (単体テスト `dependency.test.ts`)。PR 作成者が `dependabot[bot]`。merge-base から判定した HEAD までの変更ファイル (リネーム元を含む) が `backend/Cargo.toml` / `backend/Cargo.lock` / `frontend/package.json` / `frontend/pnpm-lock.yaml` だけ。その範囲の全コミットについて、作成者が `dependabot[bot]`、コミッターが `web-flow` (GitHub)、署名検証が通っている (作成者は push する人が自由に書けるので、それだけでは足りない)。必須の CI ジョブがその SHA ですべて成功。台帳のスナップショットは求めない |
-| 承認なし | AI (`foo-543674-ai-agent[bot]`) の変更で、基準ファイルに触れないもの | 手順 1〜4 がすべて合格 (必須の CI ジョブがその SHA で成功、HEAD と差分に結びついた台帳のスナップショットが契約を満たす、依存する判断依頼がすべて閉じている) したうえで、手順 5。判定は `tools/review-gate/src/ai-change.ts` (単体テスト `ai-change.test.ts`)。PR 作成者が AI の App、base が既定のブランチ、draft でない、`hold-merge` ラベルがない、変更ファイル (リネーム元を含む) に CODEOWNERS の対象がなく、必須 CI ジョブの設定 (`ai-change.ts` の `GUARDRAIL_CONFIG`: CODEOWNERS に載せられない `frontend/package.json` と `backend/Cargo.toml`、まだ存在しない rustfmt / clippy / nextest / vitest / biome / spectral の設定ファイル名) にも触れない |
-| 人間の承認が要る | 上記以外のすべて。基準ファイルを変える AI の PR、GitHub Actions の更新 (下記)、オーナー自身の PR | — |
+| 承認なし | AI (`foo-543674-ai-agent[bot]`) の変更で、基準ファイルに触れないもの | 手順 1〜4 がすべて合格 (必須の CI ジョブがその SHA で成功、HEAD と差分に結びついた台帳のスナップショットが契約を満たす、依存する判断依頼がすべて閉じている) したうえで、手順 5。判定は `tools/review-gate/src/ai-change.ts` (単体テスト `ai-change.test.ts`)。PR 作成者が AI の App、base が既定のブランチ、draft でない、`hold-merge` ラベルがない、変更ファイル (リネーム元を含む) に CODEOWNERS の対象がなく、必須 CI ジョブの設定 (`ai-change.ts` の `GUARDRAIL_CONFIG`: まだ存在しない rustfmt / clippy / nextest / vitest / biome / spectral の設定ファイル名) にも触れない。マニフェストは手順 6 で区画ごとに判定する |
+| 人間の承認が要る | 上記以外のすべて。基準ファイルを変える AI の PR、GitHub Actions の更新 (下記)、オーナー自身の PR、手順 6 に通らない依存の変更 | — |
+
+上の 2 つの承認なしの区分は、どちらも最後に手順 6 (サプライチェーンの確認、`cli.ts check-dependencies`) を通ったときだけ自動マージする。通らなくても受け入れ判定は落とさず、人の承認でマージできる (セキュリティ更新を遅らせないため)。確かめること:
+
+- マニフェストの変更が依存の区画だけであること (`tools/review-gate/src/manifest.ts`)。`frontend/package.json` は `dependencies` / `devDependencies` / `optionalDependencies` / `peerDependencies` 以外のフィールド (scripts、`pnpm.overrides` など)、`backend/Cargo.toml` は依存の表 (`[dependencies]` とその派生、`target.*`、`workspace.dependencies`) 以外の表 (`[package]`、`[lints]`、`[patch]` など) に触れたら人へ
+- npm パッケージの新規追加がないこと。`package.json` に書いた名前だけでなく、ロックファイルに初めて現れる名前 (推移的な依存や `npm:` の別名) も数える (インストール時スクリプトの対策が入るまで。`docs/dependency-policy.md`)
+- ロックファイル (`backend/Cargo.lock`、`frontend/pnpm-lock.yaml`) で新しく入る版が、公開から 7 日 (既存パッケージの major 更新は 14 日) 経っていること (`tools/review-gate/src/release-age.ts`)。推移的な依存も含む。公開日は crates.io と npm レジストリの API で読み、読めなければ人へ。150 版を超える変更は 1 つずつ確かめず人へ
 
 - AI の変更の区分で、人の目の代わりになるもの: 手元のレビューゲート (別コンテキストのレビュアー、`docs/review-contract.md`)、決定的ゲート (fmt / lint / 型 / テスト / アーキテクチャテスト / cargo deny・audit / pnpm audit / Newman)、判断依頼の未決による停止。これらを強めることは歓迎で、弱めることは基準ファイルの変更としてオーナーの承認を経る
 - 残る弱点: 台帳を書くのは別コンテキストのレビュアーだが、スナップショットを提出するのは実装側で、リモートはレビューの真正性を確かめられない (上の「何を確かめるか」の注記と「この段階で扱わないこと」)。人の承認を外す以上、この区分の品質はローカルのレビューゲートのフックと決定的ゲートに依存する。見逃しが出たら、まずゲートとレビュー観点を強める (見直すきっかけ)

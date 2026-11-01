@@ -97,7 +97,7 @@ and why). The ones most often consulted on this project:
   `errors[]` array (never single-error envelopes)
 - **data-modeling**: typed columns (DATE, DECIMAL, INTERVAL); orthogonal
   dimensions as independent columns; no Nullable escape
-- **error-handling**: `Result<_, Vec<DomainError>>` for collected validation;
+- **error-handling**: `Result<_, Vec<Violation>>` (field, code) for collected validation;
   `panic!` is a bug only, never control flow
 - **disposability**: external types do not appear in `domain` / `application`
   signatures
@@ -202,8 +202,10 @@ from the review gate and the scripted guardrails, not from a human reading
 every PR). For those, the protected `acceptance / automerge` job in
 `.github/workflows/acceptance.yml` approves as GitHub Actions and enables
 auto-merge. Changes to base files (the rules, verifiers and guardrails that
-bind the AI, plus the CI configuration listed in `ai-change.ts`) and GitHub
-Actions updates still need the owner's approval. The owner can hold a PR back
+bind the AI, plus the CI configuration listed in `ai-change.ts` and the
+manifest parts other than the dependency lists), new npm packages, package
+versions younger than the cooldown, and GitHub Actions updates still need the
+owner's approval. The owner can hold a PR back
 with the `hold-merge` label (reliable only before its verdict passes). The
 "Stop and confirm first" items below do not stop a merge by themselves: list
 their decision issue in the snapshot's `decisions` so the open issue holds
@@ -307,9 +309,11 @@ GitHub would not stop you.
 
 ### Stop and confirm first (file it as above and keep working)
 
-- Adding a new external dependency: npm packages. Cargo crates are
-  pre-approved by the owner (#65, 2026-10-31) as long as the vetting and
-  ledger procedure in `docs/dependency-policy.md` is followed
+- Adding a new npm package (its install-time scripts are not guarded yet).
+  Cargo crates and version updates of existing packages need no
+  confirmation as long as the vetting and ledger procedure in
+  `docs/dependency-policy.md` is followed (#65, owner decision 2026-11-01);
+  the verifier still sends young versions to the owner
 - Operations that affect the user's working environment (stopping or
   recreating containers, deleting volumes, rewriting branch history). Before
   deciding "it's only for verification", observe whether you actually started
@@ -462,7 +466,8 @@ database, you do not have to run `make infra-up`.
 - `.contexts/bootstrap-decisions.md`: AI context bootstrap decisions
 - `.contexts/security-overrides.md`: ledger for the pnpm.overrides patches
 - `docs/dependency-policy.md`: supply-chain rules for adding crates / npm
-  packages, the direct-dependency ledger, and which approvals exist
+  packages and which approvals exist; the vetting records are in
+  `docs/dependency-ledger.md`
 - `openapi/openapi.yaml`: OpenAPI schema (the source of truth for the API)
 - `docs/review-contract.md`: how review findings are recorded and when a
   change is complete

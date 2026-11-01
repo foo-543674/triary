@@ -9,15 +9,17 @@
 | pnpm audit | CI job `security / pnpm audit` (必須) | npm の high 以上の脆弱性 |
 | ロックファイル固定 | cargo の build / clippy / nextest は CI (`ci.yml`・`e2e.yml`・`dev-image.yml`) と git hook で `--locked`、pnpm は `--frozen-lockfile` | コミットされていない版が CI やフックの中で解決されること。`cargo fmt` と `cargo audit` は依存を解決しないので付けていない |
 | Dependabot の cooldown | `.github/dependabot.yml` | 公開直後の版 (7 日、major は 14 日) を提案しない。乗っ取られた版が見つかって yank されるまでの時間を稼ぐ。セキュリティ更新は遅らせない |
-| 直接依存の台帳 | 下の「直接依存の台帳」、検査は `backend/tests/dependency_ledger.rs` (`cargo metadata` で直接依存を取る) | 台帳に載っていない直接依存 (審査の記録がない crate) の追加、台帳に残った削除済みの crate |
-| 人間の承認 | CODEOWNERS (このファイル、`backend/deny.toml`、`backend/.cargo/`、`backend/tests/dependency_ledger.rs`)。`backend/Cargo.toml` は含めない (Dependabot の自動マージを止めないため)。crate の追加は台帳の変更を伴うので、このファイルを通じて承認を経る | 上の規則そのものの緩和、審査記録のない crate の追加 |
+| 直接依存の台帳 | `docs/dependency-ledger.md`、検査は `backend/tests/dependency_ledger.rs` (`cargo metadata` で直接依存を取る) | 台帳に載っていない直接依存 (審査の記録がない crate) の追加、台帳に残った削除済みの crate |
+| 公開日数の確認 | 受け入れの検証器 (`tools/review-gate/src/release-age.ts`) | ロックファイルで新しく入る版のうち、公開から 7 日 (既存パッケージの major 更新は 14 日) 経っていないもの。止めるのは承認なしのマージだけで、受け入れ判定は落とさない (セキュリティ更新は人の承認で入れられる) |
+| 人間の承認 | CODEOWNERS (このファイル、`backend/deny.toml`、`backend/.cargo/`、`backend/tests/dependency_ledger.rs`)。マニフェスト (`backend/Cargo.toml`・`frontend/package.json`) と台帳 (`docs/dependency-ledger.md`) は含めない。マニフェストの依存以外の区画 (scripts・lints・`[patch]` など) の変更は、検証器が承認なしの区分から外す | 上の規則そのものの緩和 |
 
 規則を緩める変更 (許可ライセンスの追加、advisory の無視、取得元の追加、cooldown の短縮、台帳検査の削除) は検証器の改訂で、オーナーの承認が要る (AGENTS.md "AI delegation scope")。
 
 ## 承認の範囲
 
-- 2026-10-31: オーナーが Rust の crate の追加を事前承認した (#65。「crateの追加はおｋです。ただしサプライチェーンなどのセキュリティリスクは考慮したガードレールは設けてください」)。条件はこのファイルの手順を守ること。AGENTS.md "Stop and confirm first" はこれを参照する。
-- npm パッケージの追加は事前承認されていない。必要になったら needs-decision の issue で確認する (AGENTS.md "Stop and confirm first")。
+- 2026-10-31: オーナーが Rust の crate の追加を事前承認した (#65)。条件は、サプライチェーンのガードレールを設けたうえで、このファイルの手順を守ること。AGENTS.md "Stop and confirm first" はこれを参照する。
+- 2026-11-01: オーナー判断により、依存の追加・更新もガードレールを通れば人の承認なしでマージする (`docs/remote-acceptance.md`「人間の承認なしでマージしてよい変更」)。そのため台帳を、保護するこのファイルから `docs/dependency-ledger.md` に分けた。審査の記録と台帳の検査は従来どおり求める。
+- npm パッケージの新規追加は、npm 側のガードレール (インストール時スクリプトの既定停止など。pnpm 10 への移行で入れる予定) が揃うまで、承認なしのマージの対象にしない (検証器が `frontend/package.json` の依存名と `frontend/pnpm-lock.yaml` に初めて現れるパッケージ名を検出する)。既存パッケージの版の更新は対象にする。
 
 ## crate を追加する手順
 
@@ -36,28 +38,3 @@
 ## advisory を無視するとき
 
 `backend/deny.toml` の `[advisories] ignore` と `backend/.cargo/audit.toml` の両方に、advisory の ID、当てはまらない理由または直せない理由、見直す条件を書く。オーナーの承認が要る。
-
-## 直接依存の台帳
-
-`backend/Cargo.toml` の `[dependencies]` / `[dev-dependencies]` / `[build-dependencies]` に書かれた crate と、この表の crate は一致していなければならない (`backend/tests/dependency_ledger.rs` が `cargo nextest run` で検査する)。表の 1 列目は `` `crate 名` `` の形で書く。
-
-| crate | 区分 | 用途 | 追加 | 確認 |
-|---|---|---|---|---|
-| `anyhow` | dependencies | main の起動エラー | 2026-10-31 以前 | 既存 (この台帳より前。審査記録なし) |
-| `axum` | dependencies | HTTP サーバー | 2026-10-31 以前 | 既存 (同上) |
-| `chrono` | dependencies | 日付・時刻 | 2026-10-31 以前 | 既存 (同上) |
-| `serde` | dependencies | シリアライズ | 2026-10-31 以前 | 既存 (同上) |
-| `serde_json` | dependencies | JSON | 2026-10-31 以前 | 既存 (同上) |
-| `sqlx` | dependencies | MySQL アクセス、migration | 2026-10-31 以前 | 既存 (同上) |
-| `thiserror` | dependencies | エラー型 | 2026-10-31 以前 | 既存 (同上) |
-| `tokio` | dependencies | 非同期ランタイム | 2026-10-31 以前 | 既存 (同上) |
-| `tower-http` | dependencies | CORS・トレースの middleware | 2026-10-31 以前 | 既存 (同上) |
-| `tracing` | dependencies | ログ | 2026-10-31 以前 | 既存 (同上) |
-| `tracing-subscriber` | dependencies | ログ出力 | 2026-10-31 以前 | 既存 (同上) |
-| `uuid` | dependencies | ID | 2026-10-31 以前 | 既存 (同上) |
-| `fake` | dev-dependencies | テストデータ | 2026-10-31 以前 | 既存 (同上) |
-| `http-body-util` | dev-dependencies | テストでレスポンス本文を読む | 2026-10-31 以前 | 既存 (同上) |
-| `pretty_assertions` | dev-dependencies | テストの差分表示 | 2026-10-31 以前 | 既存 (同上) |
-| `proptest` | dev-dependencies | プロパティテスト | 2026-10-31 以前 | 既存 (同上) |
-| `rstest` | dev-dependencies | パラメータ化テスト | 2026-10-31 以前 | 既存 (同上) |
-| `tower` | dev-dependencies | テストでルーターを呼ぶ | 2026-10-31 以前 | 既存 (同上) |

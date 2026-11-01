@@ -70,12 +70,11 @@ describe("classifyAiChange: rejected", () => {
     rejects(aiPr, /changes base file Makefile/, ["Makefile"]);
   });
 
-  it("rejects a PR that changes the frontend scripts' manifest", () => {
-    rejects(aiPr, /frontend\/package\.json, which configures/, [], ["frontend/package.json", "frontend/src/a.ts"]);
-  });
-
-  it("rejects a PR that changes the backend manifest", () => {
-    rejects(aiPr, /backend\/Cargo\.toml, which configures/, [], ["backend/Cargo.toml"]);
+  it("leaves the manifests to check-dependencies", () => {
+    assert.deepEqual(classify(aiPr, [], ["frontend/package.json", "backend/Cargo.toml"]), {
+      aiChange: true,
+      reasons: [],
+    });
   });
 
   it("rejects a PR that adds a lint configuration the CI would pick up", () => {

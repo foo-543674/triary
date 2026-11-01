@@ -168,6 +168,18 @@ for file in "${changed[@]}"; do
   done
 done
 
+# --- supply-chain check before merging without approval -------------------------
+# Manifest parts outside the dependency lists, new npm packages, and package
+# versions younger than the cooldown send the change to a human (contract:
+# docs/dependency-policy.md, docs/remote-acceptance.md). Reads crates.io and the
+# npm registry. DO NOT REMOVE OR WEAKEN: any failure means "a human merges".
+dependencies_pass() {
+  local result
+  result="$("${CLI[@]}" check-dependencies --from "$MERGE_BASE" --to "$HEAD_SHA" || echo '{}')"
+  jq -r '.reasons[]? | "not merged without approval: " + .' <<<"$result"
+  [[ "$(jq -r '.ok == true' <<<"$result")" == "true" ]]
+}
+
 # --- result -----------------------------------------------------------------------
 {
   echo "## acceptance / verdict for #$PR @ ${HEAD_SHA:0:7}"
@@ -199,10 +211,14 @@ fi
 if [[ ${#base_changes[@]} -gt 0 ]]; then
   post_status success "machine checks passed; base files changed: code owner approval required, no acceptance guarantee"
 elif [[ "$dependency_update" == "true" ]]; then
-  post_status success "machine checks passed (Dependabot dependency update; merges without human approval, #43)"
-  # Read by the automerge job in .github/workflows/acceptance.yml.
-  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    printf 'automerge=true\nkind=dependency\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
+  if dependencies_pass; then
+    post_status success "machine checks passed (Dependabot dependency update; merges without human approval, #43)"
+    # Read by the automerge job in .github/workflows/acceptance.yml.
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+      printf 'automerge=true\nkind=dependency\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"
+    fi
+  else
+    post_status success "machine checks passed (Dependabot update; supply-chain check needs a human, see the run)"
   fi
 else
   # --- 5. a change by the AI that merges without human approval? ------------------
@@ -219,7 +235,7 @@ else
     --default-branch "$(jq -r .base.repo.default_branch <<<"$pr_json")" \
     --base-files "$(IFS=,; echo "${base_changes[*]}")" || echo '{}')"
   jq -r '.reasons[]? | "not an AI change that merges without approval: " + .' <<<"$ai_classification"
-  if [[ "$(jq -r '.aiChange == true' <<<"$ai_classification")" == "true" ]]; then
+  if [[ "$(jq -r '.aiChange == true' <<<"$ai_classification")" == "true" ]] && dependencies_pass; then
     post_status success "machine checks passed (CI + review ledger; AI change, merges without human approval)"
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
       printf 'automerge=true\nkind=ai-change\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"

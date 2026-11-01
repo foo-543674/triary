@@ -12,16 +12,14 @@ export const AI_AUTHOR = "foo-543674-ai-agent[bot]";
 // A label the owner puts on a PR to keep it from merging automatically.
 export const HOLD_LABEL = "hold-merge";
 
-// Files that configure the required CI jobs but cannot be code-owned
-// (R100). The manifests are also changed by Dependabot updates, which merge
-// without approval, so CODEOWNERS cannot list them; their scripts and
-// `[lints]` decide what `lint:ci`, `arch:test`, `test:run` and clippy check.
-// The other names do not exist yet: adding one would change how a required
-// job behaves (rustfmt / clippy / nextest / vitest / biome / spectral read
-// them when present). The existing configuration files are in CODEOWNERS.
+// Files that would configure the required CI jobs but cannot be code-owned
+// because they do not exist yet (R100): adding one changes how a required job
+// behaves (rustfmt / clippy / nextest / vitest / biome / spectral read them
+// when present). The existing configuration files are in CODEOWNERS. The
+// manifests (frontend/package.json, backend/Cargo.toml) are judged by part
+// instead: `check-dependencies` (manifest.ts) lets dependency changes through
+// and sends every other part (scripts, [lints], [patch], ...) to the owner.
 export const GUARDRAIL_CONFIG: ReadonlySet<string> = new Set([
-  "frontend/package.json",
-  "backend/Cargo.toml",
   "backend/rustfmt.toml",
   "backend/.rustfmt.toml",
   "backend/clippy.toml",
