@@ -36,7 +36,9 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 ### 必須ジョブ (CI)
 
-`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`openapi / spectral lint`、`security / cargo audit`、`security / cargo deny`、`security / pnpm audit`。
+`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`quickstart / smoke`、`openapi / spectral lint`、`security / cargo audit`、`security / cargo deny`、`security / pnpm audit`。
+
+- `quickstart / smoke` (#107) は、README の quickstart をまっさらなランナーから起動し (MySQL の初回初期化を毎回通る)、プロキシ越しに `/`・`/health`・`/signup`・signup → `/web/v1/me` を確かめる。quickstart を壊す変更は他の必須ジョブでは検出できないので必須にした。検査の中身は `.github/quickstart/` (`smoke.sh`、ツールチェーンの版を dev イメージと照合する `check-toolchains.sh`、CI 用のビルドキャッシュ `compose.ci.yaml`) に置き、基準ファイルとして保護する。`quickstart/` は検査される側なので保護しない。NOTE: このジョブの GitHub Actions 上の実行は #107 の PR の CI が最初。
 
 - `integration / newman` は `integration / detect` が成功していれば `skipped` を許す (検出対象がない PR では走らない設計のため)
 - `security / cargo audit` と `security / pnpm audit` は 2026-10-31 に必須に加えた (#45 のオーナー判断「1」)。それまでは base (`main`) 自体が既知の脆弱性で失敗していて、必須にすると PR の内容と無関係に全 PR が止まるため外していた。依存の更新で緑に戻した (pnpm は PR #47、cargo は `Cargo.lock` の更新)。今後、新しい advisory が出ると PR の内容と無関係に止まる。そのときは依存を更新するか、`.contexts/security-overrides.md` の台帳に載せる対処で緑に戻す

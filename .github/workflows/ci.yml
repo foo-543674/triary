@@ -38,6 +38,60 @@ env:
   TRIARY_DEV_ENGINE: docker
 
 jobs:
+  # Starts the README's quickstart from a clean runner (fresh MySQL volume, so
+  # the first-init path runs every time) and checks it through the proxy
+  # (#107). The scripts live under .github/quickstart/, a base file, because
+  # they decide what this required job checks; quickstart/ itself is the
+  # thing under test.
+  quickstart-smoke:
+    name: quickstart / smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TRIARY_PORT: "3000"
+      COMPOSE_BAKE: "true"
+      BUILDX_BUILDER: quickstart
+      QUICKSTART_CACHE: ${{ runner.temp }}/quickstart-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check toolchain versions
+        run: sh .github/quickstart/check-toolchains.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/quickstart-cache
+          # Keyed by what the image layers depend on, not by commit, so runs
+          # that change none of it reuse one entry instead of saving a new
+          # mode=max cache each time (repository cache space is shared).
+          key: quickstart-${{ runner.os }}-${{ hashFiles('quickstart/Dockerfile', 'backend/Cargo.lock', 'frontend/pnpm-lock.yaml') }}
+          restore-keys: quickstart-${{ runner.os }}-
+      - name: Create BuildKit builder
+        run: docker buildx create --name quickstart --driver docker-container --use
+      # NOTE: unobserved whether --wait accepts the one-shot migrate service
+      # exiting 0 (restart: "no"); if this step fails on that, wait for the
+      # web and backend services explicitly instead.
+      - name: Build and start quickstart
+        run: docker compose -f quickstart/compose.yaml -f .github/quickstart/compose.ci.yaml up --build -d --wait
+      - name: Check quickstart through the proxy
+        run: sh .github/quickstart/smoke.sh
+      - name: Print quickstart logs on failure
+        if: failure()
+        run: docker compose -f quickstart/compose.yaml logs
+      - name: Stop quickstart and remove test data
+        if: always()
+        run: docker compose -f quickstart/compose.yaml down -v
+      # The cache only speeds builds up; a missing export must not fail the
+      # gate. NOTE: cache export/import is unobserved until this job runs.
+      - name: Replace build cache
+        run: |
+          if [ -d "$QUICKSTART_CACHE-new" ]; then
+            rm -rf "$QUICKSTART_CACHE"
+            mv "$QUICKSTART_CACHE-new" "$QUICKSTART_CACHE"
+          else
+            echo "no exported build cache; keeping the restored one"
+          fi
+
   # ---------- Backend ----------
   backend-lint:
     name: backend / lint (fmt + clippy)

@@ -17,6 +17,7 @@ REQUIRED_JOBS='[
   "frontend / lint (biome ci)",
   "frontend / test (vitest + storybook smoke)",
   "frontend / build (vite)",
+  "quickstart / smoke",
   "openapi / spectral lint",
   "security / cargo audit",
   "security / cargo deny",
