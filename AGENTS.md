@@ -512,7 +512,10 @@ or the issue is in Japanese.
 Language toolchains (cargo, sqlx, node packages, pnpm, ...) live only in the
 dev image (`tools/dev-image/Dockerfile`). Run every language command through
 the `./dev` entrypoint at the repository root (`../dev` from `backend/` or
-`frontend/`); the hooks, the `Makefile` and CI do the same. Do not install a
+`frontend/`); the hooks and the `Makefile` do the same. CI runs the same dev
+image through `.github/actions/dev-image/run.sh` instead, so the gates that
+decide a merge do not depend on `./dev`, which is not a base file (#105;
+`docs/remote-acceptance.md` "保護する基準ファイル"). Do not install a
 toolchain on your machine or in the AI execution environment to work around a failing `./dev`;
 fix the entrypoint or the image instead. Do not run the toolchains directly
 either, even where they happen to be installed; `.claude/settings.json`
