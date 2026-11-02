@@ -183,11 +183,13 @@ describe("./dev entrypoint", () => {
   it("passes only the listed environment variables", () => {
     const call = runCall(
       runDev(["cargo", "test"], {
-        env: { DATABASE_URL: "mysql://x", GH_TOKEN: "secret" },
+        env: { DATABASE_URL: "mysql://x", SQLX_OFFLINE: "true", GH_TOKEN: "secret" },
         fake: { engines: ["podman"] },
       }),
     );
     assert.ok(call.includes("DATABASE_URL"));
+    // The git hooks build the backend with SQLX_OFFLINE=true (.githooks/lib.sh).
+    assert.ok(call.includes("SQLX_OFFLINE"));
     assert.ok(!call.some((word) => word.includes("GH_TOKEN")));
   });
 

@@ -112,6 +112,34 @@ fi
 
 # ---- check ----------------------------------------------------------------------
 
+# Exercise the real Rust hook commands without an engine or language tools.
+# The dev stand-in checks the environment at the entrypoint boundary, where
+# dev's SQLX_OFFLINE allowlist forwards it to the container.
+new_repo rust-offline
+mkdir -p backend
+cat >dev <<'EOF'
+#!/bin/sh
+[ "${SQLX_OFFLINE:-}" = true ] || exit 90
+printf '%s\n' "$*" >>"$RUST_HOOK_LOG"
+exit "${RUST_HOOK_STATUS:-0}"
+EOF
+chmod +x dev
+export RUST_HOOK_LOG="$TMP/rust-hook.log"
+rust_hook() (
+  . "$SRC/.githooks/lib.sh"
+  SQLX_OFFLINE=false
+  export SQLX_OFFLINE
+  "$1"
+)
+expect 0 "Rust lint forces offline mode over caller settings" rust_hook run_rust_lint
+expect 0 "Rust tests force offline mode over caller settings" rust_hook run_rust_tests
+expect 0 "lint still runs fmt and strict clippy" grep -Fx 'bash -c cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings' "$RUST_HOOK_LOG"
+expect 0 "tests still run the full nextest suite" grep -Fx 'cargo nextest run --locked --all-features --no-tests=pass' "$RUST_HOOK_LOG"
+export RUST_HOOK_STATUS=7
+expect 7 "Rust lint propagates failure" rust_hook run_rust_lint
+expect 7 "Rust tests propagate failure" rust_hook run_rust_tests
+unset RUST_HOOK_STATUS RUST_HOOK_LOG
+
 new_repo check
 expect 1 "no ledger: commit is blocked" gate check --scope commit
 contains "no ledger" "no review recorded for the current commit diff"
