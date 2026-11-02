@@ -126,8 +126,9 @@ How the two servers find each other depends on how `./dev` runs commands
   port 3000 forwarding in VS Code's Ports view). While it is open, VS Code
   (`Code.exe`) holds Windows' `127.0.0.1:3000` for its `forwardPorts`, so
   the browser reaches VS Code's forwarding instead of the server you
-  started from WSL (observed 2026-11-03). Once the one-command quickstart
-  (PR #104, also on port 3000) is merged, the same applies to it.
+  started from WSL (observed 2026-11-03). The quickstart ("Try it" above)
+  also publishes port 3000, so the same should apply to it (NOTE: not
+  observed; check with the `netstat.exe` command below while it runs).
 
   If the browser still gets no page, first find out who holds the port on
   Windows (PowerShell or cmd):
