@@ -59,7 +59,13 @@ case "$*" in
   '-r .status') echo completed ;;
   '-r .id') echo 2 ;;
   '.jobs') echo jobs ;;
-  *'required[]'*) : ;;
+  *'required[]'*)
+    [[ "$*" == *'"quickstart / smoke"'* ]] || exit 90
+    case "$SCENARIO" in
+      quickstart-missing) echo 'quickstart / smoke: missing' ;;
+      quickstart-failed) echo 'quickstart / smoke: failure' ;;
+      quickstart-skipped) echo 'quickstart / smoke: skipped' ;;
+    esac ;;
   *'allowed'*) echo snapshot ;;
   *) echo "unexpected jq: $* ($input)" >&2; exit 90 ;;
 esac
@@ -110,6 +116,11 @@ contains output '[dry-run] status failure: CI:'
 contains output 'next: run CI for this HEAD'
 contains summary 'next: run CI for this HEAD'
 absent output 'verifier error:'
+for scenario in quickstart-missing quickstart-failed quickstart-skipped; do
+  run "$scenario" 1
+  contains output '[dry-run] status failure: CI: quickstart / smoke:'
+  absent output '[dry-run] status success:'
+done
 run snapshot 1
 contains output '[dry-run] status failure: review snapshot: stale head; next: post a fresh snapshot'
 absent output 'verifier error:'
