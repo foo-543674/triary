@@ -1,17 +1,19 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # pre-commit: deterministic gates on the staged change, then the review gate.
 # Design: docs/review-contract.md / AGENTS.md "Review gate".
-source "$(git rev-parse --show-toplevel)/.githooks/lib.sh"
+. "$(git rev-parse --show-toplevel)/.githooks/lib.sh"
 
-mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMRD)
-[[ ${#STAGED[@]} -eq 0 ]] && exit 0
+CHANGED=$(git diff --cached --name-only --diff-filter=ACMRD)
+[ -n "$CHANGED" ] || exit 0
 
-if touches '^backend/' "${STAGED[@]}"; then run_rust_lint || fail "backend fmt/clippy failed"; fi
-if touches '^frontend/' "${STAGED[@]}"; then run_frontend_lint || fail "frontend biome/tsc failed"; fi
-if touches '^tools/review-gate/' "${STAGED[@]}"; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
-if touches '^(dev|tools/dev-image/.*)$' "${STAGED[@]}"; then run_dev_selftest || fail "./dev self-test failed"; fi
+if touches '^backend/'; then run_rust_lint || fail "backend fmt/clippy failed"; fi
+if touches '^frontend/'; then run_frontend_lint || fail "frontend biome/tsc failed"; fi
+if touches '^tools/review-gate/'; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
+if touches '^(dev|tools/dev-image/.*)$'; then run_dev_selftest || fail "./dev self-test failed"; fi
 
 # DO NOT REMOVE OR WEAKEN: this step is the only thing that stops a commit
 # whose staged diff was never reviewed. "No review record" must stay a
 # failure; treating it as success turns the whole review gate into a no-op.
-"${REVIEW_GATE[@]}" check --scope commit
+# It hashes the index git is about to commit (GIT_INDEX_FILE), so a
+# `commit -a` that adds unreviewed changes does not match the recorded round.
+sh "$GATE" check --scope commit

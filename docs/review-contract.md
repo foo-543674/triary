@@ -2,7 +2,7 @@
 
 レビューの指摘をどう記録・処置し、何をもって変更を受け入れてよいとするかの **原典**。
 AGENTS.md・レビュースキル (`.agents/skills/code-review/SKILL.md`)・git hook (`.githooks/`)・
-Claude Code hook (`.claude/hooks/review-gate.sh`)・判定ツール (`tools/review-gate/`) はここを参照し、
+Claude Code hook (`.claude/hooks/review-gate.sh`)・判定ツール (`tools/review-gate/gate.sh`) はここを参照し、
 規則を転記しない。規則を変えるときはこのファイルを先に変え、判定ツールを追従させる。
 
 生成元: foo-skills 3.0.0 `skills/bootstrap/resources/review-contract.md` (経緯は `.contexts/bootstrap-decisions.md`)。
@@ -16,9 +16,11 @@ Claude Code hook (`.claude/hooks/review-gate.sh`)・判定ツール (`tools/revi
 
 ## 台帳
 
-- 置き場所: `$(git rev-parse --git-common-dir)/review-ledger/ledger.json`。リポジトリ外 (`.git/` 配下) に置き、追跡しない。台帳をコミットするとレビュー対象の差分そのものが変わるため
-- 書き込めるのはレビュー主体だけ。レビュー主体は `node tools/review-gate/src/cli.ts record --file <round.json>` で 1 回分のレビュー (ラウンド) を追記する。**実装側による手書き・改変は禁止**。実装側は修正と、解消を示す証拠を渡す
-- 各ラウンドは対象 diff のハッシュ・スコープ (`commit` = staged 分 / `push` = `origin/main` との merge-base から HEAD まで)・実行時刻・レビュー主体・出力が正常だったかを持つ。ハッシュは `cli.ts hash --scope <scope>` が返す値で、`record` は現在の diff と一致しないラウンドを拒否する
+- 置き場所: `$(git rev-parse --git-common-dir)/review-ledger/ledger.tsv`。リポジトリ外 (`.git/` 配下) に置き、追跡しない。台帳をコミットするとレビュー対象の差分そのものが変わるため
+- 形式: タブ区切りの行を追記していくログ (形式の定義は `tools/review-gate/gate.sh` 冒頭)。git と POSIX シェルだけで読み書き・判定できる形にしている。hook とゲートを clone したままのホストで動かすため (`.contexts/bootstrap-decisions.md`「2026-11-01 再実行 (3.1.0)」)。指摘の現在の状態はその ID の最後の行で、それより前の行が履歴
+- 書き込めるのはレビュー主体だけ。レビュー主体は `sh tools/review-gate/gate.sh record --file <round.tsv>` で 1 回分のレビュー (ラウンド) を追記する。**実装側による手書き・改変は禁止**。実装側は修正と、解消を示す証拠を渡す
+- 各ラウンドは対象 diff のハッシュ・スコープ (`commit` = staged 分 / `push` = `origin/main` との merge-base から HEAD まで)・実行時刻・レビュー主体・出力が正常だったかを持つ。ハッシュは `gate.sh hash --scope <scope>` が返す値 (固定のフラグで出した diff の `git hash-object`) で、`record` は現在の diff と一致しないラウンドを拒否する。commit の判定は git がコミットしようとしている index (`GIT_INDEX_FILE`) の diff で行うので、`commit -a` などでレビュー後に足された変更は一致しない
+- 旧台帳 (`ledger.json`) がある場合は `make ledger-migrate` で履歴・指摘・ラウンドを `ledger.tsv` に移行する。移行前は台帳の表示・記録・判定・スナップショット生成を停止する。旧ファイルは保持し、移行マーカーと変換した旧台帳の後ろに既存の TSV 行をコメント・順序も含めてそのまま保持し、ファイルを原子的に置き換える。移行済み、または旧台帳と既存 TSV の指摘 ID が重複する場合は変更せず拒否する。未解決の指摘も引き継ぐ
 - 台帳は diff をまたいで引き継ぐ。再レビューは既存の指摘の解消確認から始める
 
 ### 指摘が持つもの
@@ -90,7 +92,7 @@ Claude Code hook (`.claude/hooks/review-gate.sh`)・判定ツール (`tools/revi
 
 ## ゲートが区別するケース
 
-判定ツールのテスト (`tools/review-gate/test/evaluate.test.ts`) で次を確かめている。ゲートを変えたら、このケースが保たれていることを確かめる:
+判定ツールのテスト (`tools/review-gate/test/gate.test.sh`、`make gate-test`) で次を確かめている。ゲートを変えたら、このケースが保たれていることを確かめる:
 
 1. 前回の Critical が今回のレビューで出なかった → 解消の確認がなければ止まる
 2. 証拠付きで却下した Important → 止まらない
@@ -101,3 +103,7 @@ Claude Code hook (`.claude/hooks/review-gate.sh`)・判定ツール (`tools/revi
 ## この契約が保証しないこと
 
 台帳と hook は、実装しているエージェント自身が書き換えられる場所にある。この契約が保証するのは手元の運用の規律までで、改ざんへの耐性はない。実装エージェントの権限で変えられない受け入れ保証は `docs/remote-acceptance.md` が持つ。
+
+そのため手元の迂回対策は、`.claude/settings.json` の deny と AGENTS.md の規約、hook が有効かの確認にとどめる。シェルの字句解析で難読化まで見破る、すべてのコマンドやファイル編集を検査する、のような積み増しはしない (2026-11-01 に廃止した。守れる範囲は増えず、正当な作業を止める誤検知と hook の依存が増えたため)。
+
+Claude Code hook のコマンド照合と許容する見逃し・誤一致は、#95 の裁定に従い `.contexts/bootstrap-decisions.md`「ゲートの実装判断 (3.1.0)」に記録している。

@@ -18,6 +18,7 @@
 | 2026-04-25 | foo-skills — 版・commit SHA は **不明** (記録なし。`AGENTS.md` を生成していないことから 2.x より前と推定) | commit `a5575a1`、PR #19 (2026-04-26 マージ) | 採用済み |
 | 2026-10-31 | foo-skills 3.0.0 (`gitCommitSha` ce07f3463ad10f4ce4c2333af6c3fbbe4a4af738、https://github.com/foo-543674/foo-skills) | PR #46 (下記「2026-10-31 再実行」) | 採用済み (PR #46 のマージ。ruleset の適用は別途) |
 | 2026-10-31 | foo-skills 3.0.1 (`gitCommitSha` 9bb1b4c3280d4977f2a7e67b73f578abaf8fa083) | ブランチ `chore/dev-entrypoint` の PR (下記「2026-10-31 再実行 (3.0.1)」) | **提案中** (2 段階。第 1 段の PR のマージで入口とイメージを採用、第 2 段で切り替え) |
+| 2026-11-01 | foo-skills 3.1.0 (https://github.com/foo-543674/foo-skills、commit SHA は **不明**: キャッシュの `plugin.json` に記録なし。3.1.0 の版上げは foo-skills PR #96) | ブランチ `chore/bootstrap-3.1.0` ほかの PR (下記「2026-11-01 再実行 (3.1.0)」) | **提案中** |
 
 以降の節のうち「Phase 1」〜「次の更新タイミング」は 2026-04-25 時点の記録
 で、2026-10-31 の再実行で変わったものはその節に注記した。
@@ -331,7 +332,7 @@ bootstrap で追加したもの:
   統合テスト (Newman) と Storybook のビルドは DB や時間の都合で CI に任せた
 - **commit 時に全変更を自動で stage するオプション (`-a`) の禁止**: staged
   以外が混ざると、レビューした diff とコミットされる diff がずれるため
-- **Claude Code hook の判定 (現行)**: hooksPath・`GIT_CONFIG_*`・エイリアス
+- **Claude Code hook の判定 (2026-11-01 に廃止。下記「ゲートの実装判断 (3.1.0)」)**: hooksPath・`GIT_CONFIG_*`・エイリアス
   定義・`.git/config`・台帳ファイルへの言及はコマンド全体で止める。git の
   呼び出しの判定は `tools/review-gate/src/command.ts` (規則は同ファイル冒頭)
   に委ねる。シェルのように字句解析し (テキストは捨てず、heredoc と here-string
@@ -346,8 +347,8 @@ bootstrap で追加したもの:
   返し見つかり (引用符内の区切り、行継続、キーワードや未知のランチャーの後ろ、
   エイリアス、heredoc の誤除去、引用符内のコマンド置換など)、作業中に正当な
   コマンドの誤ブロックも実際に踏んだ (`git log ...; grep -n`、`review-gate.sh`
-  というファイル名)。個別の修正をやめ、構文の列挙に依存しない現行の方式に
-  置き換えた
+  というファイル名)。当時は個別の修正をやめ、上記の方式に置き換えた。
+  この解析方式も後に廃止した (下記「ゲートの実装判断 (3.1.0)」、#95)
 - **permission 規則**: 公式ドキュメント (code.claude.com/docs/en/permissions)
   で確認した仕様に合わせた。評価順は deny → ask → allow で最初に一致したもの、
   `:*` は語の区切りのあとの末尾ワイルドカード、規則の途中の `*` は前後に空白
@@ -392,10 +393,10 @@ ruleset が有効になる前だった。
 
 ### 動作確認の結果
 
-- `make gate-test` のテスト 151 件が通る。内訳は台帳と判定 (review-contract
+- 当時の `make gate-test` のテスト 151 件が通った。内訳は台帳と判定 (review-contract
   の 5 ケース、remote-acceptance の 1・2・4・9・10 の判定部分)、JSON 境界の
   検証、コマンド分類 (字句解析)、Claude Code hook の回帰ケース (一時リポジ
-  トリで実行)、`.git/` 書き込み保護
+  トリで実行)、当時の `.git/` 書き込み保護 (3.1.0 の修正で廃止)
 - CLI を一時リポジトリで実行し、レビューなし → 止まる、未処置の Critical →
   止まる、証拠付きの却下 → 通る、diff が変わる → 止まる、古いラウンドの記録
   → 拒否、を確かめた
@@ -533,3 +534,124 @@ audit を直す手段として「ai-box に Rust を入れる」を判断依頼�
   (追記 2026-10-31: #56 で推奨の「開発イメージの Dockerfile から作る」を暫定で
   実装した。オーナーの返事を待たずに進めたもので、オーナーが devcontainer を
   作り直して確かめるまで未確認)
+
+## 2026-11-01 再実行 (foo-skills 3.1.0)
+
+3.0.1 と 3.1.0 の原料を直接比べた (どちらもプラグインのキャッシュに残って
+いた。間の 3.0.2 の変更は 3.1.0 との差分に含まれる)。変わった原料:
+
+- `philosophy/development-values.md`: PR は中身が依存するときだけ積む、承認
+  依頼はその場で単独で判断できるものだけ (順序・時間の条件は AI と仕組みが
+  持ち、待つ変更は Draft で出す、チェックが成功してから依頼する)、判断依頼に
+  止めた理由と判断してほしい観点を書く、「人間との往復を設計する」
+- `philosophy/technology-choices.md`「開発イメージに入れるもの、clone したまま
+  で動かすもの」: hook・Claude Code hook・入口それ自身は git と POSIX シェル
+  で動かす。ゲートは準備不足で止めない。ai-box をプロジェクトの前提にしない
+- `skills/bootstrap/SKILL.md` Phase 5 と受け入れ基準 6「触れる」、対話の原則
+- `resources/`: `local-review-gate.md` (hook は clone したままのホストで動かす、
+  手元の迂回対策を積み増さない)、`context-template.md` (PR の出し方と承認の
+  依頼、コマンドの実行の仕方、判断を求めるとき)、`checklist.md`、
+  `known-pitfalls.md` (タスクランナーの取り残し、hook を言語や作業環境の
+  ランタイムで書く。後者の事例は triary 自身)、`remote-acceptance.md` (不合格
+  の説明、混在するファイル、時間や順序の条件)、`review-contract.md`
+  (エスカレーションの理由と観点)
+- `skills/ai-box/SKILL.md` も変わったが、生成物は ai-box を前提にしない方針に
+  なったので、このプロジェクトへの反映の対象にしていない
+
+チーム側: レビューゲートを作業環境の Node 22 で動かす例外は、3.0.1 の再実行で
+AI が生成した判断 (上記「入口の実装判断」) で、チームが意図して選んだ記録は
+ない。一方、オーナーはこれが不便だと foo-skills PR #94 で指摘し、「triary の
+hook のシェル化、Claude Code hook の範囲の絞り込み、ai-box 前提の記述の除去
+は、bootstrap の再実行で行う」と書いている。そのため「プラグイン側が変わり、
+チーム側の該当部分はプラグイン由来の生成物のまま」として扱い、採用する。
+
+Phase 2 で新たに聞いたことはない。新しい原料が Phase 2 に足した問いはなく
+(AI の主体は前回確認済み)、変更の向きはオーナーの指摘そのものだったため。
+
+### 変更ごとの扱い
+
+| 項目 | 状況 | 扱い | 反映先 |
+|---|---|---|---|
+| hook とゲートを git + POSIX シェルで動かす | プラグイン側 (オーナーの指摘由来) | 採用 (提案中)。下記「ゲートの実装判断 (3.1.0)」 | `tools/review-gate/gate.sh`、`.githooks/`、`.claude/hooks/` |
+| Claude Code hook はゲートの対象外の呼び出しを止めない | プラグイン側 | 採用 (提案中)。hook の `if` で `git commit` / `git push` だけに絞る | `.claude/settings.json` |
+| 手元の迂回対策を積み増さない | プラグイン側 | 採用 (提案中)。字句解析器 (`command.ts` / `classify.ts`) を削除し、deny・規約・hook の有効化確認にとどめる | `docs/review-contract.md`「この契約が保証しないこと」 |
+| ゲートは準備不足で止めない | プラグイン側 | 採用 (提案中)。`frontend/node_modules` が無ければ hook が `./dev` の中で install する | `.githooks/lib.sh` |
+| 入口 (`./dev`) を POSIX シェルで書く | プラグイン側 | 採用予定。`dev` は bash (配列、`${!name}`) で書かれている。PR #92 が `dev` を変更中なので、その上に積む別の PR にする | `dev` |
+| ai-box を前提にした記述を除く | プラグイン側 | 採用予定 (別の PR)。`AGENTS.md` の `./dev` の説明、`dev` と Dockerfile のコメントが ai-box を前提にしている | `AGENTS.md`、`dev`、`tools/dev-image/Dockerfile` |
+| タスクランナーと手順書も入口を通す | プラグイン側 | 確認だけ。`Makefile`・`frontend/package.json` の scripts・`README.md`・devcontainer を検索し、すべて入口経由 (`package.json` の scripts は `./dev pnpm run` から呼ばれる) | — |
+| PR の出し方と承認の依頼、コマンドの実行の仕方、判断依頼の理由と観点、人間との往復 | プラグイン側。オーナーのメモリーにも同じ向きの指示がある (不要な PR の積み上げをしない、1 回に 1 コマンド) | 採用予定 (別の PR) | `AGENTS.md`、派生ファイル、`docs/review-contract.md` |
+| 受け入れ判定の不合格の説明 (どの条件・なぜ・何をすれば通るか、検証経路の故障の区別) | プラグイン側 | 採用予定 (別の PR)。`acceptance.sh` はこの PR でも変えるので、その上に積む | `tools/review-gate/acceptance.sh` |
+| 混在するファイル | プラグイン側 | 確認だけ。`frontend/package.json` と `backend/Cargo.toml` は CODEOWNERS に載せず、検証器が区画ごとに判定している (`manifest.ts`、`docs/remote-acceptance.md` 手順 6) | — |
+| 時間の条件は仕組みが持つ | プラグイン側 | 確認だけ。Dependabot の `cooldown` (7 日 / major 14 日) と検証器の公開日の確認 (`release-age.ts`) が持っている | — |
+
+### ゲートの実装判断 (3.1.0)
+
+- **ファイル編集の迂回対策 (F115 修正)**: 全ファイル編集を調べる hook を削除。
+  `.claude/settings.json` の deny は `Edit(/.git/config)` と
+  `Edit(/.git/hooks/**)` のみとし、レビュー台帳には適用しない。
+  2026-11-02 に [公式 permissions 文書](https://code.claude.com/docs/en/permissions#read-and-edit)
+  で確認: `Edit` のパス規則は Write・NotebookEdit・旧 MultiEdit も対象で、
+  プロジェクト設定の先頭 `/` は主作業ディレクトリ基準、`**` は再帰的に一致する。
+  Claude Code 実機での拒否動作は未確認。確認方法は `/permissions` で規則を
+  読み戻し、一時クローンの対象パスへの編集と台帳のラウンドファイルへの Write を試す。
+- **判定は 1 つの実装**: 台帳の判定・diff ハッシュ・スナップショットの作成と
+  検証を `tools/review-gate/gate.sh` (POSIX sh + awk + git) にまとめ、git hook・
+  Claude Code hook・レビュー主体・リモートの検証 (`acceptance.sh` の `accept`)
+  が同じコードを使う。TypeScript の `ledger.ts` / `snapshot.ts` を残して二重に
+  持つと、手元とリモートで判定がずれうるため。`cli.ts` に残したのは、CI でしか
+  動かない分類 (Dependabot・AI の変更・サプライチェーン) だけ
+- **台帳の形式**: JSON をやめ、タブ区切りの行を追記するログ
+  (`.git/review-ledger/ledger.tsv`) にした。JSON は jq か言語のランタイムなし
+  では読めないため (原料「台帳の形式も、シェルと git で確認できる形を選ぶ」)。
+  指摘の現在の状態は最後の行。欄の中のタブと改行は書けない (`record` が欄の数
+  で拒否する)
+- **diff ハッシュ**: sha256 から、固定のフラグで出した diff の
+  `git hash-object` に変えた。`sha256sum` は POSIX になく、macOS にはないため。
+  手元とリモートは同じ `gate.sh` で計算するので一致する
+- **既存の台帳は移行して引き継ぐ**: 最初は「引き継がず、進行中のブランチを
+  レビューし直す」案だった。レビューで、旧台帳の未解決の指摘が黙って数えられ
+  なくなり、契約が弱まると指摘されたため撤回した。`make ledger-migrate`
+  (`tools/review-gate/src/migrate-ledger.ts`、開発イメージの中の一度きりの変換)
+  で `ledger.json` の履歴・指摘・ラウンドを `ledger.tsv` の先頭に移す。移行
+  するまで、`gate.sh` は台帳を読むコマンドを止める。規則は
+  `docs/review-contract.md`「台帳」。新しい ID は `F` で始め、旧台帳の `R`
+  番号と区別する
+- **`commit -a` の扱い**: Claude Code hook でコマンドを解析して止めるのをやめた。
+  pre-commit は git がコミットしようとしている index (`GIT_INDEX_FILE`) の
+  diff を判定するので、レビュー後に `-a` で足された変更はハッシュが一致せず
+  止まる (`gate.test.sh` で確認)。AGENTS.md の禁止はそのまま
+- **Claude Code hook の絞り込み**: 公式ドキュメント (code.claude.com/docs/en/hooks、
+  2026-11-01 に読んだ) の `if` フィールドで `Bash(git commit)` /
+  `Bash(git commit *)` / `Bash(git push)` / `Bash(git push *)` に絞った。
+  ドキュメントによると `if` は複合コマンドの各部分に照合され、`$(...)` など
+  中身が分からないコマンドでは常に hook を動かす。その場合の扱いは次項。
+  手元の Claude Code は 2.1.316。
+  NOTE: `Bash(git commit)` が引数なしの `git commit` だけに当たり、
+  `Bash(git commit *)` が引数ありに当たるという分け方は、ドキュメントの表から
+  の推測で、実際に hook が起動する組み合わせはまだ観測していない。確かめ方:
+  この設定が入った状態で `git commit` / `git commit -m x` / `ls` を実行し、
+  hook の stderr が出るかを見る
+- **Claude Code hook の解析を廃止 (#95、オーナー裁定 option B)**: hook は
+  Claude Code の `if` 照合に任せ、JSON 解析と手製の字句解析器を削除する。
+  安全網は git hook とリモート受け入れの多層の検査であり、この hook は AI に
+  ゲートの理由を早めに伝える役割に絞る。簡易な形しか認識できない解析器では
+  `if` と役割が重なり、8 回のレビューで反例を重ねても収束しなかったため。
+  生の入力に `$` または backtick があれば通す。`$(...)`・`$VAR`・backtick を
+  含むコミットはこの hook では検査せず、description など別フィールドの同じ
+  文字による素通しも許容する。それ以外は引数の commit / push をそのまま
+  判定に渡し、Claude Code の照合による誤一致も許容する。失敗時には、実際には
+  commit / push を実行しないコマンドなら簡素化または Bash 呼び出しの分割を
+  して再試行するよう案内する。
+  2026-11-02 に [公式 hook 文書](https://code.claude.com/docs/en/hooks#how-if-patterns-match-bash-commands)
+  を参照。NOTE: Claude Code 実機での照合は未観測。確認方法は前項のとおり
+- **`node` の直接実行を deny**: ゲートが Node を使わなくなったので、他の言語
+  コマンドと同じく deny にし、`./dev` 経由だけにした
+- **テスト**: `tools/review-gate/test/gate.test.sh` (git + sh だけ)。契約の 5 ケース、
+  `record` の拒否条件、スナップショットの往復・改ざん・古い HEAD・CRLF、
+  `commit -a`、node のない PATH での両 hook を確かめる。判定を壊した版で 5 件
+  落ちることを確かめた (dash で実行)。TypeScript の分類のテストと `./dev` の
+  テストは開発イメージの中で動かす (`make gate-test` / `make dev-test`)
+- **移行の 1 回分**: この変更を含む PR は、`main` 側の旧い検証器 (JSON の
+  スナップショット) で判定される。その PR に限り、旧い形式のスナップショットも
+  出す (`main` の `cli.ts` を開発イメージの中で動かす)。マージ後の PR は新しい
+  形式だけ

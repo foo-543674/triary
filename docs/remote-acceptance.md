@@ -56,11 +56,13 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 提出方式は 1 つ: **PR コメントで提出 → 検証時に内容を固定 → CI の artifact に保存**。
 
-1. 実装側 (AI) は push 後に `node tools/review-gate/src/cli.ts snapshot --pr <番号> [--decisions "#12,#15"]` の出力をそのまま PR にコメントする。`--decisions` には、この変更が依存する未裁定の判断依頼を列挙する
+1. 実装側 (AI) は push 後に `sh tools/review-gate/gate.sh snapshot --pr <番号> [--decisions "#12,#15"]` の出力をそのまま PR にコメントする。`--decisions` には、この変更が依存する未裁定の判断依頼を列挙する
 2. 検証処理は、許可された投稿者 (`foo-543674-ai-agent[bot]`、`foo-543674`) のコメントのうちマーカー `<!-- triary-review-snapshot -->` を含む最新のものを使う
 3. 検証に使ったコメントの内容を artifact `review-snapshot-<PR>-<HEAD>` に保存し、判定結果 (job summary) から内容ハッシュで参照する。PR コメントは編集できるため
 
-スナップショットが含むもの: リポジトリ、PR 番号、HEAD の SHA、base の SHA、merge-base、差分の範囲の定義 (`merge-base..head`)、diff ハッシュ、契約と検証器の版 (`docs/review-contract.md` の blob と `tools/review-gate` の tree)、依存する判断依頼、台帳、内容ハッシュ。台帳のうち resolved の指摘と、提出する差分以外のラウンドは載せない (前者はどのモードでも判定を通り、後者は判定が差分ハッシュで絞り込むので、除いても結果は変わらない。全部を載せると PR コメントの上限を超えた: 2026-11-01 に 263,298 文字のコメントが拒否された。251,810 文字は受け付けられていた)。全体は手元の台帳 (`cli.ts show`) に残る
+スナップショットが含むもの: リポジトリ、PR 番号、HEAD の SHA、base の SHA、merge-base、差分の範囲の定義 (`merge-base..head`)、diff ハッシュ、契約と検証器の版 (`docs/review-contract.md` の blob と `tools/review-gate` の tree)、依存する判断依頼、台帳、内容ハッシュ。台帳のうち resolved の指摘と、提出する差分以外のラウンドは載せない (前者はどのモードでも判定を通り、後者は判定が差分ハッシュで絞り込むので、除いても結果は変わらない。全部を載せると PR コメントの上限を超えた: 2026-11-01 に 263,298 文字のコメントが拒否された。251,810 文字は受け付けられていた)。全体は手元の台帳 (`gate.sh show --all`) に残る
+
+スナップショットの判定は、手元のゲートと同じ `tools/review-gate/gate.sh` (`accept`) で行う。台帳の判定の実装を手元とリモートで 1 つにするため。2026-11-01 より前の形式 (JSON) のスナップショットは不合格になるので、出し直す
 
 PR 差分のレビュー証跡と、CI の成功は別の証拠として扱い、どちらを検証したかを結果に別項目で出す。
 

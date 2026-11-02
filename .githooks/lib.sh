@@ -1,57 +1,58 @@
-#!/usr/bin/env bash
-# Shared helpers for the git hooks in this directory.
+# Shared helpers for the git hooks in this directory (sourced, POSIX sh).
 # Design: docs/review-contract.md and AGENTS.md "Review gate".
+#
+# The hooks themselves need only git and a POSIX shell; the review gate
+# (tools/review-gate/gate.sh) is written in the same. Language commands
+# (cargo, biome, tsc, vitest, node, ...) run in the dev image through ./dev,
+# which needs docker or podman. Nothing has to be installed or prepared by
+# hand first: dependencies the gates need are installed by the gate itself
+# (.contexts/bootstrap-decisions.md "2026-11-01 再実行 (3.1.0)").
 
-set -euo pipefail
+set -eu
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-# The review gate and the self-tests of the gate and of ./dev run on the
-# caller's Node 22: they have to work wherever git and ./dev run. Everything
-# else (cargo, biome, tsc, vitest, ...) runs in the dev image through ./dev
-# (.contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)").
-REVIEW_GATE=(node "$REPO_ROOT/tools/review-gate/src/cli.ts")
+REPO_ROOT=$(git rev-parse --show-toplevel)
+GATE="$REPO_ROOT/tools/review-gate/gate.sh"
 DEV="$REPO_ROOT/dev"
-FRONTEND_BIN="$REPO_ROOT/frontend/node_modules/.bin"
+
+# Run inside the dev image before the frontend tools: a no-op when
+# node_modules is current, an install from the pnpm store volume otherwise
+# (never an interactive prompt: a hook has no one to answer it).
+FRONTEND_DEPS='pnpm install --frozen-lockfile --prefer-offline --reporter=silent --config.confirmModulesPurge=false'
 
 fail() {
-  echo "git-hook: $*" >&2
+  printf 'git-hook: %s\n' "$*" >&2
   exit 1
 }
 
-# A deterministic gate that cannot run is a failure, never a pass. This also
-# holds for ./dev: it fails when it cannot run the dev image and never falls
-# back to tools installed on this machine.
-require_frontend_deps() {
-  [[ -x "$FRONTEND_BIN/biome" && -x "$FRONTEND_BIN/tsc" ]] ||
-    fail "frontend dependencies are missing; run '../dev pnpm install' in frontend/ before committing."
-}
-
+# touches <extended regex>: does any path in $CHANGED (one per line) match?
+# A deterministic gate that cannot run is a failure, never a pass; this also
+# holds for ./dev, which never falls back to tools installed on this machine.
 touches() {
-  local pattern="$1"
-  shift
-  printf '%s\n' "$@" | grep -Eq "$pattern"
+  printf '%s\n' "$CHANGED" | grep -Eq "$1"
 }
 
-# Each ./dev call starts a container (about 3.5 s in the ai-box's vfs
-# storage, observed 2026-10-31), so the commands of one gate share one call.
+# Each ./dev call starts a container (about 3.5 s under rootless podman with
+# vfs storage, observed 2026-10-31), so the commands of one gate share one call.
 run_rust_lint() {
   (cd "$REPO_ROOT/backend" &&
     "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings')
 }
 
 run_frontend_lint() {
-  require_frontend_deps
-  (cd "$REPO_ROOT/frontend" && "$DEV" bash -c 'node_modules/.bin/biome ci . && node_modules/.bin/tsc --noEmit')
+  (cd "$REPO_ROOT/frontend" && "$DEV" bash -c "$FRONTEND_DEPS && node_modules/.bin/biome ci . && node_modules/.bin/tsc --noEmit")
 }
 
+run_frontend_tests() {
+  (cd "$REPO_ROOT/frontend" && "$DEV" bash -c "$FRONTEND_DEPS && node scripts/check-arch.mjs && node_modules/.bin/vitest run")
+}
+
+# The gate itself is tested on this machine (git + sh); the remote verifier's
+# TypeScript parts are type-checked and tested in the dev image.
 run_review_gate_selftest() {
-  require_frontend_deps
-  (cd "$REPO_ROOT" && "$DEV" frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json)
-  node --test "$REPO_ROOT"/tools/review-gate/test/*.test.ts
+  sh "$REPO_ROOT/tools/review-gate/test/gate.test.sh" &&
+    (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json && node --test --test-reporter=dot tools/review-gate/test/*.test.ts")
 }
 
 run_dev_selftest() {
-  require_frontend_deps
-  (cd "$REPO_ROOT" && "$DEV" frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json)
-  node --test "$REPO_ROOT"/tools/dev-image/test/*.test.ts
+  (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json && node --test --test-reporter=dot tools/dev-image/test/*.test.ts")
 }

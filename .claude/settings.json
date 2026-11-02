@@ -27,7 +27,6 @@
       "Bash(docker compose exec:*)",
       "Bash(docker compose config:*)",
       "Bash(docker compose ls:*)",
-      "Bash(node:*)",
       "Bash(gh:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
@@ -52,7 +51,7 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(node tools/review-gate/src/cli.ts:*)",
+      "Bash(sh tools/review-gate/gate.sh:*)",
       "Bash(chmod:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
@@ -72,10 +71,13 @@
       "Bash(grep * ./*)"
     ],
     "deny": [
+      "Edit(/.git/config)",
+      "Edit(/.git/hooks/**)",
       "Bash(cargo:*)",
       "Bash(rustc:*)",
       "Bash(rustup:*)",
       "Bash(rustfmt:*)",
+      "Bash(node:*)",
       "Bash(sqlx:*)",
       "Bash(npm:*)",
       "Bash(npx:*)",
@@ -225,16 +227,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/review-gate.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
+            "if": "Bash(git commit)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/review-gate.sh commit"
+          },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-git-dir.sh"
+            "if": "Bash(git commit *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/review-gate.sh commit"
+          },
+          {
+            "type": "command",
+            "if": "Bash(git push)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/review-gate.sh push"
+          },
+          {
+            "type": "command",
+            "if": "Bash(git push *)",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/review-gate.sh push"
           }
         ]
       }
