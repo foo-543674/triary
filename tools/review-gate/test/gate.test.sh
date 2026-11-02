@@ -1,4 +1,11 @@
 #!/bin/sh
+# Hooks export repository selectors that must never reach fixture repositories.
+# Extract names only; a newline in a value can add a harmless extra unset.
+for git_test_env in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  unset "$git_test_env"
+done
+unset git_test_env
+
 # Tests of the review gate (gate.sh), the git hooks' use of it and the Claude
 # Code hooks, in throwaway repositories. Needs only git and a POSIX shell,
 # like the gate itself. Run: sh tools/review-gate/test/gate.test.sh
@@ -77,6 +84,31 @@ round() {
 
 N() { printf 'new\t%s\t%s\tsrc/a.rs\tAGENTS.md rule\tsrc/a.rs:1 evidence\t-\n' "$1" "$2"; }
 U() { printf 'update\t%s\t%s\t%s\t%s\t%s\t-\n' "$1" "$2" "$3" "${4:--}" "${5:--}"; }
+
+# Run the real suite under hook-like environments. Compare all Git metadata,
+# including config, refs, index and the ledger, without Git refreshing the index.
+if [ "${TRIARY_GATE_TEST_NESTED:-0}" != 1 ]; then
+  new_repo sentinel
+  sentinel=$REPO
+  mkdir -p "$sentinel/.git/review-ledger"
+  printf 'sentinel ledger\n' >"$sentinel/.git/review-ledger/ledger.tsv"
+  git worktree add -q -b sentinel-linked "$TMP/sentinel-linked" HEAD || exit 1
+  linked_git_dir=$(git -C "$TMP/sentinel-linked" rev-parse --absolute-git-dir)
+  cp -R "$sentinel/.git" "$TMP/sentinel-before" || exit 1
+  for sentinel_kind in normal linked; do
+    case $sentinel_kind in
+      normal) sentinel_dir=$sentinel/.git; sentinel_tree=$sentinel ;;
+      linked) sentinel_dir=$linked_git_dir; sentinel_tree=$TMP/sentinel-linked ;;
+    esac
+    expect 0 "$sentinel_kind: inherited hook environment is isolated" env \
+      TRIARY_GATE_TEST_NESTED=1 GIT_DIR="$sentinel_dir" \
+      GIT_INDEX_FILE="$sentinel_dir/index" GIT_WORK_TREE="$sentinel_tree" \
+      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.bare GIT_CONFIG_VALUE_0=true \
+      sh "$HERE/gate.test.sh"
+    expect 0 "$sentinel_kind: all sentinel Git metadata is byte-identical" \
+      diff -r "$TMP/sentinel-before" "$sentinel/.git"
+  done
+fi
 
 # ---- check ----------------------------------------------------------------------
 
