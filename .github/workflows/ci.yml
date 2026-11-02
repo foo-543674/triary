@@ -55,15 +55,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      # The runner context is not available in jobs.<id>.env (the first push
-      # of this job failed as a workflow file issue), so set it per step.
+      # Inside the workspace (.tmp/ is gitignored): compose builds through
+      # buildx bake, which refused a local cache under $RUNNER_TEMP without
+      # an fs entitlement ("pass --allow=fs=/home/runner/work/_temp",
+      # observed in run 41489536100). NOTE: unverified that a path under the
+      # workspace needs no entitlement; the next run of this job shows it.
+      # The path is set per step because the runner context is not
+      # available in jobs.<id>.env.
       - name: Locate the build cache
-        run: echo "QUICKSTART_CACHE=$RUNNER_TEMP/quickstart-cache" >> "$GITHUB_ENV"
+        run: echo "QUICKSTART_CACHE=$GITHUB_WORKSPACE/.tmp/quickstart-cache" >> "$GITHUB_ENV"
       - name: Check toolchain versions
         run: sh .github/quickstart/check-toolchains.sh
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: ${{ runner.temp }}/quickstart-cache
+          path: .tmp/quickstart-cache
           # Keyed by what the image layers depend on, not by commit, so runs
           # that change none of it reuse one entry instead of saving a new
           # mode=max cache each time (repository cache space is shared).
