@@ -58,13 +58,14 @@ verifier_error() {
 # DO NOT REMOVE OR WEAKEN: an unexpected error must end as a failing status,
 # never as a silently missing or pending one. Before HEAD is known, the run
 # log and summary report the error; no commit status can be addressed yet.
-trap 'verifier_error "unexpected command failure (exit $?) at line $LINENO"' ERR
+trap 'error_status=$?; if (( BASH_SUBSHELL == 0 )); then verifier_error "unexpected command failure (exit $error_status) at line $LINENO"; else exit 2; fi' ERR
 
 pr_json="$(gh api "repos/$REPO/pulls/$PR")"
 HEAD_SHA="$(jq -r .head.sha <<<"$pr_json")"
 BASE_REF="$(jq -r .base.ref <<<"$pr_json")"
 
-if [[ "$(jq -r .state <<<"$pr_json")" != "open" ]]; then
+pr_state="$(jq -r .state <<<"$pr_json")"
+if [[ "$pr_state" != "open" ]]; then
   echo "PR #$PR is not open; nothing to judge."
   exit 0
 fi
@@ -75,7 +76,8 @@ post_status pending "verifying"
 # Objects only: fetching does not execute anything from the PR.
 git fetch --quiet --no-tags origin "$BASE_REF" "+refs/pull/$PR/head:refs/remotes/pr/head"
 BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
-[[ "$(git rev-parse refs/remotes/pr/head)" == "$HEAD_SHA" ]] || {
+fetched_head="$(git rev-parse refs/remotes/pr/head)"
+[[ "$fetched_head" == "$HEAD_SHA" ]] || {
   post_status pending "PR head moved while verifying; will re-run"
   exit 0
 }
@@ -102,7 +104,8 @@ compare_file="$(mktemp)"
 dependency_update=false
 dependabot_authored=false
 if gh api "repos/$REPO/compare/$MERGE_BASE...$HEAD_SHA" >"$compare_file"; then
-  classification="$("${CLI[@]}" classify-dependency --pr-author "$(jq -r .user.login <<<"$pr_json")" \
+  pr_author="$(jq -r .user.login <<<"$pr_json")"
+  classification="$("${CLI[@]}" classify-dependency --pr-author "$pr_author" \
     --head "$HEAD_SHA" --compare-file "$compare_file" || {
       verifier_warning "classify-dependency failed" "not a dependency update (normal path with a review ledger)"
       echo '{}'
@@ -127,15 +130,18 @@ ci_run="$(gh api "repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request
       | select(.path == ".github/workflows/ci.yml" and .repository.full_name == $repo)]
     | sort_by(.run_number) | last // empty')"
 ci_state="missing"
+ci_status=""
+if [[ -n "$ci_run" ]]; then ci_status="$(jq -r .status <<<"$ci_run")"; fi
 if [[ -z "$ci_run" ]]; then
   reasons+=("CI: no run for $HEAD_SHA; next: run CI for this HEAD and wait for completion")
-elif [[ "$(jq -r .status <<<"$ci_run")" != "completed" ]]; then
+elif [[ "$ci_status" != "completed" ]]; then
   post_status pending "waiting for CI to complete on ${HEAD_SHA:0:7}"
   echo "CI still running; the workflow_run trigger will re-run this verifier."
   exit 0
 else
-  jobs="$(gh api "repos/$REPO/actions/runs/$(jq -r .id <<<"$ci_run")/jobs?per_page=100" | jq '.jobs')"
-  mapfile -t bad_jobs < <(jq -r --argjson required "$REQUIRED_JOBS" '
+  ci_id="$(jq -r .id <<<"$ci_run")"
+  jobs="$(gh api "repos/$REPO/actions/runs/$ci_id/jobs?per_page=100" | jq '.jobs')"
+  bad_job_lines="$(jq -r --argjson required "$REQUIRED_JOBS" '
       . as $jobs
       | ($required[] as $name
           | ($jobs | map(select(.name == $name)) | first) as $job
@@ -147,7 +153,9 @@ else
           | if $newman == null then empty
             elif $newman.conclusion == "success" then empty
             elif $newman.conclusion == "skipped" and $detect != null and $detect.conclusion == "success" then empty
-            else "integration / newman: \($newman.conclusion)" end)' <<<"$jobs")
+            else "integration / newman: \($newman.conclusion)" end)' <<<"$jobs")"
+  bad_jobs=()
+  if [[ -n "$bad_job_lines" ]]; then mapfile -t bad_jobs <<<"$bad_job_lines"; fi
   if [[ ${#bad_jobs[@]} -eq 0 ]]; then
     ci_state="passed"
   else
@@ -182,13 +190,16 @@ snapshot_lines="$("${GATE[@]}" accept --snapshot-file "$SNAPSHOT_FILE" \
   --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" \
   --merge-base "$MERGE_BASE" --diff-hash "$DIFF_HASH" --contract-version "$CONTRACT_VERSION")" || accept_status=$?
 [[ "$accept_status" -le 1 ]] || verifier_error "gate.sh accept exited $accept_status"
-mapfile -t snapshot_reasons < <(awk -F '\t' '$1 == "reason" { print $2 }' <<<"$snapshot_lines")
+snapshot_reason_lines="$(awk -F '\t' '$1 == "reason" { print $2 }' <<<"$snapshot_lines")"
+snapshot_reasons=()
+if [[ -n "$snapshot_reason_lines" ]]; then mapfile -t snapshot_reasons <<<"$snapshot_reason_lines"; fi
 [[ ${#snapshot_reasons[@]} -gt 0 ]] && reasons+=("${snapshot_reasons[@]/#/review snapshot: }")
 snapshot_hash="$(awk -F '\t' '$1 == "content-hash" { print $2 }' <<<"$snapshot_lines")"
 if [[ ${#snapshot_reasons[@]} -eq 0 ]]; then review_state="passed"; else review_state="failed"; fi
 fi
 
 # --- 3. no unresolved decision request this change depends on --------------------
+decision_lines="$(awk -F '\t' '$1 == "decision" { print $2 }' <<<"$snapshot_lines" | sort -u)"
 while read -r ref; do
   [[ -z "$ref" ]] && continue
   number="${ref#\#}"
@@ -198,11 +209,13 @@ while read -r ref; do
   fi
   state="$(gh api "repos/$REPO/issues/$number" -q .state 2>/dev/null || echo missing)"
   [[ "$state" == "closed" ]] || awaiting+=("#$number ($state)")
-done < <(awk -F '\t' '$1 == "decision" { print $2 }' <<<"$snapshot_lines" | sort -u)
+done <<<"$decision_lines"
 [[ ${#awaiting[@]} -gt 0 ]] && reasons+=("decision: awaiting human decision: ${awaiting[*]}; next: answer and close these decision issues, then re-run the verifier")
 
 # --- 4. base files changed -> human approval required (enforced by the ruleset) ---
-mapfile -t owned_patterns < <(grep -Ev '^\s*(#|$)' .github/CODEOWNERS | awk '{print $1}')
+owned_pattern_lines="$(awk '!/^[[:space:]]*(#|$)/ {print $1}' .github/CODEOWNERS)"
+owned_patterns=()
+if [[ -n "$owned_pattern_lines" ]]; then mapfile -t owned_patterns <<<"$owned_pattern_lines"; fi
 base_changes=()
 for file in "${changed[@]}"; do
   for pattern in "${owned_patterns[@]}"; do
@@ -226,7 +239,7 @@ dependencies_pass() {
     echo '{}'
   })"
   jq -r '.reasons[]? | "not merged without approval: " + .' <<<"$result"
-  [[ "$(jq -r '.ok == true' <<<"$result")" == "true" ]]
+  dependencies_ok="$(jq -r '.ok == true' <<<"$result")"
 }
 
 # --- result -----------------------------------------------------------------------
@@ -261,7 +274,8 @@ fi
 if [[ ${#base_changes[@]} -gt 0 ]]; then
   post_status success "machine checks passed; base files changed: code owner approval required, no acceptance guarantee"
 elif [[ "$dependency_update" == "true" ]]; then
-  if dependencies_pass; then
+  dependencies_pass
+  if [[ "$dependencies_ok" == "true" ]]; then
     post_status success "machine checks passed (Dependabot dependency update; merges without human approval, #43)"
     # Read by the automerge job in .github/workflows/acceptance.yml.
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
@@ -294,15 +308,20 @@ else
       verifier_warning "ui-reviewed events lookup failed" "no verified ui-reviewed actor (a human approves and merges when UI review is required)"
       true
     })"
+  default_branch="$(jq -r .base.repo.default_branch <<<"$pr_json")"
+  base_files="$(IFS=,; echo "${base_changes[*]}")"
   ai_classification="$("${CLI[@]}" classify-ai-change --pr-file "$pr_file" --changed-file "$changed_file" \
     --added-file "$added_file" --ui-reviewed-by "$ui_reviewed_by" \
-    --default-branch "$(jq -r .base.repo.default_branch <<<"$pr_json")" \
-    --base-files "$(IFS=,; echo "${base_changes[*]}")" || {
+    --default-branch "$default_branch" \
+    --base-files "$base_files" || {
       verifier_warning "classify-ai-change failed" "not this class (a human approves and merges)"
       echo '{}'
     })"
   jq -r '.reasons[]? | "not an AI change that merges without approval: " + .' <<<"$ai_classification"
-  if [[ "$(jq -r '.aiChange == true' <<<"$ai_classification")" == "true" ]] && dependencies_pass; then
+  ai_change="$(jq -r '.aiChange == true' <<<"$ai_classification")"
+  dependencies_ok=false
+  if [[ "$ai_change" == "true" ]]; then dependencies_pass; fi
+  if [[ "$ai_change" == "true" && "$dependencies_ok" == "true" ]]; then
     post_status success "machine checks passed (CI + review ledger; AI change, merges without human approval)"
     if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
       printf 'automerge=true\nkind=ai-change\nhead=%s\n' "$HEAD_SHA" >>"$GITHUB_OUTPUT"

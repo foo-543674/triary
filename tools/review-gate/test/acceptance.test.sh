@@ -25,6 +25,7 @@ esac
 FAKE
 cat >"$sandbox/bin/git" <<'FAKE'
 #!/usr/bin/env bash
+if [[ "${SCENARIO:-}" == fetched-head && "$*" == 'rev-parse refs/remotes/pr/head' ]]; then exit 7; fi
 case "$1" in
   fetch|diff) : ;;
   rev-parse|merge-base) echo head ;;
@@ -43,12 +44,16 @@ cat >"$sandbox/bin/jq" <<'FAKE'
 #!/usr/bin/env bash
 set -eu
 input="$(cat)"
+if [[ -n "${FAIL_JQ:-}" && "$*" == *"$FAIL_JQ"* ]]; then exit 7; fi
 case "$*" in
   '-r .head.sha') echo head ;;
   '-r .base.ref'|'-r .base.repo.default_branch') echo main ;;
   '-r .state') echo open ;;
   '-r .user.login') echo author ;;
-  *dependencyUpdate*|*dependabotAuthored*|*aiChange*) echo false ;;
+  *dependencyUpdate*) [[ "$SCENARIO" != dependency ]] && echo false || echo true ;;
+  *dependabotAuthored*) echo false ;;
+  *aiChange*) [[ "$SCENARIO" != ai ]] && echo false || echo true ;;
+  *'.ok == true'*) echo true ;;
   *'.reasons[]?'*) : ;;
   *workflow_runs*) [[ "$SCENARIO" == ci ]] || echo run ;;
   '-r .status') echo completed ;;
@@ -74,6 +79,12 @@ case "$2" in
     printf 'content-hash\thash\n' ;;
   *) exit 90 ;;
 esac
+FAKE
+real_awk="$(command -v awk)"
+cat >"$sandbox/bin/awk" <<FAKE
+#!/usr/bin/env bash
+if [[ -n "\${FAIL_AWK:-}" && "\$*" == *"\$FAIL_AWK"* ]]; then exit 7; fi
+exec "$real_awk" "\$@"
 FAKE
 chmod +x "$sandbox/bin/"*
 run() {
@@ -118,4 +129,27 @@ run missing 1
 contains output '[dry-run] status failure: decision: awaiting human decision: #99 (missing); next:'
 contains summary 'decision: awaiting human decision: #99 (missing); next:'
 absent output 'verifier error:'
+for filter in '.state' '.user.login' '.status' '.id' 'required[]' '.base.repo.default_branch' '.aiChange == true'; do
+  export FAIL_JQ="$filter"
+  run baseline 2
+  contains output '[dry-run] status failure: verifier error:'
+  absent output '[dry-run] status success:'
+done
+for scenario in dependency ai; do
+  export FAIL_JQ='.ok == true'
+  run "$scenario" 2
+  contains output '[dry-run] status failure: verifier error:'
+  absent output '[dry-run] status success:'
+done
+unset FAIL_JQ
+for filter in 'reason' 'decision' 'content-hash' 'print $1'; do
+  export FAIL_AWK="$filter"
+  run baseline 2
+  contains output '[dry-run] status failure: verifier error:'
+  absent output '[dry-run] status success:'
+done
+unset FAIL_AWK
+run fetched-head 2
+contains output '[dry-run] status failure: verifier error:'
+absent output '[dry-run] status success:'
 echo 'acceptance.test.sh: all scenarios passed'
