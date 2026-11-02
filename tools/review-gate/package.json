@@ -2,5 +2,5 @@
   "name": "triary-review-gate",
   "private": true,
   "type": "module",
-  "description": "Local review gate and remote acceptance verifier. Zero runtime dependencies; runs on Node 22 type stripping."
+  "description": "Classification steps of the remote acceptance verifier (run in CI and, for tests, in the dev image). Zero runtime dependencies; runs on Node 22 type stripping. The review gate itself is gate.sh (POSIX sh)."
 }

@@ -23,6 +23,9 @@ REQUIRED_JOBS='[
   "security / pnpm audit"
 ]'
 CLI=(node tools/review-gate/src/cli.ts)
+# The ledger verdict, hashes and snapshots: the same POSIX sh code the git
+# hooks use (gate.sh), so local and remote judge with one implementation.
+GATE=(sh tools/review-gate/gate.sh)
 
 pr_json="$(gh api "repos/$REPO/pulls/$PR")"
 HEAD_SHA="$(jq -r .head.sha <<<"$pr_json")"
@@ -85,8 +88,8 @@ if gh api "repos/$REPO/compare/$MERGE_BASE...$HEAD_SHA" >"$compare_file"; then
   dependabot_authored="$(jq -r 'if .dependabotAuthored == true then "true" else "false" end' <<<"$classification")"
   jq -r '.reasons[]? | "not a dependency update: " + .' <<<"$classification"
 fi
-DIFF_HASH="$("${CLI[@]}" range-hash --from "$MERGE_BASE" --to "$HEAD_SHA")"
-CONTRACT_VERSION="$("${CLI[@]}" contract-version --base HEAD)"
+DIFF_HASH="$("${GATE[@]}" range-hash --from "$MERGE_BASE" --to "$HEAD_SHA")"
+CONTRACT_VERSION="$("${GATE[@]}" contract-version --base HEAD)"
 
 reasons=()
 awaiting=()
@@ -134,22 +137,28 @@ fi
 # in step 0 (#43; extended to every Dependabot ecosystem by owner decision
 # 2026-11-01, provisional). No AI wrote it, so there is no AI review to bind.
 # Base files it touches (e.g. workflows) still need the code owner (step 4).
+# gate.sh accept prints reason / decision / content-hash lines (tab-separated)
+# and exits 1 when the snapshot fails the contract; anything else is a
+# verifier failure, never a pass.
+snapshot_lines=""
+snapshot_hash="none"
 if [[ "$dependabot_authored" == "true" ]]; then
   : >"$SNAPSHOT_FILE"
-  snapshot_verdict='{"ok":true,"reasons":[],"decisionRefs":[],"contentHash":null}'
   review_state="not required (Dependabot's own commits)"
 else
 gh api --paginate "repos/$REPO/issues/$PR/comments?per_page=100" |
   jq -rs --argjson allowed "$ALLOWED_SNAPSHOT_AUTHORS" '
     [.[][] | select((.user.login as $u | $allowed | index($u)) and (.body | contains("<!-- triary-review-snapshot -->")))]
     | sort_by(.created_at) | last | .body // ""' >"$SNAPSHOT_FILE"
-snapshot_verdict="$("${CLI[@]}" accept --snapshot-file "$SNAPSHOT_FILE" \
-  --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" --base-sha "$BASE_SHA" \
-  --merge-base "$MERGE_BASE" --diff-hash "$DIFF_HASH" --contract-version "$CONTRACT_VERSION" || true)"
-[[ -n "$snapshot_verdict" ]] || snapshot_verdict='{"ok":false,"reasons":["verifier produced no output"],"decisionRefs":[],"contentHash":null}'
-mapfile -t snapshot_reasons < <(jq -r '.reasons[]' <<<"$snapshot_verdict")
+accept_status=0
+snapshot_lines="$("${GATE[@]}" accept --snapshot-file "$SNAPSHOT_FILE" \
+  --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" \
+  --merge-base "$MERGE_BASE" --diff-hash "$DIFF_HASH" --contract-version "$CONTRACT_VERSION")" || accept_status=$?
+[[ "$accept_status" -le 1 ]] || snapshot_lines=$'reason\tthe snapshot verifier failed (gate.sh accept exit '"$accept_status"'); see the run log'
+mapfile -t snapshot_reasons < <(awk -F '\t' '$1 == "reason" { print $2 }' <<<"$snapshot_lines")
 [[ ${#snapshot_reasons[@]} -gt 0 ]] && reasons+=("${snapshot_reasons[@]/#/review }")
-review_state="$(jq -r 'if .ok then "passed" else "failed" end' <<<"$snapshot_verdict")"
+snapshot_hash="$(awk -F '\t' '$1 == "content-hash" { print $2 }' <<<"$snapshot_lines")"
+if [[ ${#snapshot_reasons[@]} -eq 0 ]]; then review_state="passed"; else review_state="failed"; fi
 fi
 
 # --- 3. no unresolved decision request this change depends on --------------------
@@ -162,7 +171,7 @@ while read -r ref; do
   fi
   state="$(gh api "repos/$REPO/issues/$number" -q .state 2>/dev/null || echo missing)"
   [[ "$state" == "closed" ]] || awaiting+=("#$number ($state)")
-done < <(jq -r '.decisionRefs[]' <<<"$snapshot_verdict")
+done < <(awk -F '\t' '$1 == "decision" { print $2 }' <<<"$snapshot_lines" | sort -u)
 [[ ${#awaiting[@]} -gt 0 ]] && reasons+=("awaiting human decision: ${awaiting[*]}")
 
 # --- 4. base files changed -> human approval required (enforced by the ruleset) ---
@@ -197,7 +206,7 @@ dependencies_pass() {
   echo "| item | result |"
   echo "|---|---|"
   echo "| deterministic gates (CI run on this SHA) | $ci_state |"
-  echo "| review ledger snapshot | $review_state (content hash: $(jq -r '.contentHash // "none"' <<<"$snapshot_verdict")) |"
+  echo "| review ledger snapshot | $review_state (content hash: ${snapshot_hash:-none}) |"
   echo "| awaiting human decision | ${awaiting[*]:-none} |"
   if [[ ${#base_changes[@]} -gt 0 ]]; then
     echo "| human approval / acceptance guarantee | **human confirmation required, no acceptance guarantee** (base files: ${base_changes[*]}) |"

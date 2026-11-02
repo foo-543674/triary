@@ -39,7 +39,7 @@ for dir in frontend/node_modules backend/target; do
   fi
 done
 
-echo "==> Installing frontend dependencies (needed by the git hooks)"
+echo "==> Installing frontend dependencies (for the editor; the git hooks install them themselves when missing)"
 # The image moves the pnpm store to /cache/pnpm-store, so a node_modules
 # installed from another store must be rebuilt. pnpm asks before doing that
 # and has no TTY here; confirm-modules-purge=false rebuilds without asking

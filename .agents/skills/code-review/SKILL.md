@@ -27,8 +27,8 @@ description: triary の変更を、プロジェクト固有の品質基準でレ
 1. **対象 diff とハッシュを取る**
    - `commit`: `git diff --cached`
    - `push`: `git fetch origin main` のあと `git diff $(git merge-base origin/main HEAD) HEAD`
-   - ハッシュ: `node tools/review-gate/src/cli.ts hash --scope <scope>`。このハッシュ以外の diff について記録しない
-2. **台帳を読む**: `node tools/review-gate/src/cli.ts show`。既存の指摘 (ID・状態・根拠) を把握する
+   - ハッシュ: `sh tools/review-gate/gate.sh hash --scope <scope>`。このハッシュ以外の diff について記録しない
+2. **台帳を読む**: `sh tools/review-gate/gate.sh show` (各指摘の現在の状態と、次の ID。履歴は `--all`)。既存の指摘 (ID・状態・根拠) を把握する
 3. **既存の指摘の解消確認から始める** (2 回目以降)
    - `fixed_unverified` は、渡された証拠と現在の diff で自分で確かめる。確かめられたら `resolved`、だめなら `open` (理由付き)
    - `resolved` / `rejected` の指摘が修正で再発していたら、同じ ID を新しい証拠付きで `open` に戻す
@@ -40,39 +40,31 @@ description: triary の変更を、プロジェクト固有の品質基準でレ
    - 新規指摘の由来を記録する: 前からあった見落とし (`pre_existing`) か、修正が生んだもの (`caused_by_fix`、元の指摘 ID 付き) か、不明か。確かさ (`confirmed` / `inferred` / `unknown`) を区別し、不明を推測で埋めない
    - 委任範囲では決められない指摘 (意図の衝突・権限の不足・許容できない不確実性) は `escalated` にする。判断依頼 (GitHub Issue、ラベル `needs-decision`) の番号を `decisionRef` に入れる。番号がまだなければ、依頼の文面を結果に含めて実装側に提出させ、番号が付いてから記録する。直せる欠陥をエスカレーションにしない
    - 同じカテゴリの指摘が 2 ラウンド続いたら、その観点で全件スイープして一度に出す
-6. **ラウンドを記録する**: 下記の JSON を一時ファイル (例: `<git-common-dir>/review-ledger/round.json`、`git rev-parse --git-common-dir` で場所を確かめる) に **ファイル書き込みツール (Claude Code なら Write)** で書き、`node tools/review-gate/src/cli.ts record --file <path>` を実行する
-   - シェルの heredoc では書かない。Bash の PreToolUse hook はコマンド文字列を走査するので、迂回フラグや台帳のパスを引用した証拠文がコマンドに入ると拒否される
-   - レビューを最後まで行えなかった (diff が読めない、ツールが失敗した等) ときは `"outputOk": false` で記録する。「指摘なし」と書かない
-   - `record` が拒否したら (diff が変わった、理由がない等)、原因を直してから記録し直す
+6. **ラウンドを記録する**: 下記の形式のファイル (例: `<git-common-dir>/review-ledger/round.tsv`、`git rev-parse --git-common-dir` で場所を確かめる) を **ファイル書き込みツール (Claude Code なら Write)** で書き、`sh tools/review-gate/gate.sh record --file <path>` を実行する
+   - シェルの heredoc やリダイレクトでは書かない (タブが崩れやすく、許可されていないコマンドとして確認で止まる)
+   - レビューを最後まで行えなかった (diff が読めない、ツールが失敗した等) ときは outputOk を `false` で記録する。「指摘なし」と書かない
+   - `record` が拒否したら (diff が変わった、理由がない、欄の数が違う等)、原因を直してから記録し直す。1 行でも拒否されればラウンド全体が記録されない
 7. **結果を返す** (下記「出力形式」)
 
-### ラウンドの JSON
+### ラウンドのファイル
 
-```json
-{
-  "diffHash": "<cli.ts hash の出力>",
-  "scope": "commit",
-  "reviewer": "code-reviewer",
-  "outputOk": true,
-  "newFindings": [
-    {
-      "id": "R7",
-      "severity": "critical",
-      "paths": ["backend/src/domain/session.rs"],
-      "basis": "AGENTS.md Layer rules: domain must not import sqlx",
-      "evidence": "backend/src/domain/session.rs:3 `use sqlx::Row;`",
-      "origin": { "kind": "caused_by_fix", "causedBy": "R3", "confidence": "confirmed" }
-    }
-  ],
-  "updates": [
-    { "id": "R3", "status": "resolved", "resolution": "import removed; architecture test now passes (cargo nextest run --test architecture)" }
-  ]
-}
+1 行に 1 レコード、欄は **タブ** で区切る (下の例の `<TAB>` は実際のタブ文字)。欄の中にタブと改行は書けない。値のない欄は `-`。`#` で始まる行と空行は無視する。
+
+```text
+round<TAB>commit<TAB><gate.sh hash の出力><TAB>true<TAB>code-reviewer
+new<TAB>F7<TAB>critical<TAB>backend/src/domain/session.rs<TAB>AGENTS.md Layer rules: domain must not import sqlx<TAB>backend/src/domain/session.rs:3 `use sqlx::Row;`<TAB>caused_by_fix/confirmed/F3
+update<TAB>F3<TAB>resolved<TAB>import removed; architecture test passes (cargo nextest run --test architecture)<TAB>-<TAB>-<TAB>-
 ```
 
-- `id` は台帳全体で一意 (`R` + 連番。`show` の最大値の次から)
+| 行 | 欄 (この順) |
+|---|---|
+| `round` (1 行目に 1 つだけ) | スコープ (`commit` / `push`)、diff ハッシュ、出力が正常か (`true` / `false`)、レビュー主体 |
+| `new` (新しい指摘) | ID、重大度 (`critical` / `important` / `minor`)、対象のパス (カンマ区切り)、根拠、証拠、由来 (`種別/確かさ[/元の指摘 ID]`。種別は `pre_existing` / `caused_by_fix` / `unknown`、確かさは `confirmed` / `inferred` / `unknown`。不明なら `-`) |
+| `update` (既存の指摘の更新) | ID、状態、処置の理由、新しい証拠、判断依頼 (`#123`)、重大度の変更。変えない欄は `-` |
+
+- `id` は台帳全体で一意 (`F` + 連番。`show` が次の ID を出す)。2026-11-01 より前の台帳の `R` 番号とは別物
 - `status` の値と、遷移に必要なもの (理由・新しい証拠、Critical に使えない状態) は `docs/review-contract.md`「ライフサイクル」に従う。`record` は規則に合わないラウンドを拒否する
-- `push` スコープでは `"base": "origin/main"` を付けてもよい (省略時も `origin/main`)
+- `push` スコープの base は `origin/main`。別の base なら `record --base <ref>`
 
 ## 動作原則
 
@@ -185,7 +177,7 @@ description: triary の変更を、プロジェクト固有の品質基準でレ
 - R9 → #<issue> <判断を求める内容>
 
 ### 台帳の状態
-<cli.ts check --scope <scope> の結果 (通るか、止まる理由)>
+<gate.sh check --scope <scope> の結果 (通るか、止まる理由)>
 ```
 
 該当なしのセクションは省略する。Critical がなければ「Critical: 該当なし」と書く。

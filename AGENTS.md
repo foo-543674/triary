@@ -173,8 +173,8 @@ The remote does not review again. After pushing, post the review ledger
 snapshot to the PR as a comment:
 
 ```bash
-node tools/review-gate/src/cli.ts snapshot --pr <number> [--decisions "#12,#15"] > /tmp/snapshot.md
-gh pr comment <number> --body-file /tmp/snapshot.md
+sh tools/review-gate/gate.sh snapshot --pr <number> [--decisions "#12,#15"] --output .git/review-ledger/snapshot.md
+gh pr comment <number> --body-file .git/review-ledger/snapshot.md
 ```
 
 `--decisions` lists the unresolved decision requests this change depends on.
@@ -418,11 +418,16 @@ the `./dev` entrypoint at the repository root (`../dev` from `backend/` or
 toolchain on your machine or the AI's box to work around a failing `./dev`;
 fix the entrypoint or the image instead. Do not run the toolchains directly
 either, even where they happen to be installed; `.claude/settings.json`
-denies them and allows `./dev` / `../dev` instead. The one exception is the caller's
-Node 22, which runs the review gate (`node tools/review-gate/src/cli.ts`) and
-the tests of the gate and of `./dev` (`make gate-test` / `make dev-test`),
-because those must work wherever git and `./dev` run. Why:
+denies them and allows `./dev` / `../dev` instead. Why:
 `.contexts/bootstrap-decisions.md` "2026-10-31 再実行 (3.0.1)".
+
+What handles the repository itself (the git hooks, the Claude Code hooks, the
+review gate `tools/review-gate/gate.sh` and its tests) needs only git and a
+POSIX shell, so a bare clone can commit and push with docker or podman as the
+only extra; nothing there may require Node, Python, jq or the project's
+languages. Gates prepare what they need (e.g. the frontend dependencies)
+instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
+"2026-11-01 再実行 (3.1.0)".
 
 | Command | Purpose |
 |---|---|
@@ -437,18 +442,18 @@ because those must work wherever git and `./dev` run. Why:
 | `cd backend && ../dev cargo nextest run` | Rust unit + architecture tests |
 | `cd backend && ../dev cargo clippy --all-targets` | Rust lint |
 | `cd backend && ../dev cargo fmt --all` | Rust format |
-| `cd frontend && ../dev pnpm install` | Install frontend dependencies (needed before the frontend checks and the hooks) |
+| `cd frontend && ../dev pnpm install` | Install frontend dependencies (needed before the `pnpm run` commands below; the hooks install them themselves) |
 | `cd frontend && ../dev pnpm run lint:ci` | Biome lint + format check |
 | `cd frontend && ../dev pnpm run typecheck` | TypeScript type check |
 | `cd frontend && ../dev pnpm run test:run` | Frontend unit tests |
 | `cd frontend && ../dev pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
 | `make arch-test` | Architecture tests for both backend and frontend |
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
-| `make gate-test` | Type-check and test the review gate tool |
-| `make dev-test` | Type-check and test the `./dev` entrypoint |
+| `make gate-test` | Test the review gate (git + sh) and the remote verifier's TypeScript (in the dev image) |
+| `make dev-test` | Type-check and test the `./dev` entrypoint (in the dev image) |
 | `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
-| `node tools/review-gate/src/cli.ts check --scope commit` | Ask the review gate whether the staged diff may be committed |
+| `sh tools/review-gate/gate.sh check --scope commit` | Ask the review gate whether the staged diff may be committed |
 | `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
 
 ## devcontainer and local infra

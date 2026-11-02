@@ -14,10 +14,13 @@ endif
 COMPOSE := docker compose
 
 # Language commands run in the dev image through ./dev (tools/dev-image/);
-# they are not installed on the calling machine. The review gate's and
-# ./dev's own tests are the exception and run on the caller's Node 22
-# (.contexts/bootstrap-decisions.md "2026-10-31 再実行 (3.0.1)").
+# they are not installed on the calling machine. The review gate
+# (tools/review-gate/gate.sh) and its tests need only git and a POSIX shell
+# (.contexts/bootstrap-decisions.md "2026-11-01 再実行 (3.1.0)").
 DEV := $(CURDIR)/dev
+# Installs the frontend dependencies the type checks below borrow tsc from;
+# a no-op when node_modules is current.
+FRONTEND_DEPS := (cd frontend && pnpm install --frozen-lockfile --prefer-offline --reporter=silent --config.confirmModulesPurge=false)
 
 .PHONY: help
 help: ## List available commands
@@ -94,16 +97,19 @@ arch-test: ## Run architecture tests for both backend and frontend
 
 # ---------- Review gate ----------
 
+.PHONY: ledger-migrate
+ledger-migrate: ## Migrate the legacy JSON review ledger to TSV
+	"$(DEV)" node tools/review-gate/src/migrate-ledger.ts
+
 .PHONY: hooks-install
 hooks-install: ## Enable the git hooks in .githooks/ (review gate, see AGENTS.md)
 	git config core.hooksPath .githooks
 
 .PHONY: gate-test
-gate-test: ## Type-check and test the review gate tool (tools/review-gate/)
-	"$(DEV)" frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json
-	node --test tools/review-gate/test/*.test.ts
+gate-test: ## Test the review gate (on this machine) and the remote verifier's TypeScript (in the dev image)
+	sh tools/review-gate/test/gate.test.sh
+	"$(DEV)" bash -c '$(FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json && node --test --test-reporter=dot tools/review-gate/test/*.test.ts'
 
 .PHONY: dev-test
-dev-test: ## Type-check and test the ./dev entrypoint (tools/dev-image/)
-	"$(DEV)" frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json
-	node --test tools/dev-image/test/*.test.ts
+dev-test: ## Type-check and test the ./dev entrypoint (tools/dev-image/) in the dev image
+	"$(DEV)" bash -c '$(FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json && node --test --test-reporter=dot tools/dev-image/test/*.test.ts'
