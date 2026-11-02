@@ -6,7 +6,7 @@
 # Inputs (env): GH_TOKEN, REPO (owner/name), PR (number), RUN_URL,
 #               SNAPSHOT_FILE (where to store the snapshot used),
 #               GITHUB_STEP_SUMMARY, DRY_RUN=1 (print statuses instead of posting).
-set -euo pipefail
+set -Eeuo pipefail
 
 STATUS_CONTEXT="acceptance / verdict"
 ALLOWED_SNAPSHOT_AUTHORS='["foo-543674-ai-agent[bot]","foo-543674"]'
@@ -27,29 +27,47 @@ CLI=(node tools/review-gate/src/cli.ts)
 # hooks use (gate.sh), so local and remote judge with one implementation.
 GATE=(sh tools/review-gate/gate.sh)
 
-pr_json="$(gh api "repos/$REPO/pulls/$PR")"
-HEAD_SHA="$(jq -r .head.sha <<<"$pr_json")"
-BASE_REF="$(jq -r .base.ref <<<"$pr_json")"
-
 post_status() {
   local state="$1" description="$2"
   if [[ "${DRY_RUN:-}" == "1" ]]; then
-    echo "[dry-run] status $state: ${description:0:139}"
+    echo "[dry-run] status $state: ${description:0:140}"
     return
   fi
   gh api -X POST "repos/$REPO/statuses/$HEAD_SHA" \
     -f state="$state" -f context="$STATUS_CONTEXT" \
-    -f description="${description:0:139}" -f target_url="$RUN_URL" >/dev/null
+    -f description="${description:0:140}" -f target_url="$RUN_URL" >/dev/null
 }
+
+verifier_warning() {
+  local message="verifier warning: $1; treated as $2; next: inspect the run log ($RUN_URL)"
+  echo "$message" >&2
+  printf '\n%s\n' "$message" >>"$GITHUB_STEP_SUMMARY"
+}
+
+verifier_error() {
+  trap - ERR
+  local message="verifier error: $*; next: inspect the run log ($RUN_URL), repair the verifier or API access, then re-run"
+  echo "$message" >&2
+  printf '\n### verifier error\n\n%s\n' "$message" >>"$GITHUB_STEP_SUMMARY" || true
+  if [[ -n "${HEAD_SHA:-}" ]]; then
+    post_status failure "$message" || true
+  fi
+  exit 2
+}
+
+# DO NOT REMOVE OR WEAKEN: an unexpected error must end as a failing status,
+# never as a silently missing or pending one. Before HEAD is known, the run
+# log and summary report the error; no commit status can be addressed yet.
+trap 'verifier_error "unexpected command failure (exit $?) at line $LINENO"' ERR
+
+pr_json="$(gh api "repos/$REPO/pulls/$PR")"
+HEAD_SHA="$(jq -r .head.sha <<<"$pr_json")"
+BASE_REF="$(jq -r .base.ref <<<"$pr_json")"
 
 if [[ "$(jq -r .state <<<"$pr_json")" != "open" ]]; then
   echo "PR #$PR is not open; nothing to judge."
   exit 0
 fi
-
-# DO NOT REMOVE OR WEAKEN: an unexpected error must end as a failing status,
-# never as a silently missing or pending one.
-trap 'post_status failure "verifier error; see the run log" || true' ERR
 
 post_status pending "verifying"
 
@@ -62,11 +80,13 @@ BASE_SHA="$(git rev-parse "origin/$BASE_REF")"
   exit 0
 }
 MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
-mapfile -t changed < <(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" \
-  -q '.[] | .filename, (.previous_filename // empty)')
+changed_lines="$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" \
+  -q '.[] | .filename, (.previous_filename // empty)')"
+mapfile -t changed <<<"$changed_lines"
 # Files the change adds, from the judged range itself (step 5: a new screen
 # waits for the owner's look).
-mapfile -t added < <(git diff --name-only --diff-filter=A "$MERGE_BASE" "$HEAD_SHA")
+added_lines="$(git diff --name-only --diff-filter=A "$MERGE_BASE" "$HEAD_SHA")"
+mapfile -t added <<<"$added_lines"
 
 # --- 0. is this a dependency update that needs no review ledger? -------------------
 # Dependency updates that merge without human approval (#43, owner decision;
@@ -83,10 +103,15 @@ dependency_update=false
 dependabot_authored=false
 if gh api "repos/$REPO/compare/$MERGE_BASE...$HEAD_SHA" >"$compare_file"; then
   classification="$("${CLI[@]}" classify-dependency --pr-author "$(jq -r .user.login <<<"$pr_json")" \
-    --head "$HEAD_SHA" --compare-file "$compare_file" || echo '{}')"
+    --head "$HEAD_SHA" --compare-file "$compare_file" || {
+      verifier_warning "classify-dependency failed" "not a dependency update (normal path with a review ledger)"
+      echo '{}'
+    })"
   dependency_update="$(jq -r 'if .dependencyUpdate == true then "true" else "false" end' <<<"$classification")"
   dependabot_authored="$(jq -r 'if .dependabotAuthored == true then "true" else "false" end' <<<"$classification")"
   jq -r '.reasons[]? | "not a dependency update: " + .' <<<"$classification"
+else
+  verifier_warning "compare API request failed" "not a dependency update (normal path with a review ledger)"
 fi
 DIFF_HASH="$("${GATE[@]}" range-hash --from "$MERGE_BASE" --to "$HEAD_SHA")"
 CONTRACT_VERSION="$("${GATE[@]}" contract-version --base HEAD)"
@@ -103,7 +128,7 @@ ci_run="$(gh api "repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=pull_request
     | sort_by(.run_number) | last // empty')"
 ci_state="missing"
 if [[ -z "$ci_run" ]]; then
-  reasons+=("CI has not run for $HEAD_SHA")
+  reasons+=("CI: no run for $HEAD_SHA; next: run CI for this HEAD and wait for completion")
 elif [[ "$(jq -r .status <<<"$ci_run")" != "completed" ]]; then
   post_status pending "waiting for CI to complete on ${HEAD_SHA:0:7}"
   echo "CI still running; the workflow_run trigger will re-run this verifier."
@@ -127,7 +152,9 @@ else
     ci_state="passed"
   else
     ci_state="failed"
-    reasons+=("${bad_jobs[@]/#/CI }")
+    for job in "${bad_jobs[@]}"; do
+      reasons+=("CI: $job; next: fix or re-run the required job and wait for CI success")
+    done
   fi
 fi
 
@@ -154,9 +181,9 @@ accept_status=0
 snapshot_lines="$("${GATE[@]}" accept --snapshot-file "$SNAPSHOT_FILE" \
   --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" \
   --merge-base "$MERGE_BASE" --diff-hash "$DIFF_HASH" --contract-version "$CONTRACT_VERSION")" || accept_status=$?
-[[ "$accept_status" -le 1 ]] || snapshot_lines=$'reason\tthe snapshot verifier failed (gate.sh accept exit '"$accept_status"'); see the run log'
+[[ "$accept_status" -le 1 ]] || verifier_error "gate.sh accept exited $accept_status"
 mapfile -t snapshot_reasons < <(awk -F '\t' '$1 == "reason" { print $2 }' <<<"$snapshot_lines")
-[[ ${#snapshot_reasons[@]} -gt 0 ]] && reasons+=("${snapshot_reasons[@]/#/review }")
+[[ ${#snapshot_reasons[@]} -gt 0 ]] && reasons+=("${snapshot_reasons[@]/#/review snapshot: }")
 snapshot_hash="$(awk -F '\t' '$1 == "content-hash" { print $2 }' <<<"$snapshot_lines")"
 if [[ ${#snapshot_reasons[@]} -eq 0 ]]; then review_state="passed"; else review_state="failed"; fi
 fi
@@ -166,13 +193,13 @@ while read -r ref; do
   [[ -z "$ref" ]] && continue
   number="${ref#\#}"
   if ! [[ "$number" =~ ^[0-9]+$ ]]; then
-    reasons+=("decision reference $ref is not an issue number")
+    reasons+=("decision: reference $ref is not an issue number; next: correct the reference and post a fresh snapshot with gate.sh snapshot")
     continue
   fi
   state="$(gh api "repos/$REPO/issues/$number" -q .state 2>/dev/null || echo missing)"
   [[ "$state" == "closed" ]] || awaiting+=("#$number ($state)")
 done < <(awk -F '\t' '$1 == "decision" { print $2 }' <<<"$snapshot_lines" | sort -u)
-[[ ${#awaiting[@]} -gt 0 ]] && reasons+=("awaiting human decision: ${awaiting[*]}")
+[[ ${#awaiting[@]} -gt 0 ]] && reasons+=("decision: awaiting human decision: ${awaiting[*]}; next: answer and close these decision issues, then re-run the verifier")
 
 # --- 4. base files changed -> human approval required (enforced by the ruleset) ---
 mapfile -t owned_patterns < <(grep -Ev '^\s*(#|$)' .github/CODEOWNERS | awk '{print $1}')
@@ -194,7 +221,10 @@ done
 # npm registry. DO NOT REMOVE OR WEAKEN: any failure means "a human merges".
 dependencies_pass() {
   local result
-  result="$("${CLI[@]}" check-dependencies --from "$MERGE_BASE" --to "$HEAD_SHA" || echo '{}')"
+  result="$("${CLI[@]}" check-dependencies --from "$MERGE_BASE" --to "$HEAD_SHA" || {
+    verifier_warning "check-dependencies failed" "a human merges"
+    echo '{}'
+  })"
   jq -r '.reasons[]? | "not merged without approval: " + .' <<<"$result"
   [[ "$(jq -r '.ok == true' <<<"$result")" == "true" ]]
 }
@@ -210,6 +240,7 @@ dependencies_pass() {
   echo "| awaiting human decision | ${awaiting[*]:-none} |"
   if [[ ${#base_changes[@]} -gt 0 ]]; then
     echo "| human approval / acceptance guarantee | **human confirmation required, no acceptance guarantee** (base files: ${base_changes[*]}) |"
+    echo "| base files: next action | request code owner approval for the current HEAD; approval is enforced by the ruleset |"
   else
     echo "| human approval / acceptance guarantee | not judged here; see the ruleset (docs/remote-acceptance.md) |"
   fi
@@ -259,11 +290,17 @@ else
   # Who last put the ui-reviewed label on the PR: only the owner's counts.
   ui_reviewed_by="$(gh api --paginate "repos/$REPO/issues/$PR/events?per_page=100" \
     -q '[.[] | select(.event == "labeled" and .label.name == "ui-reviewed") | .actor.login] | last // empty' \
-    2>/dev/null | tail -n 1 || true)"
+    2>/dev/null | tail -n 1 || {
+      verifier_warning "ui-reviewed events lookup failed" "no verified ui-reviewed actor (a human approves and merges when UI review is required)"
+      true
+    })"
   ai_classification="$("${CLI[@]}" classify-ai-change --pr-file "$pr_file" --changed-file "$changed_file" \
     --added-file "$added_file" --ui-reviewed-by "$ui_reviewed_by" \
     --default-branch "$(jq -r .base.repo.default_branch <<<"$pr_json")" \
-    --base-files "$(IFS=,; echo "${base_changes[*]}")" || echo '{}')"
+    --base-files "$(IFS=,; echo "${base_changes[*]}")" || {
+      verifier_warning "classify-ai-change failed" "not this class (a human approves and merges)"
+      echo '{}'
+    })"
   jq -r '.reasons[]? | "not an AI change that merges without approval: " + .' <<<"$ai_classification"
   if [[ "$(jq -r '.aiChange == true' <<<"$ai_classification")" == "true" ]] && dependencies_pass; then
     post_status success "machine checks passed (CI + review ledger; AI change, merges without human approval)"

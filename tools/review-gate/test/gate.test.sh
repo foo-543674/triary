@@ -170,6 +170,7 @@ accept() {
 }
 expect 1 "case 4: acceptance waits for the decision" accept "$TMP/snapshot.md"
 contains "case 4 acceptance" "F1 awaits a human decision (#7)"
+contains "decision next action" "next: answer and close the referenced decision issue"
 contains "decisions are listed" "decision$TAB#3"
 contains "awaited decisions are listed" "decision$TAB#7"
 
@@ -181,8 +182,10 @@ grep -q "^finding$TAB" "$TMP/snapshot.md" && ng "resolved findings are left out 
 sed "s/^pr${TAB}5\$/pr${TAB}6/" "$TMP/snapshot.md" >"$TMP/edited.md"
 expect 1 "an edited snapshot is rejected" accept "$TMP/edited.md"
 contains "edited" "content hash mismatch"
+contains "edited next action" "post a fresh snapshot with gate.sh snapshot after the last push"
 expect 1 "no snapshot is rejected" accept /dev/null
 contains "no snapshot" "no review ledger snapshot found"
+contains "missing next action" "have the current diff reviewed"
 tr -d '\r' <"$TMP/snapshot.md" | sed 's/$/\r/' >"$TMP/crlf.md"
 expect 0 "a snapshot with CRLF line ends (as GitHub may return it) is accepted" accept "$TMP/crlf.md"
 
@@ -190,6 +193,7 @@ printf 'five\n' >>a.txt
 git commit -q -am more
 expect 1 "a snapshot for an older head is rejected" accept "$TMP/snapshot.md"
 contains "stale head" "snapshot head is"
+contains "stale next action" "post a fresh snapshot with gate.sh snapshot after the last push"
 
 # ---- git hooks: the index git commits is what is checked ------------------------------
 

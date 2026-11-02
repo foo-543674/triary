@@ -418,7 +418,14 @@ inside { print }' "$snapshot_file" >"$body"
   rm -f "$body"
   printf 'content-hash\t%s\n' "${claimed:-none}"
   [ -z "$reasons" ] && return 0
-  printf '%s\n' "$reasons"
+  printf '%s\n' "$reasons" | while IFS= read -r reason; do
+    case "$reason" in
+      *'awaits a human decision'*)
+        printf '%s; next: answer and close the referenced decision issue, apply the ruling, and post a fresh snapshot with gate.sh snapshot after the last push\n' "$reason" ;;
+      *)
+        printf '%s; next: resolve any listed review findings, have the current diff reviewed, and post a fresh snapshot with gate.sh snapshot after the last push\n' "$reason" ;;
+    esac
+  done
   exit 1
 }
 

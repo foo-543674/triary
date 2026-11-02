@@ -51,6 +51,7 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 - base が進んだ場合は、ruleset の「マージ前にブランチを最新にする」(`strict_required_status_checks_policy`) で HEAD の更新を強制し、新しい HEAD で再検証させる。HEAD が同じで base だけ進んだ古い成功は使えない。契約や検証器が変わった場合も、スナップショットの `contractVersion` が base 側の版と合わなくなるので不合格になる
 - 判断依頼の Issue を閉じても自動では再判定しない。`workflow_dispatch` (入力: PR 番号) か、スナップショットの再提出で再判定する
 - 判定ステップには `# DO NOT REMOVE OR WEAKEN:` で存在意義を書き残す
+- 不合格の出力は条件名 (CI / review snapshot / decision)、検出内容、次の行動を示す。commit status には最初の理由を最大 140 文字で載せ、job summary には全理由と次の行動を載せる。基準ファイル変更時も code owner 承認が必要な旨と次の行動を示す (承認の強制は ruleset 側)。保護コメントで定めたフォールバックの発動時は判定経路を維持し、失敗内容・フォールバックの意味・実行ログへのリンクを **verifier warning** として stderr と job summary に残す。それ以外の予期しないコマンド失敗・API 失敗・`gate.sh accept` の終了値が 1 を超える場合は、条件違反とは別に **verifier error** と表示し、実行ログの確認と修復・再実行を案内する。HEAD 取得前の故障は status を発行できないため、実行ログと job summary に残す。
 
 ## 証跡の提出と対応付け
 
