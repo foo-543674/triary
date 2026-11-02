@@ -517,6 +517,11 @@ languages. Gates prepare what they need (e.g. the frontend dependencies)
 instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 "2026-11-01 再実行 (3.1.0)".
 
+"(in `backend/`)" means: run it from that directory, changing into it with
+its own `cd` call first, not chained with `&&` ("How to run commands").
+`./dev bash -c '...'` below is one command for the allow rules; chaining
+inside it is fine.
+
 | Command | Purpose |
 |---|---|
 | `make help` | List available make targets |
@@ -527,14 +532,14 @@ instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 | `make db-migrate-test` | Apply migrations to the test DB |
 | `make db-prepare` | Regenerate sqlx offline metadata |
 | `make api-generate` | Regenerate frontend types from OpenAPI |
-| `cd backend && ../dev cargo nextest run` | Rust unit + architecture tests |
-| `cd backend && ../dev cargo clippy --all-targets` | Rust lint |
-| `cd backend && ../dev cargo fmt --all` | Rust format |
-| `cd frontend && ../dev pnpm install` | Install frontend dependencies (needed before the `pnpm run` commands below; the hooks install them themselves) |
-| `cd frontend && ../dev pnpm run lint:ci` | Biome lint + format check |
-| `cd frontend && ../dev pnpm run typecheck` | TypeScript type check |
-| `cd frontend && ../dev pnpm run test:run` | Frontend unit tests |
-| `cd frontend && ../dev pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
+| `../dev cargo nextest run` (in `backend/`) | Rust unit + architecture tests |
+| `../dev cargo clippy --all-targets` (in `backend/`) | Rust lint |
+| `../dev cargo fmt --all` (in `backend/`) | Rust format |
+| `../dev pnpm install` (in `frontend/`) | Install frontend dependencies (needed before the `pnpm run` commands below; the hooks install them themselves) |
+| `../dev pnpm run lint:ci` (in `frontend/`) | Biome lint + format check |
+| `../dev pnpm run typecheck` (in `frontend/`) | TypeScript type check |
+| `../dev pnpm run test:run` (in `frontend/`) | Frontend unit tests |
+| `../dev pnpm run arch:test` (in `frontend/`) | Frontend architecture tests (dependency-cruiser) |
 | `make arch-test` | Architecture tests for both backend and frontend |
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Test the review gate (git + sh) and the remote verifier's TypeScript (in the dev image) |
@@ -542,7 +547,7 @@ instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 | `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `sh tools/review-gate/gate.sh check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
+| `../dev pnpm run dev` (in `frontend/`) | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
 
 ## devcontainer and local infra
 
