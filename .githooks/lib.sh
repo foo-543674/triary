@@ -48,11 +48,22 @@ run_frontend_tests() {
 
 # The gate itself is tested on this machine (git + sh); the remote verifier's
 # TypeScript parts are type-checked and tested in the dev image.
-run_review_gate_selftest() {
+run_review_gate_selftest() (
+  clear_selftest_git_env
   sh "$REPO_ROOT/tools/review-gate/test/gate.test.sh" &&
     (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json && node --test --test-reporter=dot tools/review-gate/test/*.test.ts")
-}
+)
 
-run_dev_selftest() {
+run_dev_selftest() (
+  clear_selftest_git_env
   (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json && node --test --test-reporter=dot tools/dev-image/test/*.test.ts")
+)
+
+# Use only in self-test subshells: the hook's gate commands need Git's selectors.
+# ./dev's container allowlist excludes GIT_*, but its direct mode inherits them.
+clear_selftest_git_env() {
+  for selftest_git_env in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    unset "$selftest_git_env"
+  done
+  unset selftest_git_env
 }
