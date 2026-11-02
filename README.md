@@ -81,6 +81,25 @@ How the two servers find each other depends on how `./dev` runs commands
   reports that the name `triary-backend` is in use while no backend runs, a
   killed run left the container behind: `docker rm -f triary-backend`.
 
+  If the browser connects but never gets a page: on the owner's WSL
+  (2026-11-01) a port docker published on `127.0.0.1` accepted the
+  connection but never answered, while MySQL published on `0.0.0.0` worked.
+  Add `TRIARY_DEV_PUBLISH_ADDRESS=0.0.0.0` to `.env` and restart
+  `make run-frontend` (NOTE: not yet observed to fix it; that is what the
+  check below is for). This publishes port 3000 on every interface of the
+  machine docker runs on, so other machines on your network may reach it
+  unless a firewall stops them; leave it unset where `127.0.0.1` works.
+  To tell where it stops, run from Windows (`curl.exe`) and from WSL:
+
+  ```sh
+  curl --noproxy '*' -4 -v --max-time 5 http://localhost:3000/
+  curl --noproxy '*' -4 -v --max-time 5 http://localhost:3000/health
+  ```
+
+  If `/` does not answer either, check that `make run-frontend` is still
+  running and printed its URL, then suspect the published port; if `/`
+  answers but `/health` fails, look at the backend or the proxy.
+
 Language commands (cargo, pnpm, npx, ...) go through `./dev`, which runs them
 in the dev image (`tools/dev-image/Dockerfile`). Inside the devcontainer it
 runs them directly; elsewhere it uses podman or docker. Do not install the

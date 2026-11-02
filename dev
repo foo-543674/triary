@@ -36,6 +36,8 @@
 #                         on the owner's WSL: a port published on 127.0.0.1
 #                         accepted TCP from Windows but never answered HTTP,
 #                         while MySQL published on 0.0.0.0 was reachable.
+#                         NOTE: unverified that 0.0.0.0 makes the dev server
+#                         answer there; check with README "Setup" (curl).
 #   TRIARY_DEV_NAME       docker only: container name, so another ./dev
 #                         container on triary-network can reach it by name
 
