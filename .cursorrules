@@ -74,8 +74,12 @@ guide. This file is the always-on context Cursor should respect.
   `# DO NOT REMOVE OR WEAKEN:`.
 - Rules: `docs/review-contract.md`. Remote acceptance (ledger snapshot on the
   PR, `acceptance / verdict` status): `docs/remote-acceptance.md`.
-- Decisions you cannot make go to GitHub Issues labelled `needs-decision`;
-  keep working on what does not depend on them.
+- Decisions you cannot make go to GitHub Issues labelled `needs-decision`
+  (say why you stopped and what to weigh); keep working on what does not
+  depend on them.
+- Stack a PR on another only when its content depends on it. Ask for approval
+  only on PRs whose checks all passed and that can be judged on their own;
+  details: `AGENTS.md` "Opening PRs and asking for approval".
 
 ## Natural language
 

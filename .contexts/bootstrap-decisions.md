@@ -579,7 +579,7 @@ Phase 2 で新たに聞いたことはない。新しい原料が Phase 2 に足
 | 入口 (`./dev`) を POSIX シェルで書く | プラグイン側 | 採用予定。`dev` は bash (配列、`${!name}`) で書かれている。PR #92 が `dev` を変更中なので、その上に積む別の PR にする | `dev` |
 | ai-box を前提にした記述を除く | プラグイン側 | 採用予定 (別の PR)。`AGENTS.md` の `./dev` の説明、`dev` と Dockerfile のコメントが ai-box を前提にしている | `AGENTS.md`、`dev`、`tools/dev-image/Dockerfile` |
 | タスクランナーと手順書も入口を通す | プラグイン側 | 確認だけ。`Makefile`・`frontend/package.json` の scripts・`README.md`・devcontainer を検索し、すべて入口経由 (`package.json` の scripts は `./dev pnpm run` から呼ばれる) | — |
-| PR の出し方と承認の依頼、コマンドの実行の仕方、判断依頼の理由と観点、人間との往復 | プラグイン側。オーナーのメモリーにも同じ向きの指示がある (不要な PR の積み上げをしない、1 回に 1 コマンド) | 採用予定 (別の PR) | `AGENTS.md`、派生ファイル、`docs/review-contract.md` |
+| PR の出し方と承認の依頼、コマンドの実行の仕方、判断依頼の理由と観点、人間との往復 | プラグイン側。オーナーのメモリーにも同じ向きの指示がある (不要な PR の積み上げをしない、1 回に 1 コマンド) | 採用 (提案中、ブランチ `chore/agents-process`)。AGENTS.md に「Opening PRs and asking for approval」「How to run commands」を足し、「Asking for decisions」に止める前の確認・往復の設計・判断依頼の理由と観点・Draft の扱いを足した。承認が要る変更と要らない変更を 1 つの PR に混ぜない、も足した。以前の「マージ待ちの PR の上に次の作業を積む」は、中身が依存するときだけに改めた | `AGENTS.md`、派生ファイル、`docs/review-contract.md` |
 | 受け入れ判定の不合格の説明 (どの条件・なぜ・何をすれば通るか、検証経路の故障の区別) | プラグイン側 | 採用予定 (別の PR)。`acceptance.sh` はこの PR でも変えるので、その上に積む | `tools/review-gate/acceptance.sh` |
 | 混在するファイル | プラグイン側 | 確認だけ。`frontend/package.json` と `backend/Cargo.toml` は CODEOWNERS に載せず、検証器が区画ごとに判定している (`manifest.ts`、`docs/remote-acceptance.md` 手順 6) | — |
 | 時間の条件は仕組みが持つ | プラグイン側 | 確認だけ。Dependabot の `cooldown` (7 日 / major 14 日) と検証器の公開日の確認 (`release-age.ts`) が持っている | — |
