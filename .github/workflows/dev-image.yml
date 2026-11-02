@@ -2,7 +2,7 @@ name: dev-image
 
 # Builds the dev image (tools/dev-image/Dockerfile) that ./dev runs every
 # language command in, proves the project's checks pass inside it, and
-# publishes it to GHCR from main. The tag comes from `./dev --image-ref`
+# publishes it to GHCR from main. The tag comes from `sh .github/actions/dev-image/image-ref.sh`
 # (content hash of the Dockerfile), so a checkout always pulls the image
 # built from its own Dockerfile.
 #
@@ -18,12 +18,14 @@ on:
       - dev
       - tools/dev-image/**
       - .github/workflows/dev-image.yml
+      - .github/actions/dev-image/**
   push:
     branches: [main]
     paths:
       - dev
       - tools/dev-image/**
       - .github/workflows/dev-image.yml
+      - .github/actions/dev-image/**
   workflow_dispatch:
 
 concurrency:
@@ -55,7 +57,7 @@ jobs:
 
       - name: Resolve image reference
         id: ref
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Build
         env:
@@ -118,7 +120,7 @@ jobs:
 
       - name: Resolve image reference
         id: ref
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         env:

@@ -8,16 +8,13 @@
 /CLAUDE.md                        @foo-543674
 /GEMINI.md                        @foo-543674
 /.cursorrules                     @foo-543674
-/Makefile                         @foo-543674
 /docs/review-contract.md          @foo-543674
 /docs/remote-acceptance.md        @foo-543674
 /docs/rulesets/                   @foo-543674
 /.agents/                         @foo-543674
 /.claude/                         @foo-543674
 /.githooks/                       @foo-543674
-/.devcontainer/                   @foo-543674
 /tools/review-gate/               @foo-543674
-/dev                              @foo-543674
 /tools/dev-image/                 @foo-543674
 /backend/tests/architecture.rs    @foo-543674
 /backend/tests/dependency_ledger.rs @foo-543674
@@ -34,5 +31,5 @@
 # keeps the AI's changes to them out of approval-free merging instead.
 /frontend/biome.json              @foo-543674
 /frontend/tsconfig.json           @foo-543674
-/frontend/vite.config.ts          @foo-543674
+/frontend/vitest.config.ts        @foo-543674
 /frontend/.storybook/             @foo-543674

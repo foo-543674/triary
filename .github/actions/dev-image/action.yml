@@ -1,7 +1,7 @@
 name: dev image
 description: >-
-  Make the dev image of this checkout (`./dev --image-ref`) available to
-  ./dev: pull it from GHCR, or build it from tools/dev-image/Dockerfile when
+  Make the dev image of this checkout (resolved by image-ref.sh) available to
+  run.sh: pull it from GHCR, or build it from tools/dev-image/Dockerfile when
   it is not published yet (the Dockerfile changed on this branch; images are
   published only from main by .github/workflows/dev-image.yml).
 
@@ -10,12 +10,12 @@ runs:
   steps:
     - name: Pull or build the dev image
       shell: bash
-      # ./dev and tools/dev-image are relative to the repository root; do not
+      # Image scripts and tools/dev-image are relative to the repository root; do not
       # depend on whether the caller job's defaults.run.working-directory
       # reaches composite steps.
       working-directory: ${{ github.workspace }}
       run: |
-        ref="$(./dev --image-ref)"
+        ref="$(sh .github/actions/dev-image/image-ref.sh)"
         if docker pull --quiet "$ref"; then
           exit 0
         fi

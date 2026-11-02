@@ -7,7 +7,7 @@ name: typescript-7-watch
 # job tries it: install the latest TypeScript 7 into the main branch's
 # frontend and run the checks that broke. When they all pass, it opens an
 # issue asking to drop the ignore entry. Commands run in the dev image
-# through ./dev (AGENTS.md "Common commands").
+# through .github/actions/dev-image/run.sh.
 
 on:
   schedule:
@@ -24,9 +24,6 @@ concurrency:
 permissions:
   contents: read
   issues: write
-
-env:
-  TRIARY_DEV_ENGINE: docker
 
 jobs:
   try:
@@ -45,7 +42,7 @@ jobs:
       - name: install dependencies with the latest TypeScript 7
         working-directory: frontend
         run: |
-          ../dev bash -c '
+          sh ../.github/actions/dev-image/run.sh bash -c '
             set -euo pipefail
             pnpm install --frozen-lockfile
             pnpm add --save-dev "typescript@^7"
@@ -58,7 +55,7 @@ jobs:
         # below, not by failing the run.
         continue-on-error: true
         run: |
-          ../dev bash -c '
+          sh ../.github/actions/dev-image/run.sh bash -c '
             set -euo pipefail
             pnpm run typecheck
             pnpm run arch:test
