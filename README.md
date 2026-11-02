@@ -57,8 +57,7 @@ make run-backend    # :8080 (with the variables of .env; the browser does not op
 make run-frontend   # http://localhost:3000, open this one in the browser
 ```
 
-Open http://localhost:3000 (under `direct` and `podman` not 127.0.0.1: the
-dev server listens on `localhost` there, see below). The browser only talks to the Vite dev server, which forwards
+Open http://localhost:3000. The browser only talks to the Vite dev server, which forwards
 `/api`, `/web` and `/health` to the backend, so the session cookie is
 same-origin. Run the backend through `make`: the Makefile exports `.env` to
 it.
@@ -66,31 +65,43 @@ it.
 How the two servers find each other depends on how `./dev` runs commands
 (`./dev --engine`):
 
-- `direct` (devcontainer) and rootless `podman` (including single-UID mode;
-  see the networking comment in `dev`). Observed with rootless Podman on 2026-10-31:
-  `/health` through `localhost:3000` reached the backend. NOTE: browser `/health`
-  for this revision remains unobserved; check by opening
-  http://localhost:3000/health from the host browser while both run
-  (VS Code forwards the ports).
+- `direct` (devcontainer): both servers run in the devcontainer and
+  `make run-frontend` makes Vite listen on `127.0.0.1`, where VS Code's port
+  forwarding connects (without it Vite listened on `[::1]` only and the
+  forwarding was refused; observed 2026-11-03). NOTE: the fixed path is not
+  yet observed from the host browser; check by opening
+  http://localhost:3000/health there while both run.
+- rootless `podman` (including single-UID mode; see the networking comment in
+  `dev`): observed 2026-10-31, `/health` through `localhost:3000` reached the
+  backend. Open `localhost`, not `127.0.0.1`: Vite listens on `localhost`
+  there, which resolved to `::1`.
 - `docker` (e.g. WSL without the devcontainer): every `./dev` call is its own
   container. `make run-backend` names the backend container `triary-backend`
   on `triary-network` (run `make infra-up` first, it creates the network);
   `make run-frontend` proxies to it by that name and publishes the dev server
-  on the host's `127.0.0.1:3000`. NOTE: unverified; before this was added,
-  `localhost:3000` was unreachable from the browser on WSL (reported
-  2026-11-01). Check the same way, from the browser. If `make run-backend`
+  on the host's `127.0.0.1:3000`. Docker's `127.0.0.1` publishing itself
+  reaches the Windows browser on WSL2 (observed 2026-11-03 with throwaway
+  servers). NOTE: this make path as a whole is not yet observed from the
+  browser; check the same way. If `make run-backend`
   reports that the name `triary-backend` is in use while no backend runs, a
   killed run left the container behind: `docker rm -f triary-backend`.
 
-  If the browser connects but never gets a page: on the owner's WSL
-  (2026-11-01) a port docker published on `127.0.0.1` accepted the
-  connection but never answered, while MySQL published on `0.0.0.0` worked.
-  Add `TRIARY_DEV_PUBLISH_ADDRESS=0.0.0.0` to `.env` and restart
-  `make run-frontend` (NOTE: not yet observed to fix it; that is what the
-  check below is for). This publishes port 3000 on every interface of the
-  machine docker runs on, so other machines on your network may reach it
-  unless a firewall stops them; leave it unset where `127.0.0.1` works.
-  To tell where it stops, run from Windows (`curl.exe`) and from WSL:
+  **Close any devcontainer window of this repository first** (or stop its
+  port 3000 forwarding in VS Code's Ports view). While it is open, VS Code
+  (`Code.exe`) holds Windows' `127.0.0.1:3000` for its `forwardPorts`, so
+  the browser reaches VS Code's forwarding instead of the server you
+  started from WSL (observed 2026-11-03). Once the one-command quickstart
+  (PR #104, also on port 3000) is merged, the same applies to it.
+
+  If the browser still gets no page, first find out who holds the port on
+  Windows (PowerShell or cmd):
+
+  ```sh
+  netstat.exe -ano -p TCP -a | findstr :3000
+  tasklist.exe /FI "PID eq <pid from the line above>"
+  ```
+
+  Then tell where it stops, from Windows (`curl.exe`) and from WSL:
 
   ```sh
   curl --noproxy '*' -4 -v --max-time 5 http://localhost:3000/
@@ -98,8 +109,11 @@ How the two servers find each other depends on how `./dev` runs commands
   ```
 
   If `/` does not answer either, check that `make run-frontend` is still
-  running and printed its URL, then suspect the published port; if `/`
-  answers but `/health` fails, look at the backend or the proxy.
+  running and printed its URL; if `/` answers but `/health` fails, look at
+  the backend or the proxy. `TRIARY_DEV_PUBLISH_ADDRESS=0.0.0.0` (see
+  `dev`) publishes on every interface instead; it was added for this
+  symptom but the cause turned out to be VS Code holding the port, so it
+  does not fix it.
 
 See the networking comment in `dev` for the Podman decision, its effects,
 and the remaining network checks; what has been observed so far is recorded in

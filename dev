@@ -31,12 +31,14 @@
 #   TRIARY_DEV_PUBLISH_ADDRESS
 #                         docker only: host address the ports are published on,
 #                         "127.0.0.1" (default) or "0.0.0.0" (every interface,
-#                         like docker-compose.yml's MySQL). Observed 2026-11-01
-#                         on the owner's WSL: a port published on 127.0.0.1
-#                         accepted TCP from Windows but never answered HTTP,
-#                         while MySQL published on 0.0.0.0 was reachable.
-#                         NOTE: unverified that 0.0.0.0 makes the dev server
-#                         answer there; check with README "Setup" (curl).
+#                         like docker-compose.yml's MySQL). The default works
+#                         from Windows on WSL2: throwaway servers published on
+#                         127.0.0.1 and on 0.0.0.0 both answered Windows'
+#                         curl.exe (observed 2026-11-03, #106). The failure
+#                         that led to this option (2026-11-01) was VS Code
+#                         holding Windows' 127.0.0.1:3000 for a devcontainer's
+#                         port forwarding, not the published address, so
+#                         0.0.0.0 does not fix it; see README "Setup".
 #   TRIARY_DEV_NAME       docker only: container name, so another ./dev
 #                         container on triary-network can reach it by name
 
