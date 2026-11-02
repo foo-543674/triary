@@ -1,0 +1,92 @@
+# Try triary with one command, from the repository root:
+#
+#   docker compose -f quickstart/compose.yaml up --build
+#
+# then open http://localhost:3000 (on WSL, from the Windows browser).
+#
+# This is the "just try the app" path, separate from development (README
+# "Setup"): it builds release images, needs nothing but docker, and
+# shares no container name, port or volume with the development infra in
+# docker-compose.yml except host port 3000, which the dev Vite server also
+# uses (stop one before starting the other, or set TRIARY_PORT).
+#
+# Delivery follows .contexts/architecture.md "配信トポロジの前提": a reverse
+# proxy (web) serves the built frontend and forwards /api, /web and /health to
+# the backend on the same origin, so the SameSite=Lax session cookie works.
+#
+# The credentials below exist only inside this compose project's network; the
+# database port is not published.
+
+name: triary-quickstart
+
+x-database-url: &database-url mysql://triary:triary@db:3306/triary
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: triary-root
+      MYSQL_DATABASE: triary
+      MYSQL_USER: triary
+      MYSQL_PASSWORD: triary
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      # 127.0.0.1, not localhost: over TCP, like migrate and backend connect.
+      # During first initialisation the image runs a temporary server on the
+      # unix socket only, which a socket ping would already report as up.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-ptriary-root"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: quickstart/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: quickstart/Dockerfile
+      target: backend
+    environment:
+      DATABASE_URL: *database-url
+      BACKEND_PORT: "8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # The runtime image has no curl; send a real HTTP request with bash.
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\r\n\r\n' >&3 && grep -q '200 OK' <&3
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: quickstart/Dockerfile
+      target: web
+    ports:
+      # 127.0.0.1 only: the app is for this machine. Observed 2026-11-03 on
+      # WSL2 (NAT mode): a port docker published on 127.0.0.1 answered the
+      # Windows browser through localhost.
+      - "127.0.0.1:${TRIARY_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db-data:
