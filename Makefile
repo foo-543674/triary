@@ -69,7 +69,8 @@ db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx
 # backend gets a name on triary-network (created by `make infra-up`), the
 # frontend reaches it by that name, listens on the container's interfaces and
 # is published on the host's 127.0.0.1:3000. Directly (devcontainer) and under
-# the ai-box's podman both servers share one network and need none of this.
+# rootless Podman (single-UID mode) with ./dev's explicit --network host,
+# both servers share one network and need none of this.
 # NOTE: unverified under docker (only the arguments are tested, by
 # `make dev-test`). Check: `make run-backend` and `make run-frontend` in two
 # WSL terminals, then open http://localhost:3000/health from the browser.
