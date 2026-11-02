@@ -17,8 +17,8 @@
 |---|---|---|---|
 | 2026-04-25 | foo-skills — 版・commit SHA は **不明** (記録なし。`AGENTS.md` を生成していないことから 2.x より前と推定) | commit `a5575a1`、PR #19 (2026-04-26 マージ) | 採用済み |
 | 2026-10-31 | foo-skills 3.0.0 (`gitCommitSha` ce07f3463ad10f4ce4c2333af6c3fbbe4a4af738、https://github.com/foo-543674/foo-skills) | PR #46 (下記「2026-10-31 再実行」) | 採用済み (PR #46 のマージ。ruleset の適用は別途) |
-| 2026-10-31 | foo-skills 3.0.1 (`gitCommitSha` 9bb1b4c3280d4977f2a7e67b73f578abaf8fa083) | ブランチ `chore/dev-entrypoint` の PR (下記「2026-10-31 再実行 (3.0.1)」) | **提案中** (2 段階。第 1 段の PR のマージで入口とイメージを採用、第 2 段で切り替え) |
-| 2026-11-01 | foo-skills 3.1.0 (https://github.com/foo-543674/foo-skills、commit SHA は **不明**: キャッシュの `plugin.json` に記録なし。3.1.0 の版上げは foo-skills PR #96) | ブランチ `chore/bootstrap-3.1.0` ほかの PR (下記「2026-11-01 再実行 (3.1.0)」) | **提案中** |
+| 2026-10-31 | foo-skills 3.0.1 (`gitCommitSha` 9bb1b4c3280d4977f2a7e67b73f578abaf8fa083) | ブランチ `chore/dev-entrypoint` の PR (下記「2026-10-31 再実行 (3.0.1)」) | 採用済み (2 段階。第 1 段の PR #52 で入口とイメージ、第 2 段の PR #53 で hook・Makefile・CI の切り替え。どちらも 2026-10-31 マージ) |
+| 2026-11-01 | foo-skills 3.1.0 (https://github.com/foo-543674/foo-skills、commit SHA は **不明**: キャッシュの `plugin.json` に記録なし。3.1.0 の版上げは foo-skills PR #96) | ブランチ `chore/bootstrap-3.1.0` ほかの PR (下記「2026-11-01 再実行 (3.1.0)」) | 一部採用済み (#96・#98・#100 がマージ済み。AGENTS.md の進め方の節はブランチ `chore/agents-process` で提案中) |
 
 以降の節のうち「Phase 1」〜「次の更新タイミング」は 2026-04-25 時点の記録
 で、2026-10-31 の再実行で変わったものはその節に注記した。
@@ -298,7 +298,7 @@ bootstrap で追加したもの:
 
 | 項目 | 状況 | 扱い | 反映先 |
 |---|---|---|---|
-| `AGENTS.md` を単一の原典にする | プラグイン側だけが変わった | 採用 (提案中)。`CLAUDE.md` の本文をそのまま移し、`CLAUDE.md` / `GEMINI.md` は `@AGENTS.md` で読み込む。`.cursorrules` / `copilot-instructions.md` は派生元を `AGENTS.md` に替え、既存の記述は残した | `AGENTS.md` ほか |
+| `AGENTS.md` を単一の原典にする | プラグイン側だけが変わった | 採用 (PR #46 のマージ)。`CLAUDE.md` の本文をそのまま移し、`CLAUDE.md` / `GEMINI.md` は `@AGENTS.md` で読み込む。`.cursorrules` / `copilot-instructions.md` は派生元を `AGENTS.md` に替え、既存の記述は残した | `AGENTS.md` ほか |
 | 自然言語の使用範囲 | プラグイン側だけ | 採用。設計文書と契約は日本語、`AGENTS.md` と派生ファイルは英語 (前回の「既存スタイルを維持」を引き継ぐ) | `AGENTS.md` Natural language |
 | 設計成果物の役割分担・計画の 3 階層 | プラグイン側だけ | 採用。API 契約は `openapi.yaml`、永続化は `backend/migrations/` に具体化 | `AGENTS.md` Design artifacts |
 | 判断待ちで止めない進め方 | プラグイン側だけ | 採用。判断待ちの置き場は **GitHub Issues (ラベル `needs-decision`)** を AI が選んだ。理由: 保護ルールを有効にすると、リポジトリ内のファイルは更新のたびにオーナーの承認が要り、判断待ちを積むこと自体が止まるため。Issue なら承認なしで積め、受け入れ検証が state (open / closed) を機械的に読める。暫定案に積んでよい差し替え費用の目安は「約 1 作業日」とした | `AGENTS.md` Asking for decisions |
@@ -436,7 +436,7 @@ rootless Podman が入った。下記の「ai-box を podman 入りの版に更�
 
 | 原料の変更 | 状況 | 扱い |
 |---|---|---|
-| `philosophy/technology-choices.md`「実行環境 — 言語のツールチェーンは作業環境に入れない」、`skills/bootstrap/SKILL.md` Phase 5「開発コマンドの入口」と settings の deny、`resources/checklist.md` 2 項目、`resources/context-template.md` の開発コマンド、`resources/known-pitfalls.md`「言語のコマンドを作業環境で直接叩く」(出典 foo-skills PR #86) | プラグイン側だけが変わった | 採用 (提案中)。下記の 2 段階で入れる |
+| `philosophy/technology-choices.md`「実行環境 — 言語のツールチェーンは作業環境に入れない」、`skills/bootstrap/SKILL.md` Phase 5「開発コマンドの入口」と settings の deny、`resources/checklist.md` 2 項目、`resources/context-template.md` の開発コマンド、`resources/known-pitfalls.md`「言語のコマンドを作業環境で直接叩く」(出典 foo-skills PR #86) | プラグイン側だけが変わった | 採用 (PR #52・#53 のマージ)。下記の 2 段階で入れた |
 
 このプロジェクトでは known-pitfalls の症状がそのまま起きていた: ai-box に
 Rust がなく `backend/` を含むコミットが pre-commit で止まり、#45 の cargo
@@ -572,15 +572,15 @@ Phase 2 で新たに聞いたことはない。新しい原料が Phase 2 に足
 
 | 項目 | 状況 | 扱い | 反映先 |
 |---|---|---|---|
-| hook とゲートを git + POSIX シェルで動かす | プラグイン側 (オーナーの指摘由来) | 採用 (提案中)。下記「ゲートの実装判断 (3.1.0)」 | `tools/review-gate/gate.sh`、`.githooks/`、`.claude/hooks/` |
-| Claude Code hook はゲートの対象外の呼び出しを止めない | プラグイン側 | 採用 (提案中)。hook の `if` で `git commit` / `git push` だけに絞る | `.claude/settings.json` |
-| 手元の迂回対策を積み増さない | プラグイン側 | 採用 (提案中)。字句解析器 (`command.ts` / `classify.ts`) を削除し、deny・規約・hook の有効化確認にとどめる | `docs/review-contract.md`「この契約が保証しないこと」 |
-| ゲートは準備不足で止めない | プラグイン側 | 採用 (提案中)。`frontend/node_modules` が無ければ hook が `./dev` の中で install する | `.githooks/lib.sh` |
-| 入口 (`./dev`) を POSIX シェルで書く | プラグイン側 | 採用予定。`dev` は bash (配列、`${!name}`) で書かれている。PR #92 が `dev` を変更中なので、その上に積む別の PR にする | `dev` |
-| ai-box を前提にした記述を除く | プラグイン側 | 採用予定 (別の PR)。`AGENTS.md` の `./dev` の説明、`dev` と Dockerfile のコメントが ai-box を前提にしている | `AGENTS.md`、`dev`、`tools/dev-image/Dockerfile` |
+| hook とゲートを git + POSIX シェルで動かす | プラグイン側 (オーナーの指摘由来) | 採用 (#96 で main に入った)。下記「ゲートの実装判断 (3.1.0)」 | `tools/review-gate/gate.sh`、`.githooks/`、`.claude/hooks/` |
+| Claude Code hook はゲートの対象外の呼び出しを止めない | プラグイン側 | 採用 (#96 で main に入った)。hook の `if` で `git commit` / `git push` だけに絞る | `.claude/settings.json` |
+| 手元の迂回対策を積み増さない | プラグイン側 | 採用 (#96 で main に入った)。字句解析器 (`command.ts` / `classify.ts`) を削除し、deny・規約・hook の有効化確認にとどめる | `docs/review-contract.md`「この契約が保証しないこと」 |
+| ゲートは準備不足で止めない | プラグイン側 | 採用 (#96 で main に入った)。`frontend/node_modules` が無ければ hook が `./dev` の中で install する | `.githooks/lib.sh` |
+| 入口 (`./dev`) を POSIX シェルで書く | プラグイン側 | 採用 (#100 で main に入った)。以前の `dev` は bash (配列、`${!name}`) で書かれていた。下記「2026-11-02 再実行 (3.1.0): 開発入口の POSIX sh 化」 | `dev` |
+| ai-box を前提にした記述を除く | プラグイン側 | 採用 (#100 で main に入った)。`AGENTS.md` の `./dev` の説明と `dev` のコメントから外した。Dockerfile のコメントだけは次のイメージ変更まで残す (下記「2026-11-02 再実行 (3.1.0): 開発入口の POSIX sh 化」) | `AGENTS.md`、`dev`、`tools/dev-image/Dockerfile` |
 | タスクランナーと手順書も入口を通す | プラグイン側 | 確認だけ。`Makefile`・`frontend/package.json` の scripts・`README.md`・devcontainer を検索し、すべて入口経由 (`package.json` の scripts は `./dev pnpm run` から呼ばれる) | — |
 | PR の出し方と承認の依頼、コマンドの実行の仕方、判断依頼の理由と観点、人間との往復 | プラグイン側。オーナーのメモリーにも同じ向きの指示がある (不要な PR の積み上げをしない、1 回に 1 コマンド) | 採用 (提案中、ブランチ `chore/agents-process`)。AGENTS.md に「Opening PRs and asking for approval」「How to run commands」を足し、「Asking for decisions」に止める前の確認・往復の設計・判断依頼の理由と観点・Draft の扱いを足した。承認が要る変更と要らない変更を 1 つの PR に混ぜない、も足した。以前の「マージ待ちの PR の上に次の作業を積む」は、中身が依存するときだけに改めた | `AGENTS.md`、派生ファイル、`docs/review-contract.md` |
-| 受け入れ判定の不合格の説明 (どの条件・なぜ・何をすれば通るか、検証経路の故障の区別) | プラグイン側 | 採用予定 (別の PR)。`acceptance.sh` はこの PR でも変えるので、その上に積む | `tools/review-gate/acceptance.sh` |
+| 受け入れ判定の不合格の説明 (どの条件・なぜ・何をすれば通るか、検証経路の故障の区別) | プラグイン側 | 採用 (#98 で main に入った)。不合格の理由を `<条件>: ...; next: ...` の形で出し、検証経路の故障は `verifier_error` として区別する | `tools/review-gate/acceptance.sh` |
 | 混在するファイル | プラグイン側 | 確認だけ。`frontend/package.json` と `backend/Cargo.toml` は CODEOWNERS に載せず、検証器が区画ごとに判定している (`manifest.ts`、`docs/remote-acceptance.md` 手順 6) | — |
 | 時間の条件は仕組みが持つ | プラグイン側 | 確認だけ。Dependabot の `cooldown` (7 日 / major 14 日) と検証器の公開日の確認 (`release-age.ts`) が持っている | — |
 
