@@ -249,6 +249,46 @@ combination of PRs causes.
 - List what the automerge job merged in your status report (change,
   condition version, verification evidence, open items, how to revert).
   Report serious incidents immediately.
+- Do not mix changes that need approval with changes that merge without it in
+  one PR: the whole PR then needs approval. Split the part that needs approval
+  into its own PR.
+
+#### Opening PRs and asking for approval
+
+Ask for a human approval in a form the human can judge on the spot from the
+PR alone. Do not make the human look up or remember the premises.
+
+- **Make one PR depend on another only when its content really depends on
+  it.** Work whose content is independent branches from `main`, not from the
+  previous work branch. A needless dependency hides the diff to look at and
+  makes the human manage the approval order.
+- When the content does depend on an unmerged PR, first try to break the
+  dependency (land the shared part as a small independent PR, split
+  differently). If you cannot, stack the PR on that PR's branch and open it;
+  do not keep the work only locally.
+- A stacked PR shows only its own diff (its base is the lower PR's branch),
+  and its description says what it depends on and what to look at. After the
+  lower PR merges, the AI retargets the base, re-verifies and keeps the merge
+  order.
+- **Ask a human to approve only PRs that can be judged on their own right
+  now.** Do not hand the human conditional asks ("approve #yy after #zz
+  merges", "approve in N days"). The AI and the machinery (Dependabot
+  cooldowns, the verifier, auto-merge) hold order and waiting conditions, and
+  the PR goes into an ask only once they are met. A change waiting on a
+  condition is still opened, as a Draft, with what it waits for in the
+  description; holding it back removes the human's chance to notice whether
+  it is needed at all. A Draft is not an ask; the AI takes it out of Draft
+  and asks once the condition is met.
+- **Before asking, check yourself that every check on the current HEAD has
+  completed and passed** (`gh pr checks`). If one failed, find the cause in
+  the log and fix it first; never make the human investigate a failing check.
+- If a failure the AI cannot fix remains (a UI diff that needs a human, an
+  outage), the ask says which check fails, why, why the AI cannot fix it, how
+  it affects mergeability, and what the human should do. Do not ask for
+  approval on a PR with a failure you cannot explain.
+- The ask names the places in the diff that need the human's judgement
+  (file, line, setting key) and why they need approval (which condition they
+  hit). Do not make the human read the parts that merge without approval.
 
 ## AI delegation scope
 
@@ -279,6 +319,27 @@ next step from the result yourself. Ask the human only for interactive
 authentication, destructive production operations, or commands that are not
 allowed.
 
+### How to run commands (so no confirmation prompt stops the work)
+
+Running a command that is not allowed waits for a human confirmation and
+stops the whole session; the human is usually away, so one prompt costs one
+round trip. Run commands in a form the allow rules match:
+
+- Create and edit files with the AI tool's file editing (Claude Code: Edit /
+  Write), not with `sed -i`, `awk`, `perl -i`, redirects (`>`, `>>`) or
+  heredocs.
+- Read and search files with the AI tool's read / search features or with a
+  single allowed command.
+- One command per call. Do not chain with `&&`, `;`, `|`, `$(...)` or
+  `cd ... &&`: the allow rules are matched against each chained command, and
+  one unallowed part (`cd`, `head`, `xargs`, ...) stops the whole call. Pass
+  paths as arguments instead of `cd`.
+- When you need a command that is not allowed, first look for an allowed way
+  (the `./dev` entrypoint, the AI tool's features). If none exists and you
+  need it repeatedly, file adding it to `.claude/settings.json` as a decision
+  request and go on with work that does not need it. Do not run a command you
+  know will prompt.
+
 ### Asking for decisions
 
 Do not hand a decision back just because something is undefined. Make the
@@ -288,11 +349,32 @@ evidence cannot settle it, a permission is missing, the uncertainty cannot be
 resolved within acceptable cost / time / impact, or a rule / acceptance
 criterion / verifier has to be revised.
 
+Before handing a decision back, check that you can say which of these
+conditions it meets and what in the situation made it so. If you cannot, it
+is not a place to stop: decide yourself, go on, and leave the decision and
+its reason in the PR description or similar.
+
+**Design the asks so they need few round trips.** Do not send decisions and
+human-only tasks (settings, authentication, granting permissions, commands
+the AI cannot run) one by one as you notice them; collect them first and
+hand them over together, with:
+
+- the list of what the human does (order, dependencies, what can run in
+  parallel), including checks the human can run, with their results to send
+  back in one go
+- where the conflict is that needs the human's judgement (references to the
+  decision requests)
+- how far things must get for the AI to resume, and what to send back then
+- if round trips remain where the next step depends on a result, what each
+  round trip checks and how many to expect; if it looks like more, say so
+  with the reason and the new estimate as soon as you notice
+
 **Asking does not stop the work.** The human is often away.
 
 1. Move ahead with work that does not depend on the decision. A pending PR
-   merge is also a pending decision: stack the next work on that PR's branch
-   instead of waiting (write the stacking order in the PR description).
+   merge is also a pending decision: do not wait for it. When the next work
+   depends on that PR, follow "Opening PRs and asking for approval" (stack
+   only when the content depends on it).
 2. Build the dependent part as a small, easy-to-replace provisional version.
    Make it visibly provisional in the code and note how to replace it.
 3. Each time you stack more on a provisional version, re-check the
@@ -300,13 +382,19 @@ criterion / verifier has to be revised.
    switch to independent work instead. When no safe work is left, report that
    and wait.
 4. File the decision request in the **decision queue: GitHub Issues with the
-   label `needs-decision`**. One issue per decision with: the question,
+   label `needs-decision`**. One issue per decision with: the question, why
+   you stopped (which condition above it meets and what in the situation made
+   it so), the perspective to decide on (what to weigh against what),
    options with a recommendation and its reason, what you built provisionally,
    the replacement cost, what is blocked on it (which PR merge, etc.), and its
-   premises (target version, facts relied on). Update the issue when premises,
-   recommendation or cost change; close stale ones with a note.
-5. Every status report lists the open decisions and the PRs waiting for a
-   merge, in stacking order and merge order, so the human can answer in one go.
+   premises (target version, facts relied on). Order open requests by impact
+   so the human can answer them together when back. Update the issue when
+   premises, recommendation or cost change; close stale ones with a note.
+5. Every status report lists the open decisions and the PRs waiting for an
+   approval, each in a form that can be judged on its own (check status, what
+   to look at), so the human can answer in one go. Draft PRs waiting on a
+   condition are listed separately as "waiting" (what they wait for, when it
+   is likely met); they ask nothing of the human.
 6. When a ruling arrives, check that its premises still hold before applying
    it. After replacing the provisional version and getting the replacement
    reviewed, record the ruling and close the issue.
@@ -439,6 +527,11 @@ languages. Gates prepare what they need (e.g. the frontend dependencies)
 instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 "2026-11-01 再実行 (3.1.0)".
 
+"(in `backend/`)" means: run it from that directory, changing into it with
+its own `cd` call first, not chained with `&&` ("How to run commands").
+`./dev bash -c '...'` below is one command for the allow rules; chaining
+inside it is fine.
+
 | Command | Purpose |
 |---|---|
 | `make help` | List available make targets |
@@ -449,14 +542,14 @@ instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 | `make db-migrate-test` | Apply migrations to the test DB |
 | `make db-prepare` | Regenerate sqlx offline metadata |
 | `make api-generate` | Regenerate frontend types from OpenAPI |
-| `cd backend && ../dev cargo nextest run` | Rust unit + architecture tests |
-| `cd backend && ../dev cargo clippy --all-targets` | Rust lint |
-| `cd backend && ../dev cargo fmt --all` | Rust format |
-| `cd frontend && ../dev pnpm install` | Install frontend dependencies (needed before the `pnpm run` commands below; the hooks install them themselves) |
-| `cd frontend && ../dev pnpm run lint:ci` | Biome lint + format check |
-| `cd frontend && ../dev pnpm run typecheck` | TypeScript type check |
-| `cd frontend && ../dev pnpm run test:run` | Frontend unit tests |
-| `cd frontend && ../dev pnpm run arch:test` | Frontend architecture tests (dependency-cruiser) |
+| `../dev cargo nextest run` (in `backend/`) | Rust unit + architecture tests |
+| `../dev cargo clippy --all-targets` (in `backend/`) | Rust lint |
+| `../dev cargo fmt --all` (in `backend/`) | Rust format |
+| `../dev pnpm install` (in `frontend/`) | Install frontend dependencies (needed before the `pnpm run` commands below; the hooks install them themselves) |
+| `../dev pnpm run lint:ci` (in `frontend/`) | Biome lint + format check |
+| `../dev pnpm run typecheck` (in `frontend/`) | TypeScript type check |
+| `../dev pnpm run test:run` (in `frontend/`) | Frontend unit tests |
+| `../dev pnpm run arch:test` (in `frontend/`) | Frontend architecture tests (dependency-cruiser) |
 | `make arch-test` | Architecture tests for both backend and frontend |
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Test the review gate (git + sh) and the remote verifier's TypeScript (in the dev image) |
@@ -464,7 +557,7 @@ instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 | `./dev <command>` | Run a command through the POSIX sh entrypoint (rootless Podman, including single-UID mode, or docker; directly inside the dev image). Image tag calculation requires host `sha256sum` or `shasum`. NOTE: the devcontainer build remains unverified; rebuild and open it to check (#56). Each non-direct call starts a container; chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `sh tools/review-gate/gate.sh check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). For rootless Podman networking, see the networking comment in `dev`; under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
+| `../dev pnpm run dev` (in `frontend/`) | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). For rootless Podman networking, see the networking comment in `dev`; under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
 
 ## devcontainer and local infra
 
