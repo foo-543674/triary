@@ -51,11 +51,14 @@ jobs:
       TRIARY_PORT: "3000"
       COMPOSE_BAKE: "true"
       BUILDX_BUILDER: quickstart
-      QUICKSTART_CACHE: ${{ runner.temp }}/quickstart-cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      # The runner context is not available in jobs.<id>.env (the first push
+      # of this job failed as a workflow file issue), so set it per step.
+      - name: Locate the build cache
+        run: echo "QUICKSTART_CACHE=$RUNNER_TEMP/quickstart-cache" >> "$GITHUB_ENV"
       - name: Check toolchain versions
         run: sh .github/quickstart/check-toolchains.sh
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
