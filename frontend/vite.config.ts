@@ -56,11 +56,14 @@ export default defineConfig({
     // is the backend's default port; override it with the BACKEND_ORIGIN
     // environment variable (read from the process environment, not from
     // .env files).
+    // Where Vite listens is chosen by `make run-frontend` (--host), not here.
     // Observed 2026-10-31 with rootless Podman and host networking:
-    // /health through localhost:3000 reached the backend. Vite listens on `localhost` only
-    // (127.0.0.1 was refused there, where localhost resolves to ::1), so open
-    // http://localhost:3000. NOTE: not yet observed from a browser or in the
-    // devcontainer; check localhost:3000/health with both servers running.
+    // /health through localhost:3000 reached the backend; without --host Vite
+    // listens on `localhost` only (127.0.0.1 was refused there, where
+    // localhost resolves to ::1). Observed 2026-11-03 in the devcontainer
+    // (#106): without --host it listened on [::1]:3000 only, and VS Code's
+    // port forwarding, which connects to 127.0.0.1:3000, was refused; hence
+    // --host 127.0.0.1 there.
     proxy: Object.fromEntries(
       ['/api', '/web', '/health'].map((prefix) => [
         prefix,

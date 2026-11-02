@@ -71,9 +71,16 @@ db-prepare: ## Regenerate sqlx offline metadata for query! macros (backend/.sqlx
 # is published on the host's 127.0.0.1:3000. Directly (devcontainer) and under
 # rootless Podman (single-UID mode) with ./dev's explicit --network host,
 # both servers share one network and need none of this.
+# Directly (devcontainer), Vite is told to listen on 127.0.0.1: without --host
+# it listened on [::1]:3000 only, and VS Code's port forwarding connects to
+# 127.0.0.1:3000 and was refused (observed 2026-11-03 on the owner's WSL2,
+# #106). Under Podman it keeps Vite's default (localhost; observed working
+# 2026-10-31).
 # NOTE: unverified under docker (only the arguments are tested, by
 # `make dev-test`). Check: `make run-backend` and `make run-frontend` in two
 # WSL terminals, then open http://localhost:3000/health from the browser.
+# While a devcontainer window is open, VS Code holds the host's
+# 127.0.0.1:3000 (forwardPorts), so close it first (README "Setup").
 BACKEND_CONTAINER := triary-backend
 
 .PHONY: run-backend
@@ -83,9 +90,12 @@ run-backend: ## Run the backend on :8080 with the variables of .env
 .PHONY: run-frontend
 run-frontend: ## Run the Vite dev server on :3000 (proxies /api, /web and /health to the backend)
 	cd frontend && "$(DEV)" pnpm install --frozen-lockfile
-	@if [[ "$$("$(DEV)" --engine)" == docker ]]; then \
+	@engine="$$("$(DEV)" --engine)"; \
+	if [[ "$$engine" == docker ]]; then \
 	  cd frontend && TRIARY_DEV_PUBLISH=3000 BACKEND_ORIGIN=http://$(BACKEND_CONTAINER):$(or $(BACKEND_PORT),8080) \
 	    "$(DEV)" pnpm run dev --host 0.0.0.0; \
+	elif [[ "$$engine" == direct ]]; then \
+	  cd frontend && "$(DEV)" pnpm run dev --host 127.0.0.1; \
 	else \
 	  cd frontend && "$(DEV)" pnpm run dev; \
 	fi
