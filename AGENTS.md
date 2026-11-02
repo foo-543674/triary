@@ -223,7 +223,17 @@ about checking what the job did.
 So the AI's job does not end at opening a PR: drive it to the merge. Keep the
 verdict green (fix CI, post a fresh snapshot after every push), and for a PR
 stack, after each merge update the next PR onto `main`, have its diff
-reviewed again and post its snapshot.
+reviewed again and post its snapshot. Branches need not be up to date
+before merging (owner decision 2026-11-02, `docs/remote-acceptance.md`):
+do not update a PR just because `main` moved. When a PR that changes
+`docs/review-contract.md` or `tools/review-gate/` (what the snapshot's
+`contractVersion` covers) merges, re-run the verdict of every open PR
+(`workflow_dispatch` of `acceptance.yml` with the PR number) so they are
+judged under the new contract. When other rules change (this file, the
+other contracts, workflows), look through the open PRs yourself and
+re-review or fix the ones the new rule affects; fixing after the merge is
+fine. Check the daily CI run on `main` for breakage that only the
+combination of PRs causes.
 
 - Never activate a revision of the conditions yourself, including one that
   narrows the scope. Propose it and get human approval. The only thing you

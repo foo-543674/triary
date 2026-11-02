@@ -102,8 +102,10 @@ jobs:
   #       create and approve pull requests" (owner action, listed in #43).
   #       A merge made with GITHUB_TOKEN does not trigger push workflows on
   #       main (GitHub docs, "Triggering a workflow from a workflow"), so
-  #       CI does not re-run on main for these merges; the PR's CI on the
-  #       up-to-date head (ruleset: strict status checks) is the evidence.
+  #       CI does not re-run on main for these merges; the PR's CI on its
+  #       head is the evidence. Branches need not be up to date (owner
+  #       decision 2026-11-02), so the daily CI run on main (ci.yml
+  #       `schedule`) catches what only the combination breaks.
   automerge:
     name: acceptance / automerge
     needs: verdict
