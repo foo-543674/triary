@@ -1,0 +1,21 @@
+# CI-only local BuildKit cache, persisted by the existing actions/cache pin.
+# NOTE: verify cache import/export in the first quickstart / smoke CI run.
+services:
+  migrate:
+    build:
+      cache_from:
+        - type=local,src=${QUICKSTART_CACHE:?}/migrate
+      cache_to:
+        - type=local,dest=${QUICKSTART_CACHE:?}-new/migrate,mode=max
+  backend:
+    build:
+      cache_from:
+        - type=local,src=${QUICKSTART_CACHE:?}/backend
+      cache_to:
+        - type=local,dest=${QUICKSTART_CACHE:?}-new/backend,mode=max
+  web:
+    build:
+      cache_from:
+        - type=local,src=${QUICKSTART_CACHE:?}/web
+      cache_to:
+        - type=local,dest=${QUICKSTART_CACHE:?}-new/web,mode=max

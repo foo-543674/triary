@@ -32,12 +32,71 @@ env:
   #       so they can compile without a live database. Run
   #       `cargo sqlx prepare` locally whenever queries change.
   SQLX_OFFLINE: "true"
-  # Every language command runs in the dev image through ./dev (AGENTS.md
-  # "Common commands"); the runner's own toolchains are not used. Runners
-  # also ship podman, which ./dev would prefer; docker is the engine here.
-  TRIARY_DEV_ENGINE: docker
+  # Language commands use the protected CI runner in .github/actions/dev-image.
 
 jobs:
+  # Starts the README's quickstart from a clean runner (fresh MySQL volume, so
+  # the first-init path runs every time) and checks it through the proxy
+  # (#107). The scripts live under .github/quickstart/, a base file, because
+  # they decide what this required job checks; quickstart/ itself is the
+  # thing under test.
+  quickstart-smoke:
+    name: quickstart / smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TRIARY_PORT: "3000"
+      COMPOSE_BAKE: "true"
+      BUILDX_BUILDER: quickstart
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # Inside the workspace (.tmp/ is gitignored): compose builds through
+      # buildx bake, which refused a local cache under $RUNNER_TEMP without
+      # an fs entitlement ("pass --allow=fs=/home/runner/work/_temp",
+      # observed in run 41489536100). NOTE: unverified that a path under the
+      # workspace needs no entitlement; the next run of this job shows it.
+      # The path is set per step because the runner context is not
+      # available in jobs.<id>.env.
+      - name: Locate the build cache
+        run: echo "QUICKSTART_CACHE=$GITHUB_WORKSPACE/.tmp/quickstart-cache" >> "$GITHUB_ENV"
+      - name: Check toolchain versions
+        run: sh .github/quickstart/check-toolchains.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .tmp/quickstart-cache
+          # Keyed by what the image layers depend on, not by commit, so runs
+          # that change none of it reuse one entry instead of saving a new
+          # mode=max cache each time (repository cache space is shared).
+          key: quickstart-${{ runner.os }}-${{ hashFiles('quickstart/Dockerfile', 'backend/Cargo.lock', 'frontend/pnpm-lock.yaml') }}
+          restore-keys: quickstart-${{ runner.os }}-
+      - name: Create BuildKit builder
+        run: docker buildx create --name quickstart --driver docker-container --use
+      # NOTE: unobserved whether --wait accepts the one-shot migrate service
+      # exiting 0 (restart: "no"); if this step fails on that, wait for the
+      # web and backend services explicitly instead.
+      - name: Build and start quickstart
+        run: docker compose -f quickstart/compose.yaml -f .github/quickstart/compose.ci.yaml up --build -d --wait
+      - name: Check quickstart through the proxy
+        run: sh .github/quickstart/smoke.sh
+      - name: Print quickstart logs on failure
+        if: failure()
+        run: docker compose -f quickstart/compose.yaml logs
+      - name: Stop quickstart and remove test data
+        if: always()
+        run: docker compose -f quickstart/compose.yaml down -v
+      # The cache only speeds builds up; a missing export must not fail the
+      # gate. NOTE: cache export/import is unobserved until this job runs.
+      - name: Replace build cache
+        run: |
+          if [ -d "$QUICKSTART_CACHE-new" ]; then
+            rm -rf "$QUICKSTART_CACHE"
+            mv "$QUICKSTART_CACHE-new" "$QUICKSTART_CACHE"
+          else
+            echo "no exported build cache; keeping the restored one"
+          fi
+
   # ---------- Backend ----------
   backend-lint:
     name: backend / lint (fmt + clippy)
@@ -52,16 +111,16 @@ jobs:
       - name: Resolve dev image
         id: dev
         working-directory: .
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-lint-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: target-lint-${{ steps.dev.outputs.ref }}-
       - name: cargo fmt --check
-        run: ../dev cargo fmt --all -- --check
+        run: sh ../.github/actions/dev-image/run.sh cargo fmt --all -- --check
       - name: cargo clippy
-        run: ../dev cargo clippy --locked --all-targets --all-features
+        run: sh ../.github/actions/dev-image/run.sh cargo clippy --locked --all-targets --all-features
 
   backend-test:
     name: backend / test (nextest)
@@ -76,14 +135,14 @@ jobs:
       - name: Resolve dev image
         id: dev
         working-directory: .
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-test-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: target-test-${{ steps.dev.outputs.ref }}-
       - name: cargo nextest run
-        run: ../dev cargo nextest run --locked --all-features --no-tests=pass
+        run: sh ../.github/actions/dev-image/run.sh cargo nextest run --locked --all-features --no-tests=pass
 
   backend-build:
     name: backend / build (release)
@@ -99,14 +158,14 @@ jobs:
       - name: Resolve dev image
         id: dev
         working-directory: .
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
           key: target-release-${{ steps.dev.outputs.ref }}-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: target-release-${{ steps.dev.outputs.ref }}-
       - name: cargo build --release
-        run: ../dev cargo build --locked --release
+        run: sh ../.github/actions/dev-image/run.sh cargo build --locked --release
 
   # ---------- Frontend ----------
   frontend-lint:
@@ -119,11 +178,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
-      - run: ../dev pnpm install --frozen-lockfile
+      - run: sh ../.github/actions/dev-image/run.sh pnpm install --frozen-lockfile
       - name: biome ci
-        run: ../dev pnpm exec biome ci .
+        run: sh ../.github/actions/dev-image/run.sh pnpm exec biome ci .
       - name: typecheck (tsc --noEmit)
-        run: ../dev pnpm exec tsc --noEmit
+        run: sh ../.github/actions/dev-image/run.sh pnpm exec tsc --noEmit
 
   frontend-test:
     name: frontend / test (vitest + storybook smoke)
@@ -135,17 +194,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
-      - run: ../dev pnpm install --frozen-lockfile
+      - run: sh ../.github/actions/dev-image/run.sh pnpm install --frozen-lockfile
       - name: dependency-cruiser (architecture rules)
-        run: ../dev pnpm run arch:test
+        run: sh ../.github/actions/dev-image/run.sh pnpm run arch:test
       - name: vitest run
-        run: ../dev pnpm exec vitest run
+        run: sh ../.github/actions/dev-image/run.sh pnpm exec vitest run
       - name: build storybook
         # NOTE: Real story rendering is covered by the vitest stories smoke
         #       test. This step exists to catch breakage in the bundler /
         #       preset / config layer by running the production storybook
         #       build.
-        run: ../dev pnpm run build-storybook
+        run: sh ../.github/actions/dev-image/run.sh pnpm run build-storybook
 
   frontend-build:
     name: frontend / build (vite)
@@ -158,8 +217,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
-      - run: ../dev pnpm install --frozen-lockfile
-      - run: ../dev pnpm exec vite build
+      - run: sh ../.github/actions/dev-image/run.sh pnpm install --frozen-lockfile
+      - run: sh ../.github/actions/dev-image/run.sh pnpm exec vite build
 
   # ---------- Integration tests (language agnostic via Postman / Newman) ----------
   # NOTE: Detect whether `backend/migrations/` and the Postman collection are
@@ -190,8 +249,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # MySQL comes from docker-compose.yml (service mysql-test) on
-    # triary-network, which ./dev joins under docker, so the dev image
-    # reaches it by name. The backend and newman run in ONE ./dev call: the
+    # triary-network, which run.sh joins, so the dev image reaches it by name.
+    # The backend and newman run in ONE run.sh call: the
     # collection targets http://127.0.0.1:8080, which is only the backend
     # when both share the container.
     env:
@@ -205,7 +264,7 @@ jobs:
           docker compose up -d --wait mysql-test
       - name: Resolve dev image
         id: dev
-        run: echo "ref=$(./dev --image-ref)" >> "$GITHUB_OUTPUT"
+        run: echo "ref=$(sh .github/actions/dev-image/image-ref.sh)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: backend/target
@@ -213,13 +272,13 @@ jobs:
           restore-keys: target-release-${{ steps.dev.outputs.ref }}-
       - name: run migrations
         working-directory: backend
-        run: ../dev sqlx migrate run
+        run: sh ../.github/actions/dev-image/run.sh sqlx migrate run
       - name: build backend
         working-directory: backend
-        run: ../dev cargo build --locked --release
+        run: sh ../.github/actions/dev-image/run.sh cargo build --locked --release
       - name: start backend and run newman
         run: |
-          ./dev bash -c '
+          sh .github/actions/dev-image/run.sh bash -c '
             backend/target/release/triary-backend > backend/backend.log 2>&1 &
             for _ in $(seq 1 30); do
               curl -sf http://127.0.0.1:8080/health >/dev/null && break
@@ -241,7 +300,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - name: spectral lint
-        run: ./dev npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
+        run: sh .github/actions/dev-image/run.sh npx -y @stoplight/spectral-cli lint "openapi/**/*.{yaml,yml,json}"
 
   # ---------- Dependency vulnerability scans ----------
   security-scan-backend:
@@ -254,7 +313,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
-      - run: ../dev cargo audit
+      - run: sh ../.github/actions/dev-image/run.sh cargo audit
 
   # Supply-chain policy (backend/deny.toml, docs/dependency-policy.md):
   # advisories, licenses, wildcard versions and sources other than crates.io.
@@ -262,7 +321,8 @@ jobs:
   # using cargo-deny's own Cargo.lock (--locked), instead of coming from a
   # third-party installer. It downloads the RustSec advisory DB at run time.
   # NOTE: unverified on CI until this job's first run; locally the same
-  #       commands passed through ./dev on 2026-10-31.
+  #       commands passed through the local dev entrypoint on 2026-10-31.
+  #       NOTE: the CI runner replacement is unverified; check this job's run.
   # TODO: move it into tools/dev-image/Dockerfile; until then, run it locally
   #       the same way.
   security-deny-backend:
@@ -276,7 +336,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
       - run: |
-          ../dev bash -c '
+          sh ../.github/actions/dev-image/run.sh bash -c '
             set -euo pipefail
             cargo install --locked --quiet cargo-deny@0.20.2 --root ../.tmp/cargo-tools
             ../.tmp/cargo-tools/bin/cargo-deny --locked check'
@@ -291,4 +351,4 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/dev-image
-      - run: ../dev pnpm audit --audit-level high
+      - run: sh ../.github/actions/dev-image/run.sh pnpm audit --audit-level high

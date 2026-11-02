@@ -1,8 +1,8 @@
 import tailwindcss from '@tailwindcss/vite';
 import devtools from 'solid-devtools/vite';
+import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import solidPlugin from 'vite-plugin-solid';
-import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [
@@ -73,10 +73,5 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./src/test/setup.ts'],
   },
 });

@@ -36,7 +36,9 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 
 ### 必須ジョブ (CI)
 
-`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`openapi / spectral lint`、`security / cargo audit`、`security / cargo deny`、`security / pnpm audit`。
+`backend / lint (fmt + clippy)`、`backend / test (nextest)`、`backend / build (release)`、`frontend / lint (biome ci)`、`frontend / test (vitest + storybook smoke)`、`frontend / build (vite)`、`quickstart / smoke`、`openapi / spectral lint`、`security / cargo audit`、`security / cargo deny`、`security / pnpm audit`。
+
+- `quickstart / smoke` (#107) は、README の quickstart をまっさらなランナーから起動し (MySQL の初回初期化を毎回通る)、プロキシ越しに `/`・`/health`・`/signup`・signup → `/web/v1/me` を確かめる。quickstart を壊す変更は他の必須ジョブでは検出できないので必須にした。検査の中身は `.github/quickstart/` (`smoke.sh`、ツールチェーンの版を dev イメージと照合する `check-toolchains.sh`、CI 用のビルドキャッシュ `compose.ci.yaml`) に置き、基準ファイルとして保護する。`quickstart/` は検査される側なので保護しない。NOTE: このジョブの GitHub Actions 上の実行は #107 の PR の CI が最初。
 
 - `integration / newman` は `integration / detect` が成功していれば `skipped` を許す (検出対象がない PR では走らない設計のため)
 - `security / cargo audit` と `security / pnpm audit` は 2026-10-31 に必須に加えた (#45 のオーナー判断「1」)。それまでは base (`main`) 自体が既知の脆弱性で失敗していて、必須にすると PR の内容と無関係に全 PR が止まるため外していた。依存の更新で緑に戻した (pnpm は PR #47、cargo は `Cargo.lock` の更新)。今後、新しい advisory が出ると PR の内容と無関係に止まる。そのときは依存を更新するか、`.contexts/security-overrides.md` の台帳に載せる対処で緑に戻す
@@ -82,10 +84,21 @@ Dependabot の PR は、範囲内の全コミットが Dependabot 自身のも�
 - アーキテクチャテスト (`backend/tests/architecture.rs`、`frontend/.dependency-cruiser.cjs`、`frontend/scripts/check-arch.mjs`)
 - git hook (`.githooks/`)、判定ツール (`tools/review-gate/`)
 - 依存のサプライチェーン対策 (`docs/dependency-policy.md`、`backend/deny.toml`、`backend/.cargo/audit.toml`、`backend/tests/dependency_ledger.rs`)。`backend/Cargo.toml` 自体は含めない (含めると Dependabot の自動マージが code owner の承認で止まる。直接依存の追加は台帳の検査で `docs/dependency-policy.md` の変更を伴うので、承認を経る)
-- 開発コマンドの入口 (`dev`) と開発イメージ (`tools/dev-image/`)。決定的ゲートが何の上で走るかを決めるため
-- CI の workflow と設定 (`.github/`)、`Makefile`、`.devcontainer/`
-- 必須 CI ジョブが読む設定 (`frontend/biome.json`、`frontend/tsconfig.json`、`frontend/vite.config.ts`、`frontend/.storybook/`)。変えるとゲートが何を確かめるかが変わるため (2026-11-01、R100)。`frontend/package.json` と `backend/Cargo.toml` は依存の更新と同居するので載せず、検証器が依存以外の区画への変更を承認なしの区分から外す (手順 6)
+- 開発イメージ (`tools/dev-image/`)。決定的ゲートが何の上で走るかを決めるため
+- CI の workflow と実行入口 (`.github/`、`.github/actions/dev-image/` を含む)
+- 必須 CI ジョブが読む設定 (`frontend/biome.json`、`frontend/tsconfig.json`、`frontend/vitest.config.ts`、`frontend/.storybook/`)。変えるとゲートが何を確かめるかが変わるため (2026-11-01、R100)。`frontend/package.json` と `backend/Cargo.toml` は依存の更新と同居するので載せず、検証器が依存以外の区画への変更を承認なしの区分から外す (手順 6)
 - `.github/CODEOWNERS` 自身
+
+次は保護対象から外した (#105。オーナーとの合意はホスト側の会話で、#105・#108 の本文に 2026-11-03 として記録)。保護の目的は「AI が自分を検査するゲートを緩めてマージできないようにする」こと。`Makefile`・`.devcontainer/`・`dev` はマージを決めるリモートの CI から読まれない。`vite.config.ts` は下の表のとおり、テストの設定を分けたうえで、残りの影響を受け入れて外す。
+
+| ファイル | 外す理由 |
+|---|---|
+| `Makefile` | 人が手で使うタスクの入口。CI からも `.githooks/` からも呼ばれない |
+| `.devcontainer/` | 開発環境の設定。CI からも hook からも呼ばれない |
+| `dev` | 手元の実行入口。CI は保護対象の `.github/actions/dev-image/run.sh` と `image-ref.sh` で開発イメージを直接使う。手元の hook は `./dev` 経由のままだが、マージを決めるのはリモートの CI。`dev-image.yml` は入口そのものの動作の検証を続ける |
+| `frontend/vite.config.ts` | ビルドと開発サーバーの設定。テストの設定は保護対象の `frontend/vitest.config.ts` に分け、こちらは `vite.config.ts` を読み込まない (読み込むと、`vite.config.ts` の変更でテストの中身が変わるため)。残る影響: 必須ジョブの `frontend / build (vite)` (`vite build`) と `frontend / test` の Storybook のビルド (`.storybook/main.ts` が `vite.config.ts` を共有) は今も `vite.config.ts` を読むので、承認なしの変更で「バンドルが通るか」の検査を弱められる。テスト (vitest) の意味は変えられない。この 2 つのビルドの検査は弱いもので、承認の手間に見合わないと判断した (#105) |
+
+分ける前後で `vitest run` が同じテストを走らせることを確かめた (2026-11-02、AI の作業環境で `pnpm exec vitest run` と `pnpm run test:run`: どちらも 14 ファイル・68 テストが合格。分ける前も同じ件数)。NOTE: GitHub Actions 上で `run.sh` を使ったジョブはこの変更の PR の CI が初めての実行。PR のチェック結果で確かめる。
 
 承認後に push されたら承認を失効させる (`dismiss_stale_reviews_on_push` と `require_last_push_approval`)。bootstrap の再実行による変更も基準の改訂として同じ承認を経る。
 

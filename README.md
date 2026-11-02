@@ -25,7 +25,43 @@ repository.
 
 See `.contexts/setup-plan.md` for the rationale behind these choices.
 
+## Try it
+
+Needs only git and Docker (Docker Desktop, Rancher Desktop, or Docker Engine
+on WSL / Linux). No VS Code, devcontainer, `make` or `.env`.
+
+```sh
+git clone https://github.com/foo-543674/triary.git
+cd triary
+docker compose -f quickstart/compose.yaml up --build
+```
+
+Open http://localhost:3000 once the log shows the `web` service running
+(on WSL, open it in the Windows browser). The first run builds the images, so
+it takes a while; later runs reuse them. Stop with Ctrl+C;
+`docker compose -f quickstart/compose.yaml down -v` also deletes the data.
+
+This builds release images of the backend and the frontend and serves them
+from one origin behind a reverse proxy (`quickstart/`). It shares nothing
+with the development setup ("Setup" below) except host port 3000: stop the dev
+servers first, or pick another port with
+`TRIARY_PORT=3100 docker compose -f quickstart/compose.yaml up --build`.
+On Windows, a VS Code window attached to the devcontainer forwards its own
+port 3000 and takes `localhost:3000` from the Windows browser; close that
+window (or stop forwarding 3000 in its Ports panel) or use another port.
+
+What has been observed (2026-11-03, WSL2 in NAT mode, Windows browser side
+checked with `curl.exe`): the pages, `/health`, and signing up then calling
+the API with the session cookie, all through the proxy. NOTE: macOS is not
+observed yet, and neither is a real browser login. The session cookie is
+`Secure` and served over plain `http://localhost`; Chrome, Edge and Firefox
+treat localhost as secure, Safari may drop such a cookie. Check by signing
+up, then reloading the page: you should still be signed in. If not, use one
+of the other browsers.
+
 ## Setup
+
+For changing the code. To only try the app, see "Try it" above.
 
 ### Prerequisites
 
@@ -185,6 +221,7 @@ docker run --rm -p 8081:8080 \
 ├── frontend/           # SolidJS + Tailwind frontend
 ├── openapi/            # OpenAPI schema (source of truth for the API)
 ├── tests/integration/  # Postman collection (language-agnostic integration tests)
+├── quickstart/         # One-command "try it" stack (README "Try it")
 ├── docker-compose.yml  # Local infra (MySQL dev/test)
 ├── Makefile            # Developer task hub
 ├── docs/               # Review contract, remote acceptance contract, ruleset
