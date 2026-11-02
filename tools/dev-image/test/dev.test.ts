@@ -17,7 +17,7 @@ const dev = join(repoRoot, "dev");
 
 // Only the tools ./dev itself needs, so a docker or cargo installed on the
 // machine running the tests can never leak in.
-const SYSTEM_TOOLS = ["bash", "dirname", "sha256sum", "id", "cat"] as const;
+const SYSTEM_TOOLS = ["sh", "dirname", "sha256sum", "id", "cat"] as const;
 
 type Engine = "docker" | "podman";
 
@@ -25,6 +25,8 @@ interface FakeOptions {
   readonly engines: readonly Engine[];
   readonly imagePresent?: boolean;
   readonly pullSucceeds?: boolean;
+  readonly hashTool?: "sha256sum" | "shasum" | "none";
+  readonly networkPresent?: boolean;
 }
 
 interface Run {
@@ -35,24 +37,33 @@ interface Run {
 }
 
 const which = (tool: string): string => {
-  const found = spawnSync("bash", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
+  const found = spawnSync("sh", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
   assert.ok(found !== "", `test prerequisite missing: ${tool}`);
   return found;
 };
 
-const fakeBin = ({ engines, imagePresent = true, pullSucceeds = true }: FakeOptions): { bin: string; log: string } => {
+const fakeBin = ({ engines, imagePresent = true, pullSucceeds = true, hashTool = "sha256sum", networkPresent = false }: FakeOptions): { bin: string; log: string } => {
   const dir = mkdtempSync(join(tmpdir(), "dev-entrypoint-"));
   const bin = join(dir, "bin");
   const log = join(dir, "calls.log");
   mkdirSync(bin);
-  SYSTEM_TOOLS.forEach((tool) => symlinkSync(which(tool), join(bin, tool)));
+  SYSTEM_TOOLS.filter((tool) => tool !== "sha256sum").forEach((tool) => symlinkSync(which(tool), join(bin, tool)));
+  if (hashTool === "sha256sum") symlinkSync(which("sha256sum"), join(bin, "sha256sum"));
+  if (hashTool === "shasum") {
+    // Emulate the optional macOS tool without requiring Perl in the test image.
+    writeFileSync(join(bin, "shasum"), `#!${which("sh")}
+[ "$1 $2" = "-a 256" ] || exit 1
+exec ${which("sha256sum")}
+`);
+    chmodSync(join(bin, "shasum"), 0o755);
+  }
   // Each call is logged as NUL-separated arguments followed by a record
-  // separator; arguments may contain newlines (the bash -c script does).
-  const script = (name: Engine) => `#!${which("bash")}
+  // separator; arguments may contain newlines (the sh -c script does).
+  const script = (name: Engine) => `#!${which("sh")}
 { printf '%s\\0' ${name} "$@"; printf '\\036\\0'; } >> ${JSON.stringify(log)}
 case "$1 $2" in
   "image inspect") exit ${imagePresent ? 0 : 1} ;;
-  "network inspect") exit 1 ;;
+  "network inspect") exit ${networkPresent ? 0 : 1} ;;
 esac
 [ "$1" = pull ] && exit ${pullSucceeds ? 0 : 1}
 exit 0
@@ -69,7 +80,7 @@ const runDev = (
   { cwd = repoRoot, env = {}, fake = { engines: [] } }: { cwd?: string; env?: Record<string, string>; fake?: FakeOptions } = {},
 ): Run => {
   const { bin, log } = fakeBin(fake);
-  const result = spawnSync(join(bin, "bash"), [dev, ...args], {
+  const result = spawnSync(join(bin, "sh"), [dev, ...args], {
     cwd,
     encoding: "utf8",
     env: { PATH: bin, ...env },
@@ -78,7 +89,7 @@ const runDev = (
     ? readFileSync(log, "utf8")
         .split("\x1e\0")
         .filter((record) => record !== "")
-        .map((record) => record.split("\0").filter((word) => word !== ""))
+        .map((record) => record.split("\0").slice(0, -1))
     : [];
   return { status: result.status, stdout: result.stdout, stderr: result.stderr, calls };
 };
@@ -95,6 +106,58 @@ const expectedRef = (): string => {
 };
 
 describe("./dev entrypoint", () => {
+  it("hashes with shasum when sha256sum is absent", () => {
+    const run = runDev(["--image-ref"], { fake: { engines: [], hashTool: "shasum" } });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout.trim(), expectedRef());
+  });
+
+  it("names both required hashing tools and never calls an engine when neither exists", () => {
+    const run = runDev(["--image-ref"], { fake: { engines: ["docker", "podman"], hashTool: "none" } });
+    assert.notEqual(run.status, 0);
+    assert.equal(run.stdout, "");
+    assert.match(run.stderr, /requires sha256sum or shasum/);
+    assert.deepEqual(run.calls, []);
+  });
+
+  it("joins triary-network when docker can inspect it", () => {
+    const call = runCall(runDev(["true"], { fake: { engines: ["docker"], networkPresent: true } }));
+    assert.equal(call[call.indexOf("--network") + 1], "triary-network");
+  });
+
+  it("keeps all four named volume caches", () => {
+    const call = runCall(runDev(["true"], { fake: { engines: ["podman"] } }));
+    for (const cache of ["triary-dev-cargo-registry:/usr/local/cargo/registry", "triary-dev-cargo-git:/usr/local/cargo/git", "triary-dev-corepack:/cache/corepack", "triary-dev-pnpm-store:/cache/pnpm-store"]) {
+      assert.ok(call.includes(cache));
+    }
+  });
+
+  it("preserves empty arguments, whitespace, and shell metacharacters", () => {
+    const args = ["printf", "", "two words", "line\nbreak", "$(false); * ' \" "];
+    const call = runCall(runDev(args, { fake: { engines: ["docker"] } }));
+    assert.deepEqual(call.slice(-args.length), args);
+  });
+
+  it("passes environment values as data without evaluating them", () => {
+    const run = runDev(["true"], {
+      env: { RUSTFLAGS: "$(exit 99); ' \" *", SQLX_OFFLINE: "" },
+      fake: { engines: ["podman"] },
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.ok(runCall(run).includes("RUSTFLAGS"));
+    assert.ok(!runCall(run).includes("SQLX_OFFLINE"));
+  });
+
+  it("honors an explicit engine and rejects one that is missing", () => {
+    const run = runDev(["true"], {
+      env: { TRIARY_DEV_ENGINE: "docker" }, fake: { engines: ["docker", "podman"] },
+    });
+    assert.equal(runCall(run)[0], "docker");
+    const missing = runDev(["true"], { env: { TRIARY_DEV_ENGINE: "docker" } });
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /is not installed/);
+  });
+
   it("derives the image tag from the Dockerfile content", () => {
     const run = runDev(["--image-ref"]);
     assert.equal(run.status, 0, run.stderr);
@@ -147,7 +210,7 @@ describe("./dev entrypoint", () => {
     assert.ok(!call.includes("--user"));
     const image = call.indexOf(expectedRef());
     assert.ok(image > 0, `image ref missing: ${JSON.stringify(call)}`);
-    assert.deepEqual(call.slice(image + 1, image + 3), ["bash", "-c"]);
+    assert.deepEqual(call.slice(image + 1, image + 3), ["sh", "-c"]);
     assert.deepEqual(call.slice(-3), ["dev", "cargo", "test"]);
   });
 
@@ -212,7 +275,7 @@ describe("./dev entrypoint", () => {
     assert.equal(call[call.indexOf("--name") + 1], "triary-backend");
   });
 
-  it("does not publish ports or name the container under podman (it shares the host network)", () => {
+  it("does not publish ports or name the container under podman with explicit host networking", () => {
     const call = runCall(
       runDev(["pnpm", "run", "dev"], {
         env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_NAME: "triary-backend" },
@@ -221,6 +284,7 @@ describe("./dev entrypoint", () => {
     );
     assert.ok(!call.includes("--publish"));
     assert.ok(!call.includes("--name"));
+    assert.equal(call[call.indexOf("--network") + 1], "host");
   });
 
   it("publishes on every interface when asked", () => {
@@ -264,13 +328,13 @@ describe("./dev entrypoint", () => {
     const call = runCall(runDev(["cargo", "test"], { fake: { engines: ["podman"] } }));
     const script = call[call.indexOf("-c") + 1] ?? "";
     const empty = mkdtempSync(join(tmpdir(), "dev-empty-mount-"));
-    const guarded = spawnSync(which("bash"), ["-c", script, "dev", "true"], {
+    const guarded = spawnSync(which("sh"), ["-c", script, "dev", "true"], {
       encoding: "utf8",
       env: { PATH: process.env.PATH ?? "", TRIARY_DEV_ROOT: empty },
     });
     assert.equal(guarded.status, 125);
     assert.match(guarded.stderr, /not visible inside the container/);
-    const visible = spawnSync(which("bash"), ["-c", script, "dev", "true"], {
+    const visible = spawnSync(which("sh"), ["-c", script, "dev", "true"], {
       encoding: "utf8",
       env: { PATH: process.env.PATH ?? "", TRIARY_DEV_ROOT: repoRoot },
     });

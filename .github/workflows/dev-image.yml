@@ -9,7 +9,7 @@ name: dev-image
 # Pull requests only build and test: an image built from unreviewed code is
 # never published. The package is pullable without login: observed
 # 2026-10-31 with an anonymous `podman pull` of the first published tag
-# (df-d98c305832a9) from the ai-box, which has no GHCR credentials.
+# (df-d98c305832a9) with rootless Podman (single-UID mode), without GHCR credentials.
 
 on:
   pull_request:

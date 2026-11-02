@@ -655,3 +655,27 @@ Phase 2 で新たに聞いたことはない。新しい原料が Phase 2 に足
   スナップショット) で判定される。その PR に限り、旧い形式のスナップショットも
   出す (`main` の `cli.ts` を開発イメージの中で動かす)。マージ後の PR は新しい
   形式だけ
+
+## 2026-11-02 再実行 (3.1.0): 開発入口の POSIX sh 化
+
+- 原料: foo-skills 3.1.0 の `skills/bootstrap/SKILL.md` Phase 5
+  「開発コマンドの入口」「ai-box をプロジェクトの前提にしない」、
+  `philosophy/technology-choices.md`「開発イメージに入れるもの、clone したままで動かすもの」。
+  ユーザーの今回の指示に基づく変更。過去の環境観測と判断は上書きしない。
+- `dev` を POSIX sh に変更し、rootless Podman (単一 UID モード) または
+  docker を前提とする。Podman のネットワーク指定を明示する判断とその影響・
+  未観測事項の確認方法は `dev` のネットワークコメントを参照。
+  現在の操作説明は AGENTS.md / README.md を参照。
+- SHA-256 タグの形式を保ち、ホストの `sha256sum`、なければ `shasum -a 256` を使う。
+  両方なければ両ツール名を示して失敗し、コンテナへのフォールバックは行わない。
+- 反映先: `dev`、入口テスト、AGENTS.md と派生ファイル、README.md、
+  Makefile および関連コメント。hook・レビューゲート自体の POSIX 化は今回の対象外。
+- 検証記録: 2026-11-02 に実装者がこのマシンで `make dev-test` を実行し、
+  tsc と Node テストすべて (29 件) が成功。新しい POSIX sh の `./dev` を経由し、
+  実際の rootless Podman（単一 UID モード）でコマンドが実行された。
+  `sh -n dev` と `dash -n dev` も成功。
+- NOTE: 実 docker エンジンと macOS の `shasum` は未観測。
+  確認方法は README.md「Setup」を参照。Podman の inspect による
+  ネットワークモード確認とブラウザーからの `/health` も未観測で、
+  確認方法は `dev` のネットワークコメントを参照。
+- Dockerfile の ai-box 表記はタグを維持するため、次の実際のイメージ変更まで残す。

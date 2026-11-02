@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # dev: run a project command inside the triary dev image.
 #
 #   ./dev cargo nextest run        # from backend/
@@ -15,10 +15,9 @@
 # sets because it is built from tools/dev-image/Dockerfile, #56) the command
 # runs directly. TRIARY_DEV_DIRECT=1 does the same for any other environment
 # that already provides the toolchain.
-# NOTE: unverified that the devcontainer built from the dev image works; it
-# can only be built on the owner's machine (#56).
-# Otherwise podman is preferred (the ai-box ships rootless single-UID Podman),
-# then docker (the owner's machine).
+# NOTE: the devcontainer build/open is unverified; check by rebuilding and
+# opening it with a multi-UID-capable engine (#56).
+# Otherwise rootless Podman (single-UID mode) is preferred, then docker.
 #
 # Environment:
 #   TRIARY_DEV_IMAGE_REF  use this image instead of the content-derived tag
@@ -27,8 +26,8 @@
 #   TRIARY_DEV_PUBLISH    docker only: ports to publish on the host's 127.0.0.1
 #                         (space separated, e.g. "3000"). Each docker call is its
 #                         own container on its own network, so a server inside it
-#                         is not reachable from the host without this. Podman in
-#                         the ai-box shares the host network and needs nothing.
+#                         is not reachable from the host without this. Podman
+#                         is explicitly run with --network host.
 #   TRIARY_DEV_PUBLISH_ADDRESS
 #                         docker only: host address the ports are published on,
 #                         "127.0.0.1" (default) or "0.0.0.0" (every interface,
@@ -41,35 +40,21 @@
 #   TRIARY_DEV_NAME       docker only: container name, so another ./dev
 #                         container on triary-network can reach it by name
 
-set -euo pipefail
+set -eu
+# Only the documented port list is split; never expand it as file patterns.
+set -f
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
 REGISTRY_IMAGE="ghcr.io/foo-543674/triary-dev"
 DOCKERFILE="$ROOT/tools/dev-image/Dockerfile"
 
 die() {
-  echo "dev: $*" >&2
+  printf 'dev: %s\n' "$*" >&2
   exit 1
 }
 
-image_ref() {
-  if [[ -n "${TRIARY_DEV_IMAGE_REF:-}" ]]; then
-    printf '%s\n' "$TRIARY_DEV_IMAGE_REF"
-    return
-  fi
-  [[ -r "$DOCKERFILE" ]] || die "missing $DOCKERFILE"
-  local sum
-  if command -v sha256sum >/dev/null 2>&1; then
-    sum="$(sha256sum "$DOCKERFILE")" || die "cannot hash $DOCKERFILE"
-  else
-    # macOS ships shasum instead of sha256sum; the digest is the same.
-    sum="$(shasum -a 256 "$DOCKERFILE")" || die "cannot hash $DOCKERFILE"
-  fi
-  printf '%s:df-%s\n' "$REGISTRY_IMAGE" "${sum:0:12}"
-}
-
 pick_engine() {
-  if [[ -n "${TRIARY_DEV_ENGINE:-}" ]]; then
+  if [ -n "${TRIARY_DEV_ENGINE:-}" ]; then
     command -v "$TRIARY_DEV_ENGINE" >/dev/null 2>&1 || die "TRIARY_DEV_ENGINE=$TRIARY_DEV_ENGINE is not installed"
     printf '%s\n' "$TRIARY_DEV_ENGINE"
   elif command -v podman >/dev/null 2>&1; then
@@ -77,92 +62,130 @@ pick_engine() {
   elif command -v docker >/dev/null 2>&1; then
     echo docker
   else
-    die "neither podman nor docker is available. Do not install cargo/pnpm on this machine instead; update the ai-box (it ships podman) or install docker."
+    die "neither podman nor docker is available. Install rootless Podman (single-UID mode is supported) or docker, not a host language toolchain."
   fi
 }
 
-runs_directly() {
-  [[ "${TRIARY_DEV_IMAGE:-}" == "1" || "${TRIARY_DEV_DIRECT:-}" == "1" ]]
+# NOTE: unverified platform defaults: Linux coreutils provides sha256sum;
+# macOS ships shasum. Check with `command -v sha256sum` / `command -v shasum`.
+hash_dockerfile() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum < "$DOCKERFILE"
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 < "$DOCKERFILE"
+  else
+    die "SHA-256 hashing requires sha256sum or shasum; install one of these tools."
+  fi
 }
 
-if [[ "${1:-}" == "--image-ref" ]]; then
-  image_ref
-  exit 0
-fi
-if [[ "${1:-}" == "--engine" ]]; then
-  if runs_directly; then echo direct; else pick_engine; fi
-  exit 0
-fi
-[[ $# -gt 0 ]] || die "usage: ./dev <command> [args...]   (or ./dev --image-ref / --engine)"
+image_ref() {
+  if [ -n "${TRIARY_DEV_IMAGE_REF:-}" ]; then
+    printf '%s\n' "$TRIARY_DEV_IMAGE_REF"
+    return
+  fi
+  [ -r "$DOCKERFILE" ] || die "missing $DOCKERFILE"
+  sum=$(hash_dockerfile) || die "cannot hash $DOCKERFILE"
+  printf '%s:df-%.12s\n' "$REGISTRY_IMAGE" "$sum"
+}
 
-if runs_directly; then
-  exec "$@"
-fi
+runs_directly() {
+  [ "${TRIARY_DEV_IMAGE:-}" = 1 ] || [ "${TRIARY_DEV_DIRECT:-}" = 1 ]
+}
 
-WORKDIR="$(pwd -P)"
+ensure_image() {
+  if ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "dev: pulling $IMAGE" >&2
+    "$ENGINE" pull --quiet "$IMAGE" >&2 ||
+      die "cannot pull $IMAGE. If tools/dev-image/Dockerfile changed on this branch, the image is published only after it reaches main (.github/workflows/dev-image.yml)."
+  fi
+}
+
+# These functions receive the command as positional parameters and prepend
+# engine options. Quoted "$@" preserves empty arguments and all whitespace.
+run_container() {
+  set -- --rm -i \
+    --volume "$ROOT:$ROOT" --workdir "$WORKDIR" \
+    --volume triary-dev-cargo-registry:/usr/local/cargo/registry \
+    --volume triary-dev-cargo-git:/usr/local/cargo/git \
+    --volume triary-dev-corepack:/cache/corepack \
+    --volume triary-dev-pnpm-store:/cache/pnpm-store \
+    --env "TRIARY_DEV_ROOT=$ROOT" "$@"
+  if [ -t 0 ] && [ -t 1 ]; then set -- --tty "$@"; fi
+  for name in DATABASE_URL TEST_DATABASE_URL SQLX_OFFLINE RUSTFLAGS CARGO_TERM_COLOR RUST_LOG RUST_BACKTRACE CI TERM REVIEW_GATE_BASE BACKEND_PORT BACKEND_ORIGIN; do
+    # name comes exclusively from the fixed allowlist above; the value is
+    # expanded as data, never evaluated as shell code.
+    eval 'value=${'"$name"':-}'
+    if [ -n "$value" ]; then set -- --env "$name" "$@"; fi
+  done
+  run_engine "$@"
+}
+
+run_engine() {
+  case "$ENGINE" in
+    docker)
+      set -- --user "$(id -u):$(id -g)" "$@"
+      if "$ENGINE" network inspect triary-network >/dev/null 2>&1; then
+        set -- --network triary-network "$@"
+      fi
+      publish_address=${TRIARY_DEV_PUBLISH_ADDRESS:-127.0.0.1}
+      case "$publish_address" in
+        127.0.0.1|0.0.0.0) ;;
+        *) die "TRIARY_DEV_PUBLISH_ADDRESS: use 127.0.0.1 or 0.0.0.0, not $publish_address" ;;
+      esac
+      ports=
+      for port in ${TRIARY_DEV_PUBLISH:-}; do
+        case "$port" in
+          ''|*[!0-9]*) die "TRIARY_DEV_PUBLISH: not a port number: $port" ;;
+        esac
+        ports="$port $ports"
+      done
+      # Prepending in reverse keeps the caller's publication order.
+      for port in $ports; do
+        set -- --publish "$publish_address:$port:$port" "$@"
+      done
+      if [ -n "${TRIARY_DEV_NAME:-}" ]; then set -- --name "$TRIARY_DEV_NAME" "$@"; fi
+      ;;
+    podman)
+      # Observed 2026-10-31: single-UID rootless mappings 0 -> 1000 (size 1)
+      # kept generated files owned by the caller without --user. Check other
+      # hosts with `podman info` and `./dev touch ownership-check` + `ls -ln`.
+      # Explicit host networking replaces one environment's containers.conf setting.
+      # It is always on so dev servers reach each other over localhost under
+      # rootless Podman without port publishing; container processes can also
+      # reach host ports. This changes behavior for other rootless Podman setups.
+      # What has been observed under rootless Podman: .contexts/bootstrap-decisions.md
+      # (2026-11-02 entry for this entrypoint).
+      # NOTE: network mode remains unobserved via inspection; run
+      # `podman inspect --format '{{.HostConfig.NetworkMode}}' <id>` (expect host).
+      # Browser /health remains unobserved for this revision; open
+      # http://localhost:3000/health with make run-backend and make run-frontend running.
+      set -- --network host "$@"
+      ;;
+  esac
+  exec "$ENGINE" run "$@"
+}
+
+case "${1:-}" in
+  --image-ref) image_ref; exit 0 ;;
+  --engine)
+    if runs_directly; then echo direct; else pick_engine; fi
+    exit 0 ;;
+esac
+[ "$#" -gt 0 ] || die "usage: ./dev <command> [args...]   (or ./dev --image-ref / --engine)"
+if runs_directly; then exec "$@"; fi
+
+WORKDIR=$(pwd -P)
 case "$WORKDIR/" in
   "$ROOT"/*) ;;
   *) die "run ./dev from inside the repository ($ROOT); the container only sees the repository" ;;
 esac
+ENGINE=$(pick_engine)
+IMAGE=$(image_ref)
+ensure_image
 
-ENGINE="$(pick_engine)"
-IMAGE="$(image_ref)"
-
-if ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo "dev: pulling $IMAGE" >&2
-  "$ENGINE" pull --quiet "$IMAGE" >&2 ||
-    die "cannot pull $IMAGE. If tools/dev-image/Dockerfile changed on this branch, the image is published only after it reaches main (.github/workflows/dev-image.yml)."
-fi
-
-args=(run --rm -i
-  --volume "$ROOT:$ROOT"
-  --workdir "$WORKDIR"
-  --volume triary-dev-cargo-registry:/usr/local/cargo/registry
-  --volume triary-dev-cargo-git:/usr/local/cargo/git
-  --volume triary-dev-corepack:/cache/corepack
-  --volume triary-dev-pnpm-store:/cache/pnpm-store
-  --env TRIARY_DEV_ROOT="$ROOT")
-[[ -t 0 && -t 1 ]] && args+=(--tty)
-
-for name in DATABASE_URL TEST_DATABASE_URL SQLX_OFFLINE RUSTFLAGS CARGO_TERM_COLOR RUST_LOG RUST_BACKTRACE CI TERM REVIEW_GATE_BASE BACKEND_PORT BACKEND_ORIGIN; do
-  [[ -n "${!name:-}" ]] && args+=(--env "$name")
-done
-
-case "$ENGINE" in
-  docker)
-    # Files written to the work tree must stay owned by the caller.
-    args+=(--user "$(id -u):$(id -g)")
-    # Reach the local MySQL (docker-compose.yml) when it is running.
-    if docker network inspect triary-network >/dev/null 2>&1; then
-      args+=(--network triary-network)
-    fi
-    publish_address="${TRIARY_DEV_PUBLISH_ADDRESS:-127.0.0.1}"
-    [[ "$publish_address" == 127.0.0.1 || "$publish_address" == 0.0.0.0 ]] ||
-      die "TRIARY_DEV_PUBLISH_ADDRESS: use 127.0.0.1 or 0.0.0.0, not $publish_address"
-    for port in ${TRIARY_DEV_PUBLISH:-}; do
-      [[ "$port" =~ ^[0-9]+$ ]] || die "TRIARY_DEV_PUBLISH: not a port number: $port"
-      args+=(--publish "$publish_address:$port:$port")
-    done
-    if [[ -n "${TRIARY_DEV_NAME:-}" ]]; then
-      args+=(--name "$TRIARY_DEV_NAME")
-    fi
-    ;;
-  podman)
-    # Rootless Podman maps the container's root to the caller, so files are
-    # owned by the caller without --user. The ai-box configures netns=host
-    # (~/.config/containers/containers.conf). Observed 2026-10-31 in the
-    # podman-enabled ai-box: `podman info` uidmap/gidmap = 0 -> 1000 (size 1),
-    # `netns = "host"` in containers.conf, and a file created with
-    # `./dev touch x` is owned by the caller (node).
-    ;;
-esac
-
-# The bind mount resolves $ROOT on the engine's host. When that host does not
-# see this path (for example docker-outside-of-docker from a container that is
-# neither the dev image nor marked TRIARY_DEV_DIRECT), the engine mounts an
-# empty directory instead; stop rather than run against it.
-exec "$ENGINE" "${args[@]}" "$IMAGE" bash -c '
-  [[ -f "$TRIARY_DEV_ROOT/dev" && -f "$TRIARY_DEV_ROOT/tools/dev-image/Dockerfile" ]] || {
+# Check the bind mount on the engine's host before running the command.
+run_container "$IMAGE" sh -c '
+  [ -f "$TRIARY_DEV_ROOT/dev" ] && [ -f "$TRIARY_DEV_ROOT/tools/dev-image/Dockerfile" ] || {
     echo "dev: the repository is not visible inside the container at $TRIARY_DEV_ROOT (is the engine running on another host? the devcontainer runs commands directly; in another container that has the toolchain set TRIARY_DEV_DIRECT=1)" >&2
     exit 125
   }
