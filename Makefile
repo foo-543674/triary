@@ -124,6 +124,8 @@ hooks-install: ## Enable the git hooks in .githooks/ (review gate, see AGENTS.md
 .PHONY: gate-test
 gate-test: ## Test the review gate (on this machine) and the remote verifier's TypeScript (in the dev image)
 	sh tools/review-gate/test/gate.test.sh
+	# Host-only: bash and standard POSIX utilities; API and language tools are fakes.
+	bash tools/review-gate/test/acceptance.test.sh
 	"$(DEV)" bash -c '$(FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json && node --test --test-reporter=dot tools/review-gate/test/*.test.ts'
 
 .PHONY: dev-test
