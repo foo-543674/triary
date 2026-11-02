@@ -22,7 +22,7 @@ CHANGED=$(git diff --name-only "$(git merge-base "$BASE" HEAD)" HEAD)
 [ -n "$CHANGED" ] || exit 0
 
 if touches '^backend/'; then
-  (cd "$REPO_ROOT/backend" && "$DEV" cargo nextest run --locked --all-features --no-tests=pass) || fail "backend tests failed"
+  run_rust_tests || fail "backend tests failed"
 fi
 if touches '^frontend/'; then run_frontend_tests || fail "frontend architecture tests or unit tests failed"; fi
 if touches '^tools/review-gate/'; then run_review_gate_selftest || fail "review-gate self-test failed"; fi
