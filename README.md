@@ -66,11 +66,12 @@ it.
 How the two servers find each other depends on how `./dev` runs commands
 (`./dev --engine`):
 
-- `direct` (devcontainer) and `podman` (the AI's box, `netns = "host"`): both
-  servers share one network. Observed in the AI's box on 2026-10-31:
-  `/health` through `localhost:3000` reached the backend. Not verified in the
-  devcontainer yet; check by opening http://localhost:3000/health from the
-  host browser while both run (VS Code forwards the ports).
+- `direct` (devcontainer) and rootless `podman` (including single-UID mode;
+  see the networking comment in `dev`). Observed with rootless Podman on 2026-10-31:
+  `/health` through `localhost:3000` reached the backend. NOTE: browser `/health`
+  for this revision remains unobserved; check by opening
+  http://localhost:3000/health from the host browser while both run
+  (VS Code forwards the ports).
 - `docker` (e.g. WSL without the devcontainer): every `./dev` call is its own
   container. `make run-backend` names the backend container `triary-backend`
   on `triary-network` (run `make infra-up` first, it creates the network);
@@ -100,9 +101,18 @@ How the two servers find each other depends on how `./dev` runs commands
   running and printed its URL, then suspect the published port; if `/`
   answers but `/health` fails, look at the backend or the proxy.
 
+See the networking comment in `dev` for the Podman decision, its effects,
+and the remaining network checks; what has been observed so far is recorded in
+`.contexts/bootstrap-decisions.md`. NOTE: docker on a real engine remains unobserved; run `make dev-test` with
+`TRIARY_DEV_ENGINE=docker`. macOS `shasum` remains unobserved; run
+`./dev --image-ref` on macOS with `sha256sum` absent from PATH.
+
 Language commands (cargo, pnpm, npx, ...) go through `./dev`, which runs them
 in the dev image (`tools/dev-image/Dockerfile`). Inside the devcontainer it
-runs them directly; elsewhere it uses podman or docker. Do not install the
+runs them directly; elsewhere it uses rootless Podman (single-UID mode is
+supported) or docker. The entrypoint is POSIX sh; no host language toolchain
+is needed. Image tag calculation requires host `sha256sum` or `shasum`; if neither
+is installed, the entrypoint fails with a message naming both tools. Do not install the
 toolchains on your machine; see "Common commands" in `AGENTS.md`.
 
 NOTE: two things are not settled yet (`.contexts/bootstrap-decisions.md`
@@ -110,12 +120,14 @@ NOTE: two things are not settled yet (`.contexts/bootstrap-decisions.md`
 
 - The devcontainer is built from the dev image's Dockerfile (#56), so it has
   the same toolchain as CI. Unverified until the owner rebuilds it once.
-- Step 6 outside the devcontainer is unverified (see the list above for
-  docker). The backend's `DATABASE_URL` in `.env.example` uses the container
+- NOTE: step 6 outside the devcontainer remains unobserved (see the list above
+  for docker), including the following database connectivity caveat. The
+  backend's `DATABASE_URL` in `.env.example` uses the container
   name `triary-mysql`: under docker `./dev` joins `triary-network`, which
-  resolves it; under podman in the ai-box the container shares the box's
-  network and that name probably does not resolve. Check by running step 6
-  there.
+  resolves it; under rootless Podman (see the networking comment in `dev`),
+  that container name may not resolve. Check step 6 with this
+  engine/configuration; use a host-reachable MySQL address
+  in `DATABASE_URL` if needed.
 
 ## Common commands
 

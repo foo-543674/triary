@@ -100,3 +100,9 @@ the issue or conversation is Japanese. Design docs in `.contexts/` and
 - `.contexts/bootstrap-decisions.md` — selected quality lenses and rationale
 - `docs/review-contract.md`, `docs/remote-acceptance.md` — review and
   acceptance rules
+
+The `./dev` entrypoint is POSIX sh and supports rootless Podman (including
+single-UID mode) or docker without a host language toolchain. See the
+networking comment in `dev` for Podman; docker uses the publish/name options described
+in README "Setup". Image tag calculation requires host `sha256sum` or `shasum`.
+What has been observed and what is still to check: `dev` and README "Setup".

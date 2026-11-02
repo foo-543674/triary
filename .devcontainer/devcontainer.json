@@ -4,8 +4,9 @@
   // ./dev use (#56). Inside, ./dev runs commands directly: the image sets
   // TRIARY_DEV_IMAGE=1. The image sets HOME=/home/dev for ./dev's callers;
   // the editor user gets its own home through remoteEnv.
-  // NOTE: unverified — built and opened only on the owner's machine (the
-  //       ai-box cannot build images with apt-get, which common-utils needs).
+  // NOTE: build/open unverified; check by rebuilding and opening with an
+  // engine that supports multiple UIDs. Observed 2026-10-31: single-UID
+  // rootless Podman fails on apt-get user switches (common-utils needs it).
   "build": {
     "dockerfile": "../tools/dev-image/Dockerfile",
     "context": "../tools/dev-image"

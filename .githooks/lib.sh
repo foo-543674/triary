@@ -31,8 +31,8 @@ touches() {
   printf '%s\n' "$CHANGED" | grep -Eq "$1"
 }
 
-# Each ./dev call starts a container (about 3.5 s under rootless podman with
-# vfs storage, observed 2026-10-31), so the commands of one gate share one call.
+# Each non-direct ./dev call starts a container, so one gate shares one call.
+# Observed 2026-10-31: about 3.5 s per call with rootless Podman/vfs storage.
 # Force the checked-in backend/.sqlx cache even when DATABASE_URL is set
 # (including via .env, documented by sqlx 0.8's query! Requirements).
 # A changed query without cached metadata fails compilation with sqlx's

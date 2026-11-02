@@ -425,7 +425,7 @@ Language toolchains (cargo, sqlx, node packages, pnpm, ...) live only in the
 dev image (`tools/dev-image/Dockerfile`). Run every language command through
 the `./dev` entrypoint at the repository root (`../dev` from `backend/` or
 `frontend/`); the hooks, the `Makefile` and CI do the same. Do not install a
-toolchain on your machine or the AI's box to work around a failing `./dev`;
+toolchain on your machine or in the AI execution environment to work around a failing `./dev`;
 fix the entrypoint or the image instead. Do not run the toolchains directly
 either, even where they happen to be installed; `.claude/settings.json`
 denies them and allows `./dev` / `../dev` instead. Why:
@@ -461,10 +461,10 @@ instead of asking for it. Why: `.contexts/bootstrap-decisions.md`
 | `make hooks-install` | Enable the review-gate git hooks (`.githooks/`) in this clone |
 | `make gate-test` | Test the review gate (git + sh) and the remote verifier's TypeScript (in the dev image) |
 | `make dev-test` | Type-check and test the `./dev` entrypoint (in the dev image) |
-| `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
+| `./dev <command>` | Run a command through the POSIX sh entrypoint (rootless Podman, including single-UID mode, or docker; directly inside the dev image). Image tag calculation requires host `sha256sum` or `shasum`. NOTE: the devcontainer build remains unverified; rebuild and open it to check (#56). Each non-direct call starts a container; chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `sh tools/review-gate/gate.sh check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports by default: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
+| `cd frontend && ../dev pnpm run dev` | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). For rootless Podman networking, see the networking comment in `dev`; under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
 
 ## devcontainer and local infra
 
