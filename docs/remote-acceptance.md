@@ -48,9 +48,13 @@ AGENTS.md・`docs/review-contract.md`・検証処理 (`.github/workflows/accepta
 - 検証処理は PR のコードを **実行しない**。checkout するのは base の版だけで、PR の HEAD は diff ハッシュの計算のために git オブジェクトとして fetch するだけ。PR のコードを実行する CI (`ci.yml`) と、証跡を検証して結果を発行する処理を分けている
 - 結果は commit status `acceptance / verdict` として HEAD に発行する。ruleset では、この status を **GitHub Actions (integration id 15368) が発行したもの** に限って required check にする設計で、AI の App が同名の status を発行しても数えられないことを狙っている。NOTE: 未確認 — `integration_id` の指定が check run だけでなく REST の commit status にも効くかは確かめていない。確認方法: ruleset の適用後、App の資格情報で同名の status を発行し、マージが拒否されるかを見る (動作確認 #5)。効かなければ check run での発行に切り替える
 - PR 内で追加・変更した workflow は `pull_request` で走り、同名の status を発行できてしまう。これは `.github/` が基準ファイルで code owner の承認が要ることで塞いでいる (承認者は workflow の変更を見て判断する)。機械的な遮断ではないことをここに明記する
-- base が進んだ場合は、ruleset の「マージ前にブランチを最新にする」(`strict_required_status_checks_policy`) で HEAD の更新を強制し、新しい HEAD で再検証させる。HEAD が同じで base だけ進んだ古い成功は使えない。契約や検証器が変わった場合も、スナップショットの `contractVersion` が base 側の版と合わなくなるので不合格になる
+- base が進んでも、ブランチの更新は強制しない。ruleset の「マージ前にブランチを最新にする」(`strict_required_status_checks_policy`) はオフにしている (オーナーの判断、2026-11-02。マージのたびにほかの PR が古くなり、更新・承認・スナップショットの出し直しを手作業で繰り返すことになっていたため)。そのため、HEAD が同じで base だけが進んだときは、古い base に対する成功がそのまま残る
+  - 受け入れる穴: 別々に成功した 2 つの PR を合わせたときの不具合は、マージ前には捕まえられない。PR の CI は、実行した時点の base とマージした状態をテストする (`pull_request` イベントの仕様。NOTE: このリポジトリでの観測はまだない)。マージ後の `main` の CI で気づく
+  - スナップショットの `contractVersion` は、`docs/review-contract.md` と `tools/review-gate/` の版だけを表す (`gate.sh` の `contract_version_at`)。このどちらかを変える PR がマージされたら、AI が開いている PR の判定を `workflow_dispatch` (入力: PR 番号) で実行し直す。再判定では `contractVersion` が新しい base 側の版と合わないので不合格になり、新しい契約でのレビューとスナップショットの出し直しを求められる
+  - 受け入れる穴: それ以外の規則 (AGENTS.md、この文書、workflow 等) が変わっても、レビュー済みの PR はさかのぼって無効にならない。古い規則でレビューされた PR がそのままマージされうる。これらを `contractVersion` に含めると、規則を 1 行直すたびに開いている PR のスナップショットがすべて無効になるため、含めない。代わりに、それらの規則を変える PR がマージされたら、AI が開いている PR を見て、新しい規則に影響を受けるものを再レビューに回すか直す。直すのはマージの後でもよい。人に確認や手作業を足すほどガードレールが形だけになるので、AI が見つけて直せる穴は AI が持つ (オーナーの方針、2026-11-02)
 - 判断依頼の Issue を閉じても自動では再判定しない。`workflow_dispatch` (入力: PR 番号) か、スナップショットの再提出で再判定する
 - 判定ステップには `# DO NOT REMOVE OR WEAKEN:` で存在意義を書き残す
+- 不合格の出力は条件名 (CI / review snapshot / decision)、検出内容、次の行動を示す。commit status には最初の理由を最大 140 文字で載せ、job summary には全理由と次の行動を載せる。基準ファイル変更時も code owner 承認が必要な旨と次の行動を示す (承認の強制は ruleset 側)。保護コメントで定めたフォールバックの発動時は判定経路を維持し、失敗内容・フォールバックの意味・実行ログへのリンクを **verifier warning** として stderr と job summary に残す。それ以外の予期しないコマンド失敗・API 失敗・`gate.sh accept` の終了値が 1 を超える場合は、条件違反とは別に **verifier error** と表示し、実行ログの確認と修復・再実行を案内する。HEAD 取得前の故障は status を発行できないため、実行ログと job summary に残す。
 
 ## 証跡の提出と対応付け
 
@@ -97,7 +101,7 @@ Dependabot の PR は、範囲内の全コミットが Dependabot 自身のも�
 | 適用 | 2026-10-31 14:37 UTC にオーナーが `gh api -X PUT repos/foo-543674/triary/rulesets/14771319 --input docs/rulesets/main.json` を実行 (#42) |
 | 有効化済み | 有効 (読み戻しで確認。詳細は「マージを止められるか」)。下記の動作確認は未 |
 
-主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)、ブランチを最新にする。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない設計。適用後の読み戻しで App の `current_user_can_bypass: never` を確認した (2026-10-31)。`bypass_actors` は App の権限では読めず未確認。
+主な設定: 削除・force push の禁止、PR 必須、承認 1 件 + code owner の承認必須、push で承認失効、最後の push 以外の人の承認、required status check `acceptance / verdict` (GitHub Actions 発行に限る)。「ブランチを最新にする」は 2026-11-02 にオフにした (上記「検証の経路」)。bypass はリポジトリの admin ロールの PR 経由のマージだけ (オーナーが自分の PR をマージするため。自分の PR は自己承認できない)。AI の App は admin ではないので bypass できない設計。適用後の読み戻しで App の `current_user_can_bypass: never` を確認した (2026-10-31)。`bypass_actors` は App の権限では読めず未確認。
 
 ### 動作確認 (適用後)
 
@@ -147,7 +151,7 @@ Dependabot の PR は、範囲内の全コミットが Dependabot 自身のも�
 - 承認の後にブランチへ別のコミットが push された場合、その承認を使わせない仕組みは ruleset の `dismiss_stale_reviews_on_push` と `require_last_push_approval` (`docs/rulesets/main.json`) である。ruleset は 2026-10-31 から有効だが、これらが実際に効くことは動作確認 #7 が済むまで未確認。それまでの確かな防御は `--match-head-commit` (判定した HEAD 以外をマージしない) である
 - NOTE: 未確認 — Dependabot のブランチで、作成者を偽った上で `web-flow` の署名付きコミットを作れるか (GitHub の Web UI や contents API で作ったコミットを `web-flow` が署名するかどうか、`author` を指定できるかどうかも確かめていない)。書き込み権限が要る操作で、今の書き込み権限者はオーナーと AI の App だけ。確かめ方: テスト用のブランチで contents API に `author` を指定してコミットし、`author.login` と `committer.login` を見る。より強い対策は、`dependabot/**` への push を Dependabot に限る ruleset (オーナーの操作)。影響範囲: 2026-11-01 から Dependabot 自身のコミットだけの PR はスナップショットを求めないので、偽装が可能なら、依存ファイルに限らず基準ファイル以外のあらゆる変更がスナップショットなしで判定を通る (承認なしの自動マージは依存ファイルに限られ、基準ファイルは code owner の承認が要るのは変わらない)
 - **GitHub Actions の更新は承認あり (2026-10-31 にオーナーが確定、#43)。** オーナーは当初含めると判断したが、workflow は `.github/` にあり、ruleset の code owner 承認必須 (基準ファイルの保護) にかかる。外すには `.github/workflows/` を CODEOWNERS から外す必要があり、PR が workflow を足して同名の status を出す穴を承認で塞いでいる仕組み (上の「保護する基準ファイル」) が弱まる。この穴を説明したうえで、オーナーは承認ありを選んだ。運用: Actions の更新 PR はスナップショットなしで判定が通り (上の「Dependabot の PR」、2026-11-01 から暫定)、オーナーが承認してマージする
-- NOTE: 未確認 — GITHUB_TOKEN で行ったマージは `main` への push の workflow を起動しない (GitHub のドキュメント「Triggering a workflow from a workflow」による)。そのため、この区分のマージでは `main` の CI が走らない。根拠は、ruleset の「ブランチを最新にする」で最新の HEAD に対して走った PR の CI とする
+- NOTE: 未確認 — GITHUB_TOKEN で行ったマージは `main` への push の workflow を起動しない (GitHub のドキュメント「Triggering a workflow from a workflow」による)。そのため、この区分のマージでは `main` の push の CI が走らない。根拠は、PR の HEAD に対して走った CI とする。2026-11-02 から「ブランチを最新にする」はオフなので、この CI は最新の `main` との組み合わせを確かめていない。その穴は、`ci.yml` が毎日 `main` で走ることで後から捕まえる (`schedule`。手動では `workflow_dispatch`)
 - 変更されたパスは判定の材料の 1 つで、パスだけで安全と決めない。検証器が機械的に確かめられない部分は承認ありとする
 - 戻し方: `git revert` でマージを戻す (依存更新ならロックファイルとマニフェスト)。データ変更・外部への作用は起きない (デプロイの仕組みがまだないため)。デプロイが入ったら見直す
 - 改訂できる人: オーナー (`foo-543674`)。AI は改訂案を出せるが、自分で有効にしない (範囲を狭める改訂も同じ)。すぐにやってよいのは、条件を変えずに承認なしのマージを一時的に止めることだけ (`acceptance.yml` の automerge ジョブを無効にする PR、またはリポジトリ設定で Actions の承認を切る)

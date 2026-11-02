@@ -33,9 +33,23 @@ touches() {
 
 # Each ./dev call starts a container (about 3.5 s under rootless podman with
 # vfs storage, observed 2026-10-31), so the commands of one gate share one call.
+# Force the checked-in backend/.sqlx cache even when DATABASE_URL is set
+# (including via .env, documented by sqlx 0.8's query! Requirements).
+# A changed query without cached metadata fails compilation with sqlx's
+# "no cached data for this query" diagnostic; regenerate with make db-prepare
+# against a migrated database. Offline builds cannot detect schema-only drift.
 run_rust_lint() {
   (cd "$REPO_ROOT/backend" &&
-    "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings')
+    SQLX_OFFLINE=true "$DEV" bash -c 'cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings')
+}
+
+run_rust_tests() {
+  # Inspected 2026-11-02: backend/tests checks source/dependency metadata;
+  # unit/HTTP tests use in-memory fakes (src/testing.rs), with no live DB.
+  # Run the full suite, as CI's backend-test does without a DB service.
+  # Live-MySQL coverage remains in CI's separate Newman integration job.
+  (cd "$REPO_ROOT/backend" &&
+    SQLX_OFFLINE=true "$DEV" cargo nextest run --locked --all-features --no-tests=pass)
 }
 
 run_frontend_lint() {
@@ -48,11 +62,22 @@ run_frontend_tests() {
 
 # The gate itself is tested on this machine (git + sh); the remote verifier's
 # TypeScript parts are type-checked and tested in the dev image.
-run_review_gate_selftest() {
+run_review_gate_selftest() (
+  clear_selftest_git_env
   sh "$REPO_ROOT/tools/review-gate/test/gate.test.sh" &&
     (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/review-gate/tsconfig.json && node --test --test-reporter=dot tools/review-gate/test/*.test.ts")
-}
+)
 
-run_dev_selftest() {
+run_dev_selftest() (
+  clear_selftest_git_env
   (cd "$REPO_ROOT" && "$DEV" bash -c "(cd frontend && $FRONTEND_DEPS) && frontend/node_modules/.bin/tsc -p tools/dev-image/tsconfig.json && node --test --test-reporter=dot tools/dev-image/test/*.test.ts")
+)
+
+# Use only in self-test subshells: the hook's gate commands need Git's selectors.
+# ./dev's container allowlist excludes GIT_*, but its direct mode inherits them.
+clear_selftest_git_env() {
+  for selftest_git_env in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+    unset "$selftest_git_env"
+  done
+  unset selftest_git_env
 }

@@ -223,7 +223,17 @@ about checking what the job did.
 So the AI's job does not end at opening a PR: drive it to the merge. Keep the
 verdict green (fix CI, post a fresh snapshot after every push), and for a PR
 stack, after each merge update the next PR onto `main`, have its diff
-reviewed again and post its snapshot.
+reviewed again and post its snapshot. Branches need not be up to date
+before merging (owner decision 2026-11-02, `docs/remote-acceptance.md`):
+do not update a PR just because `main` moved. When a PR that changes
+`docs/review-contract.md` or `tools/review-gate/` (what the snapshot's
+`contractVersion` covers) merges, re-run the verdict of every open PR
+(`workflow_dispatch` of `acceptance.yml` with the PR number) so they are
+judged under the new contract. When other rules change (this file, the
+other contracts, workflows), look through the open PRs yourself and
+re-review or fix the ones the new rule affects; fixing after the merge is
+fine. Check the daily CI run on `main` for breakage that only the
+combination of PRs causes.
 
 - Never activate a revision of the conditions yourself, including one that
   narrows the scope. Propose it and get human approval. The only thing you
@@ -547,7 +557,7 @@ inside it is fine.
 | `./dev <command>` | Run a command inside the dev image (podman in the ai-box, docker elsewhere, directly in the devcontainer, which is built from the dev image's Dockerfile; NOTE: unverified until the owner rebuilds it, #56). Each call starts a container (about 3.5 s in the ai-box, observed 2026-10-31); chain several commands in one `./dev bash -c '...'` when that matters |
 | `./dev --image-ref` | Print the image this checkout uses (tag = hash of `tools/dev-image/Dockerfile`; published from `main` by `.github/workflows/dev-image.yml`) |
 | `sh tools/review-gate/gate.sh check --scope commit` | Ask the review gate whether the staged diff may be committed |
-| `../dev pnpm run dev` (in `frontend/`) | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker no `-p` is passed, so the server is probably not reachable from the host browser. Check by opening it; until then use the devcontainer on the owner's machine |
+| `../dev pnpm run dev` (in `frontend/`) | Frontend dev server. NOTE: unverified (not opened from a browser through `./dev`). `./dev` publishes no ports by default: under podman in the ai-box the container shares the box's network (`netns = "host"`); under docker `make run-frontend` publishes it on the host's `127.0.0.1:3000` and reaches the backend started by `make run-backend` by name (`TRIARY_DEV_PUBLISH` / `TRIARY_DEV_NAME` in `./dev`; README "Setup"). Use the make targets to run the app |
 
 ## devcontainer and local infra
 

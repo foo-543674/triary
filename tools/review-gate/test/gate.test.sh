@@ -1,4 +1,11 @@
 #!/bin/sh
+# Hooks export repository selectors that must never reach fixture repositories.
+# Extract names only; a newline in a value can add a harmless extra unset.
+for git_test_env in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  unset "$git_test_env"
+done
+unset git_test_env
+
 # Tests of the review gate (gate.sh), the git hooks' use of it and the Claude
 # Code hooks, in throwaway repositories. Needs only git and a POSIX shell,
 # like the gate itself. Run: sh tools/review-gate/test/gate.test.sh
@@ -78,7 +85,60 @@ round() {
 N() { printf 'new\t%s\t%s\tsrc/a.rs\tAGENTS.md rule\tsrc/a.rs:1 evidence\t-\n' "$1" "$2"; }
 U() { printf 'update\t%s\t%s\t%s\t%s\t%s\t-\n' "$1" "$2" "$3" "${4:--}" "${5:--}"; }
 
+# Run the real suite under hook-like environments. Compare all Git metadata,
+# including config, refs, index and the ledger, without Git refreshing the index.
+if [ "${TRIARY_GATE_TEST_NESTED:-0}" != 1 ]; then
+  new_repo sentinel
+  sentinel=$REPO
+  mkdir -p "$sentinel/.git/review-ledger"
+  printf 'sentinel ledger\n' >"$sentinel/.git/review-ledger/ledger.tsv"
+  git worktree add -q -b sentinel-linked "$TMP/sentinel-linked" HEAD || exit 1
+  linked_git_dir=$(git -C "$TMP/sentinel-linked" rev-parse --absolute-git-dir)
+  cp -R "$sentinel/.git" "$TMP/sentinel-before" || exit 1
+  for sentinel_kind in normal linked; do
+    case $sentinel_kind in
+      normal) sentinel_dir=$sentinel/.git; sentinel_tree=$sentinel ;;
+      linked) sentinel_dir=$linked_git_dir; sentinel_tree=$TMP/sentinel-linked ;;
+    esac
+    expect 0 "$sentinel_kind: inherited hook environment is isolated" env \
+      TRIARY_GATE_TEST_NESTED=1 GIT_DIR="$sentinel_dir" \
+      GIT_INDEX_FILE="$sentinel_dir/index" GIT_WORK_TREE="$sentinel_tree" \
+      GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.bare GIT_CONFIG_VALUE_0=true \
+      sh "$HERE/gate.test.sh"
+    expect 0 "$sentinel_kind: all sentinel Git metadata is byte-identical" \
+      diff -r "$TMP/sentinel-before" "$sentinel/.git"
+  done
+fi
+
 # ---- check ----------------------------------------------------------------------
+
+# Exercise the real Rust hook commands without an engine or language tools.
+# The dev stand-in checks the environment at the entrypoint boundary, where
+# dev's SQLX_OFFLINE allowlist forwards it to the container.
+new_repo rust-offline
+mkdir -p backend
+cat >dev <<'EOF'
+#!/bin/sh
+[ "${SQLX_OFFLINE:-}" = true ] || exit 90
+printf '%s\n' "$*" >>"$RUST_HOOK_LOG"
+exit "${RUST_HOOK_STATUS:-0}"
+EOF
+chmod +x dev
+export RUST_HOOK_LOG="$TMP/rust-hook.log"
+rust_hook() (
+  . "$SRC/.githooks/lib.sh"
+  SQLX_OFFLINE=false
+  export SQLX_OFFLINE
+  "$1"
+)
+expect 0 "Rust lint forces offline mode over caller settings" rust_hook run_rust_lint
+expect 0 "Rust tests force offline mode over caller settings" rust_hook run_rust_tests
+expect 0 "lint still runs fmt and strict clippy" grep -Fx 'bash -c cargo fmt --all -- --check && cargo clippy --locked --all-targets --all-features --quiet -- -D warnings' "$RUST_HOOK_LOG"
+expect 0 "tests still run the full nextest suite" grep -Fx 'cargo nextest run --locked --all-features --no-tests=pass' "$RUST_HOOK_LOG"
+export RUST_HOOK_STATUS=7
+expect 7 "Rust lint propagates failure" rust_hook run_rust_lint
+expect 7 "Rust tests propagate failure" rust_hook run_rust_tests
+unset RUST_HOOK_STATUS RUST_HOOK_LOG
 
 new_repo check
 expect 1 "no ledger: commit is blocked" gate check --scope commit
@@ -170,6 +230,7 @@ accept() {
 }
 expect 1 "case 4: acceptance waits for the decision" accept "$TMP/snapshot.md"
 contains "case 4 acceptance" "F1 awaits a human decision (#7)"
+contains "decision next action" "next: answer and close the referenced decision issue"
 contains "decisions are listed" "decision$TAB#3"
 contains "awaited decisions are listed" "decision$TAB#7"
 
@@ -181,8 +242,10 @@ grep -q "^finding$TAB" "$TMP/snapshot.md" && ng "resolved findings are left out 
 sed "s/^pr${TAB}5\$/pr${TAB}6/" "$TMP/snapshot.md" >"$TMP/edited.md"
 expect 1 "an edited snapshot is rejected" accept "$TMP/edited.md"
 contains "edited" "content hash mismatch"
+contains "edited next action" "post a fresh snapshot with gate.sh snapshot after the last push"
 expect 1 "no snapshot is rejected" accept /dev/null
 contains "no snapshot" "no review ledger snapshot found"
+contains "missing next action" "have the current diff reviewed"
 tr -d '\r' <"$TMP/snapshot.md" | sed 's/$/\r/' >"$TMP/crlf.md"
 expect 0 "a snapshot with CRLF line ends (as GitHub may return it) is accepted" accept "$TMP/crlf.md"
 
@@ -190,6 +253,7 @@ printf 'five\n' >>a.txt
 git commit -q -am more
 expect 1 "a snapshot for an older head is rejected" accept "$TMP/snapshot.md"
 contains "stale head" "snapshot head is"
+contains "stale next action" "post a fresh snapshot with gate.sh snapshot after the last push"
 
 # ---- git hooks: the index git commits is what is checked ------------------------------
 

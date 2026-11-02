@@ -7,6 +7,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertLedger, migrateLedger } from '../src/migrate-ledger.ts';
 
+// Fixture Git commands must also be isolated when ./dev runs in direct mode.
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith('GIT_')) delete process.env[name];
+}
+
 const finding = (id: string, status: string) => ({
   id, severity: 'critical', status, paths: ['a', 'b'], reviewedDiffHash: 'old',
   basis: 'rule\twith\nlines\rhere', evidence: 'evidence',
