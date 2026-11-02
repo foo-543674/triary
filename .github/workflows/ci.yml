@@ -5,6 +5,15 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Branches need not be up to date before merging (owner decision
+  # 2026-11-02, docs/remote-acceptance.md), and merges made by the automerge
+  # job (GITHUB_TOKEN) start no push run. The daily run on main catches a
+  # breakage that only the combination of separately green PRs causes;
+  # workflow_dispatch runs it on demand. Scheduled runs use the default
+  # branch.
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 # The token is read-only. Once GitHub Actions may approve pull requests
 # (needed to auto-merge Dependabot updates, #43), a writable token reachable
