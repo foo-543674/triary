@@ -191,6 +191,75 @@ describe("./dev entrypoint", () => {
     assert.ok(!call.some((word) => word.includes("GH_TOKEN")));
   });
 
+  it("reports how commands run", () => {
+    assert.equal(runDev(["--engine"], { fake: { engines: ["docker"] } }).stdout.trim(), "docker");
+    assert.equal(runDev(["--engine"], { fake: { engines: ["docker", "podman"] } }).stdout.trim(), "podman");
+    assert.equal(
+      runDev(["--engine"], { env: { TRIARY_DEV_DIRECT: "1" }, fake: { engines: ["docker"] } }).stdout.trim(),
+      "direct",
+    );
+  });
+
+  it("publishes the requested ports on the host's loopback and names the docker container", () => {
+    const call = runCall(
+      runDev(["pnpm", "run", "dev"], {
+        env: { TRIARY_DEV_PUBLISH: "3000 3001", TRIARY_DEV_NAME: "triary-backend" },
+        fake: { engines: ["docker"] },
+      }),
+    );
+    const published = call.flatMap((word, i) => (word === "--publish" ? [call[i + 1]] : []));
+    assert.deepEqual(published, ["127.0.0.1:3000:3000", "127.0.0.1:3001:3001"]);
+    assert.equal(call[call.indexOf("--name") + 1], "triary-backend");
+  });
+
+  it("does not publish ports or name the container under podman (it shares the host network)", () => {
+    const call = runCall(
+      runDev(["pnpm", "run", "dev"], {
+        env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_NAME: "triary-backend" },
+        fake: { engines: ["podman"] },
+      }),
+    );
+    assert.ok(!call.includes("--publish"));
+    assert.ok(!call.includes("--name"));
+  });
+
+  it("publishes on every interface when asked", () => {
+    const call = runCall(
+      runDev(["pnpm", "run", "dev"], {
+        env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_PUBLISH_ADDRESS: "0.0.0.0" },
+        fake: { engines: ["docker"] },
+      }),
+    );
+    assert.equal(call[call.indexOf("--publish") + 1], "0.0.0.0:3000:3000");
+  });
+
+  it("refuses any other publish address", () => {
+    const run = runDev(["pnpm", "run", "dev"], {
+      env: { TRIARY_DEV_PUBLISH: "3000", TRIARY_DEV_PUBLISH_ADDRESS: "192.168.0.1" },
+      fake: { engines: ["docker"] },
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /use 127\.0\.0\.1 or 0\.0\.0\.0/);
+    assert.ok(!run.calls.some((words) => words[1] === "run"));
+  });
+
+  it("refuses a published port that is not a number", () => {
+    const run = runDev(["pnpm", "run", "dev"], {
+      env: { TRIARY_DEV_PUBLISH: "0.0.0.0:3000" },
+      fake: { engines: ["docker"] },
+    });
+    assert.notEqual(run.status, 0);
+    assert.match(run.stderr, /not a port number/);
+    assert.ok(!run.calls.some((words) => words[1] === "run"));
+  });
+
+  it("passes the backend origin to the dev server", () => {
+    const call = runCall(
+      runDev(["pnpm", "run", "dev"], { env: { BACKEND_ORIGIN: "http://triary-backend:8080" }, fake: { engines: ["docker"] } }),
+    );
+    assert.ok(call.includes("BACKEND_ORIGIN"));
+  });
+
   it("stops inside the container when the repository is not visible there", () => {
     const call = runCall(runDev(["cargo", "test"], { fake: { engines: ["podman"] } }));
     const script = call[call.indexOf("-c") + 1] ?? "";
