@@ -11,7 +11,14 @@ include .env
 export
 endif
 
-COMPOSE := docker compose
+# The project name, compose file and project directory are pinned, so an
+# inherited COMPOSE_PROJECT_NAME / COMPOSE_FILE or the caller's directory
+# cannot point the infra targets (including infra-reset's `down -v`) at
+# another project. The name is fixed to "triary" because docker-compose.yml
+# already fixes the container names, so every checkout shares one stack.
+# CURDIR is where make runs this Makefile (the repository root, or the
+# directory given to `make -C`).
+COMPOSE := docker compose -p triary --project-directory "$(CURDIR)" -f "$(CURDIR)/docker-compose.yml"
 
 # Language commands run in the dev image through ./dev (tools/dev-image/);
 # they are not installed on the calling machine. The review gate

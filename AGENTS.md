@@ -400,7 +400,8 @@ hand them over together, with:
    reviewed, record the ruling and close the issue.
 
 Do not do these before the ruling: irreversible operations, anything that
-affects the user's working environment, external effects (publishing,
+reaches beyond this project's disposable local environment (see "Stop and
+confirm first"), external effects (publishing,
 sending, deploying, production), relaxing rules / acceptance criteria /
 verifiers. Commits and pushes to work branches and filing decision requests
 are fine. Read from the workflow trigger definitions on 2026-10-31 (not
@@ -419,10 +420,18 @@ GitHub would not stop you.
   confirmation as long as the vetting and ledger procedure in
   `docs/dependency-policy.md` is followed (#65, owner decision 2026-11-01);
   the verifier still sends young versions to the owner
-- Operations that affect the user's working environment (stopping or
-  recreating containers, deleting volumes, rewriting branch history). Before
-  deciding "it's only for verification", observe whether you actually started
-  it yourself
+- Operations that cannot be rebuilt or that reach beyond this project:
+  machine-wide cleanup (`docker system prune`, `docker volume prune`),
+  deleting or rewriting remote branches, secrets and variables, releases,
+  repository settings, disabling workflows. This project's local
+  environment (its containers, volumes, databases, local branches and work
+  trees) is disposable and rebuilt when broken: stop, recreate, reset or
+  delete it as the work needs without asking (owner decision 2026-11-03),
+  through `make infra-*`, which pins this checkout's compose file. Other
+  projects share the same container engine, so raw `docker compose`
+  lifecycle commands and removal by name still ask.
+  The exception is another session's uncommitted work: do not force-remove
+  a work tree you did not create
 - Changes to layer structure or architecture rules
 - Breaking changes to the OpenAPI schema or any `/api/v1/*` endpoint
 - Authentication / authorization / cryptography decisions
