@@ -1,7 +1,7 @@
 //! Argon2id password hashing (architecture.md "認証・セッション方針").
 
 use argon2::password_hash::{
-    PasswordHash as PhcString, PasswordHasher as _, PasswordVerifier as _, SaltString,
+    PasswordHasher as _, PasswordVerifier as _, phc::PasswordHash as PhcString,
 };
 use argon2::{Algorithm, Argon2, Params, Version};
 
@@ -40,10 +40,8 @@ impl PasswordHasher for Argon2idHasher {
         // A 128-bit salt from the OS CSPRNG (the length argon2 recommends).
         let mut salt = [0u8; 16];
         getrandom::fill(&mut salt).map_err(|error| PasswordHashingFailed(error.to_string()))?;
-        let salt = SaltString::encode_b64(&salt)
-            .map_err(|error| PasswordHashingFailed(error.to_string()))?;
         self.argon2
-            .hash_password(password.expose().as_bytes(), &salt)
+            .hash_password_with_salt(password.expose().as_bytes(), &salt)
             .map(|phc| PasswordHash::new(phc.to_string()))
             .map_err(|error| PasswordHashingFailed(error.to_string()))
     }
@@ -99,6 +97,17 @@ mod tests {
             &password("any password"),
             &PasswordHash::new(DUMMY_HASH.into())
         ));
+    }
+
+    /// Hashes stored before the argon2 0.6 update must keep verifying.
+    /// Generated on 2026-11-03 by this hasher built with argon2 0.5.3.
+    #[test]
+    fn verifies_a_hash_made_by_argon2_0_5() {
+        const STORED: &str = "$argon2id$v=19$m=19456,t=2,p=1$aKEKfTuyIzfyznvRpi7zBw$uJpEFI46r0voYS4wJu7ZN3pAFZSK+PrNVmuNXW6Does";
+        let hasher = Argon2idHasher::new();
+        let stored = PasswordHash::new(STORED.into());
+        assert!(hasher.verify(&password("hashed by argon2 0.5.3"), &stored));
+        assert!(!hasher.verify(&password("hashed by argon2 0.5.4"), &stored));
     }
 
     #[test]
